@@ -2,24 +2,28 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
-     * Seed the application's database.
+     * Urutan seeder PENTING karena ada FK dependencies:
+     * 1. SystemSetting, IndustrySector, SalaryRange — tidak ada FK
+     * 2. Faculty — tidak ada FK
+     * 3. StudyProgram — FK ke faculty
+     * 4. GraduationYear — tidak ada FK
+     * 5. SuperadminSeeder — users table
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            SystemSettingSeeder::class,
+            IndustrySectorSeeder::class,
+            SalaryRangeSeeder::class,
+            FacultySeeder::class,
+            StudyProgramSeeder::class,
+            GraduationYearSeeder::class,
+            SuperadminSeeder::class,
         ]);
     }
 }
