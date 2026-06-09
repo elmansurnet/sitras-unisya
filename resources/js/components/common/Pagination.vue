@@ -1,153 +1,81 @@
 <script setup>
-/**
- * Pagination.vue
- * Task 2A.18 | Sesuai 06_UI_UX.md Design System
- */
-import { computed } from 'vue'
-
 const props = defineProps({
-  currentPage:  { type: Number, required: true },
-  lastPage:     { type: Number, required: true },
-  perPage:      { type: Number, default: 15 },
-  total:        { type: Number, default: 0 },
-  from:         { type: Number, default: 0 },
-  to:           { type: Number, default: 0 },
-  loading:      { type: Boolean, default: false },
-  maxVisible:   { type: Number, default: 5 },
+  currentPage: { type: Number, required: true },
+  lastPage: { type: Number, required: true },
+  total: { type: Number, default: 0 },
+  perPage: { type: Number, default: 15 },
+  loading: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['page-change'])
+const emit = defineEmits(['change'])
 
-const pages = computed(() => {
-  const { currentPage: cur, lastPage: last, maxVisible: max } = props
-  if (last <= max) return Array.from({ length: last }, (_, i) => i + 1)
+function pages() {
+  const range = []
+  const delta = 2
+  const left = Math.max(1, props.currentPage - delta)
+  const right = Math.min(props.lastPage, props.currentPage + delta)
 
-  const half   = Math.floor(max / 2)
-  let start    = Math.max(1, cur - half)
-  let end      = start + max - 1
+  for (let i = left; i <= right; i++) range.push(i)
 
-  if (end > last) {
-    end   = last
-    start = Math.max(1, end - max + 1)
-  }
+  if (left > 2) range.unshift('...')
+  if (left > 1) range.unshift(1)
+  if (right < props.lastPage - 1) range.push('...')
+  if (right < props.lastPage) range.push(props.lastPage)
 
-  const list = []
-  if (start > 1) { list.push(1); if (start > 2) list.push('...') }
-  for (let i = start; i <= end; i++) list.push(i)
-  if (end < last) { if (end < last - 1) list.push('...'); list.push(last) }
-  return list
-})
-
-function go(page) {
-  if (
-    typeof page !== 'number' ||
-    page < 1 ||
-    page > props.lastPage ||
-    page === props.currentPage ||
-    props.loading
-  ) return
-  emit('page-change', page)
+  return range
 }
+
+const from = () => (props.currentPage - 1) * props.perPage + 1
+const to = () => Math.min(props.currentPage * props.perPage, props.total)
 </script>
 
 <template>
-  <nav
-    v-if="lastPage > 1"
-    class="pagination"
-    aria-label="Navigasi halaman"
-  >
-    <!-- Info -->
-    <span class="pagination-info">
-      {{ from }}–{{ to }} dari {{ total }}
+  <div v-if="lastPage > 0" class="flex items-center justify-between flex-wrap gap-3 py-3 px-1 text-sm text-[var(--color-text-muted)]">
+    <span>
+      Menampilkan <strong class="text-[var(--color-text)]">{{ from() }}–{{ to() }}</strong> dari
+      <strong class="text-[var(--color-text)]">{{ total }}</strong> data
     </span>
 
-    <!-- Controls -->
-    <div class="pagination-controls">
-      <!-- Prev -->
+    <nav class="flex items-center gap-1" aria-label="Pagination">
       <button
-        type="button"
-        class="pg-btn"
-        :disabled="currentPage === 1 || loading"
+        class="w-8 h-8 flex items-center justify-center rounded-md border border-[var(--color-border)] hover:bg-[var(--color-surface-offset)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        :disabled="currentPage <= 1 || loading"
+        @click="emit('change', currentPage - 1)"
         aria-label="Halaman sebelumnya"
-        @click="go(currentPage - 1)"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-          <path d="M15 18l-6-6 6-6"/>
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
 
-      <!-- Pages -->
-      <template v-for="p in pages" :key="typeof p === 'string' ? `dots-${p}` : p">
-        <span v-if="p === '...'" class="pg-dots" aria-hidden="true">…</span>
+      <template v-for="p in pages()" :key="p">
+        <span v-if="p === '...'" class="w-8 h-8 flex items-center justify-center text-[var(--color-text-faint)]">…</span>
         <button
           v-else
-          type="button"
-          class="pg-btn"
-          :class="{ 'pg-btn--active': p === currentPage }"
-          :aria-label="`Halaman ${p}`"
-          :aria-current="p === currentPage ? 'page' : undefined"
+          class="w-8 h-8 flex items-center justify-center rounded-md border text-sm font-medium transition-colors"
+          :class="
+            p === currentPage
+              ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
+              : 'border-[var(--color-border)] hover:bg-[var(--color-surface-offset)]'
+          "
           :disabled="loading"
-          @click="go(p)"
+          @click="emit('change', p)"
+          :aria-current="p === currentPage ? 'page' : undefined"
         >
           {{ p }}
         </button>
       </template>
 
-      <!-- Next -->
       <button
-        type="button"
-        class="pg-btn"
-        :disabled="currentPage === lastPage || loading"
+        class="w-8 h-8 flex items-center justify-center rounded-md border border-[var(--color-border)] hover:bg-[var(--color-surface-offset)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        :disabled="currentPage >= lastPage || loading"
+        @click="emit('change', currentPage + 1)"
         aria-label="Halaman berikutnya"
-        @click="go(currentPage + 1)"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-          <path d="M9 18l6-6-6-6"/>
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
         </svg>
       </button>
-    </div>
-  </nav>
+    </nav>
+  </div>
 </template>
-
-<style scoped>
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  padding-top: var(--space-4);
-}
-.pagination-info { font-size: var(--text-sm); color: var(--color-text-muted); }
-.pagination-controls { display: flex; align-items: center; gap: var(--space-1); }
-
-.pg-btn {
-  min-width: 32px; height: 32px;
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  transition: background var(--transition-interactive), color var(--transition-interactive),
-              border-color var(--transition-interactive);
-}
-.pg-btn:hover:not(:disabled) {
-  background: var(--color-surface-offset);
-  color: var(--color-text);
-  border-color: var(--color-primary);
-}
-.pg-btn--active {
-  background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
-  font-weight: 600;
-  cursor: default;
-}
-.pg-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.pg-dots { padding: 0 var(--space-1); color: var(--color-text-faint); font-size: var(--text-sm); }
-</style>
