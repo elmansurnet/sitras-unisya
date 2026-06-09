@@ -1,42 +1,56 @@
 <script setup>
-/**
- * Toast.vue — Toast notification container
- * Task 2A.21 | Sesuai 06_UI_UX.md Design System
- * Digunakan bersama composable useToast.js
- */
 import { useToast } from '@/composables/useToast'
 
-const { toasts, remove } = useToast()
+const { toasts, dismiss } = useToast()
 
-const ICONS = {
-  success: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`,
-  error:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
-  warning: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
-  info:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+const iconMap = {
+  success: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>`,
+  error: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>`,
+  warning: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>`,
+  info: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+}
+
+const colorMap = {
+  success: 'bg-[var(--color-success-highlight)] text-[var(--color-success)] border-[var(--color-success)]',
+  error: 'bg-[var(--color-error-highlight)] text-[var(--color-error)] border-[var(--color-error)]',
+  warning: 'bg-[var(--color-warning-highlight)] text-[var(--color-warning)] border-[var(--color-warning)]',
+  info: 'bg-[var(--color-blue-highlight)] text-[var(--color-blue)] border-[var(--color-blue)]',
 }
 </script>
 
 <template>
   <Teleport to="body">
-    <div class="toast-container" aria-live="polite" aria-atomic="false" role="status">
-      <TransitionGroup name="toast" tag="div" class="toast-list">
+    <div
+      class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 w-80 pointer-events-none"
+      aria-live="polite"
+      aria-label="Notifikasi"
+    >
+      <TransitionGroup
+        enter-active-class="transition duration-300"
+        enter-from-class="opacity-0 translate-x-6"
+        enter-to-class="opacity-100 translate-x-0"
+        leave-active-class="transition duration-200"
+        leave-from-class="opacity-100 translate-x-0"
+        leave-to-class="opacity-0 translate-x-6"
+      >
         <div
-          v-for="t in toasts"
-          :key="t.id"
-          :class="['toast', `toast--${t.type}`]"
+          v-for="toast in toasts"
+          :key="toast.id"
+          :class="[
+            'pointer-events-auto flex items-start gap-3 p-4 rounded-lg border shadow-[var(--shadow-md)]',
+            colorMap[toast.type] ?? colorMap.info,
+          ]"
           role="alert"
         >
-          <span class="toast-icon" v-html="ICONS[t.type] ?? ICONS.info"></span>
-          <span class="toast-msg">{{ t.message }}</span>
+          <span class="flex-shrink-0 mt-0.5" v-html="iconMap[toast.type] ?? iconMap.info" />
+          <p class="flex-1 text-sm font-medium">{{ toast.message }}</p>
           <button
-            type="button"
-            class="toast-close"
-            :aria-label="'Tutup notifikasi'"
-            @click="remove(t.id)"
+            class="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity pointer-events-auto"
+            @click="dismiss(toast.id)"
+            aria-label="Tutup notifikasi"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
@@ -44,51 +58,3 @@ const ICONS = {
     </div>
   </Teleport>
 </template>
-
-<style scoped>
-.toast-container {
-  position: fixed; bottom: var(--space-6); right: var(--space-6);
-  z-index: 2000; display: flex; flex-direction: column; gap: var(--space-2);
-  pointer-events: none;
-  max-width: min(380px, calc(100vw - var(--space-8)));
-}
-.toast-list { display: flex; flex-direction: column; gap: var(--space-2); }
-.toast {
-  display: flex; align-items: flex-start; gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-  pointer-events: all;
-  font-size: var(--text-sm);
-  color: var(--color-text);
-  min-width: 260px;
-}
-.toast-icon { flex-shrink: 0; margin-top: 1px; }
-.toast-msg  { flex: 1; line-height: 1.5; }
-.toast-close {
-  flex-shrink: 0; padding: 2px;
-  color: var(--color-text-faint); cursor: pointer; background: none; border: none;
-  border-radius: var(--radius-sm);
-  transition: color var(--transition-interactive);
-}
-.toast-close:hover { color: var(--color-text); }
-
-/* Variants */
-.toast--success .toast-icon { color: var(--color-success); }
-.toast--error   .toast-icon { color: var(--color-error); }
-.toast--warning .toast-icon { color: var(--color-warning); }
-.toast--info    .toast-icon { color: var(--color-blue); }
-
-/* Transition */
-.toast-enter-active { transition: all 0.22s cubic-bezier(0.16,1,0.3,1); }
-.toast-leave-active { transition: all 0.18s ease; }
-.toast-enter-from   { opacity: 0; transform: translateX(20px); }
-.toast-leave-to     { opacity: 0; transform: translateX(20px); }
-.toast-move         { transition: transform 0.2s ease; }
-
-@media (prefers-reduced-motion: reduce) {
-  .toast-enter-active, .toast-leave-active, .toast-move { transition: none; }
-}
-</style>
