@@ -2,55 +2,88 @@
 
 namespace App\Providers;
 
+use App\Models\Alumni;
+use App\Models\Employer;
+use App\Models\SurveyResponse;
 use App\Models\User;
 use App\Observers\AlumniObserver;
 use App\Observers\EmployerObserver;
 use App\Observers\SurveyResponseObserver;
 use App\Observers\UserObserver;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\URL;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
-use Laravel\Sanctum\PersonalAccessToken;
-use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
         //
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
-        // Security: prevent mass assignment vulnerabilities globally
-        Model::shouldBeStrict(!app()->isProduction());
+        $this->registerRateLimiters();
+        $this->registerObservers();
+    }
 
-        // Force HTTPS di production
-        if (app()->isProduction()) {
-            URL::forceScheme('https');
-        }
+    /**
+     * Daftarkan 4 rate limiter sesuai 07_SECURITY.md §7.1
+     *
+     * 1. otp-request : 5 req/menit per IP
+     * 2. auth        : 10 req/menit per IP
+     * 3. api         : 60 req/menit per user (atau 20/menit per IP jika guest)
+     * 4. export      : 5 req per 5 menit per user/IP
+     */
+    private function registerRateLimiters(): void
+    {
+        RateLimiter::for('otp-request', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip())
+                ->response(function () {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Terlalu banyak permintaan OTP. Coba lagi dalam 1 menit.',
+                    ], 429);
+                });
+        });
 
-        // Sanctum custom token model (jika diperlukan di masa depan)
-        // Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+        RateLimiter::for('auth', function (Request $request) {
+            return Limit::perMinute(10)->by($request->ip())
+                ->response(function () {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Terlalu banyak percobaan login. Coba lagi dalam 1 menit.',
+                    ], 429);
+                });
+        });
 
-        // =========================================================================
-        // Register Observers
-        // AlumniObserver    — diisi sesi 2B (model Alumni belum ada)
-        // EmployerObserver  — diisi sesi 2C (model Employer belum ada)
-        // SurveyResponseObserver — diisi sesi 3B
-        // UserObserver      — aktif sekarang
-        // =========================================================================
+        RateLimiter::for('api', function (Request $request) {
+            return $request->user()
+                ? Limit::perMinute(60)->by($request->user()->id)
+                : Limit::perMinute(20)->by($request->ip());
+        });
+
+        RateLimiter::for('export', function (Request $request) {
+            return Limit::perMinutes(5, 5)->by($request->user()?->id ?? $request->ip())
+                ->response(function () {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Batas export tercapai. Coba lagi dalam 5 menit.',
+                    ], 429);
+                });
+        });
+    }
+
+    /**
+     * Daftarkan Eloquent Observers.
+     * Body observer diisi di sesi 2A/2B sesuai catatan di 08_PHASE_TRACKER.md.
+     */
+    private function registerObservers(): void
+    {
+        Alumni::observe(AlumniObserver::class);
+        Employer::observe(EmployerObserver::class);
+        SurveyResponse::observe(SurveyResponseObserver::class);
         User::observe(UserObserver::class);
-
-        // Observer berikut diaktifkan saat model-nya sudah dibuat di sesi terkait:
-        // \App\Models\Alumni::observe(AlumniObserver::class);         // sesi 2B
-        // \App\Models\Employer::observe(EmployerObserver::class);     // sesi 2C
-        // \App\Models\SurveyResponse::observe(SurveyResponseObserver::class); // sesi 3B
     }
 }
