@@ -8,7 +8,12 @@ use Illuminate\Support\Facades\Schema;
  * Migration: alumni_work_histories
  *
  * Skema sesuai 02_DATABASE.md §2.3
- * Relasi ke employers nullable — employer bisa belum terdaftar di sistem.
+ *
+ * CATATAN FK employer_id:
+ * Kolom employer_id (nullable) sudah ada di tabel ini, namun FOREIGN KEY CONSTRAINT
+ * ke tabel employers BELUM ditambahkan di sini karena tabel employers dibuat di sesi 2B.
+ * Constraint FK akan ditambahkan via migration terpisah di sesi 2B:
+ *   2026_06_09_200003_add_fk_employer_to_alumni_work_histories.php
  */
 return new class extends Migration
 {
@@ -20,37 +25,54 @@ return new class extends Migration
 
             // Relasi ke alumni (required)
             $table->unsignedBigInteger('alumni_id');
-            $table->foreign('alumni_id')->references('id')->on('alumni')->cascadeOnDelete();
+            $table->foreign('alumni_id')
+                  ->references('id')
+                  ->on('alumni')
+                  ->cascadeOnDelete();
 
-            // Relasi ke employers (nullable — mungkin belum terdaftar)
+            // Relasi ke employers (nullable — employer mungkin belum terdaftar di sistem)
+            // FK CONSTRAINT ke employers ditambahkan di sesi 2B setelah tabel employers dibuat
             $table->unsignedBigInteger('employer_id')->nullable();
-            $table->foreign('employer_id')->references('id')->on('employers')->nullOnDelete();
 
-            // Data pekerjaan
-            $table->string('company_name', 150);
-            $table->string('position', 100);
-            $table->string('industry', 100)->nullable();
-            $table->string('city', 100)->nullable();
-            $table->string('province', 100)->nullable();
-
-            // Gaji — FK ke salary_ranges nullable
-            $table->unsignedBigInteger('salary_range_id')->nullable();
-            $table->foreign('salary_range_id')->references('id')->on('salary_ranges')->nullOnDelete();
+            // Data pekerjaan — sesuai 02_DATABASE.md §2.3
+            $table->string('company_name', 255);                // VARCHAR(255) sesuai spec
+            $table->string('position', 255);                    // VARCHAR(255) sesuai spec
+            $table->string('industry_sector', 100)->nullable(); // nama kolom sesuai spec
+            $table->enum('employment_type', [
+                'penuh_waktu',
+                'paruh_waktu',
+                'kontrak',
+                'freelance',
+                'wirausaha',
+                'magang',
+            ])->nullable();
 
             // Periode kerja
             $table->date('start_date');
-            $table->date('end_date')->nullable(); // null = masih bekerja
-            $table->boolean('is_current')->default(false);
+            $table->date('end_date')->nullable(); // NULL = masih bekerja
+            $table->tinyInteger('is_current')->unsigned()->default(0);
 
-            // Sumber data
-            $table->enum('source', ['alumni', 'admin', 'survey'])->default('alumni');
+            // Lokasi
+            $table->string('city', 100)->nullable();
+            $table->string('province', 100)->nullable();
+            $table->string('country', 100)->nullable();         // kolom sesuai spec
+
+            // Gaji — sesuai spec: VARCHAR(50) kode range, bukan FK
+            $table->string('monthly_salary_range', 50)->nullable(); // contoh: '3_5jt'
+
+            // Relevansi & tunggu kerja
+            $table->tinyInteger('is_relevant_to_study')->unsigned()->nullable(); // 1=ya,0=tidak
+            $table->tinyInteger('waiting_time_months')->unsigned()->nullable();  // bulan tunggu
+
+            // Deskripsi
+            $table->text('description')->nullable();
 
             // Timestamps
             $table->timestamps();
 
             // Index sesuai 02_DATABASE.md §2.3
             $table->index('alumni_id');
-            $table->index('employer_id');
+            $table->index('employer_id'); // index kolom ada, constraint FK menyusul di sesi 2B
             $table->index('is_current');
         });
     }
