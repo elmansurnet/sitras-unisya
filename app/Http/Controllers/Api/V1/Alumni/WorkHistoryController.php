@@ -5,36 +5,17 @@ namespace App\Http\Controllers\Api\V1\Alumni;
 use App\Http\Controllers\Controller;
 use App\Models\Alumni;
 use App\Models\AlumniWorkHistory;
-use App\Models\AuditLog;
-use App\Repositories\AlumniRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
-/**
- * Alumni\WorkHistoryController
- * Endpoint: /api/v1/alumni/work-histories (alumni self-access)
- *           /api/v1/admin/alumni/{alumni}/work-histories (admin read-only)
- */
 class WorkHistoryController extends Controller
 {
-    public function __construct(
-        private readonly AlumniRepository $repo,
-    ) {}
-
-    // ─── GET /api/v1/alumni/work-histories ───────────────────────────────────
-
-    /**
-     * Daftar riwayat pekerjaan milik alumni yang login.
-     */
+    // ─── GET /api/v1/alumni/work-histories ────────────────────────────────────
     public function index(Request $request): JsonResponse
     {
-        $alumni = $this->repo->findByUserId($request->user()->id);
-
-        if (!$alumni) {
-            return $this->alumniNotFound();
-        }
+        $alumni = Alumni::where('user_id', $request->user()->id)->firstOrFail();
 
         $histories = $alumni->workHistories()
             ->orderByDesc('start_date')
@@ -42,230 +23,96 @@ class WorkHistoryController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Riwayat pekerjaan berhasil diambil',
-            'data'    => $histories->map(fn ($wh) => $this->formatWorkHistory($wh))->toArray(),
+            'data'    => $histories,
         ]);
     }
 
-    // ─── GET /api/v1/admin/alumni/{alumni}/work-histories ────────────────────
-
-    /**
-     * Lihat riwayat pekerjaan alumni tertentu (admin view).
-     */
-    public function indexForAdmin(Alumni $alumni): JsonResponse
+    // ─── POST /api/v1/alumni/work-histories ───────────────────────────────────
+    public function store(Request $request): JsonResponse
     {
-        Gate::authorize('view', $alumni);
+        $data = $request->validate($this->rules());
 
-        $histories = $alumni->workHistories()
-            ->orderByDesc('start_date')
-            ->get();
+        $alumni = Alumni::where('user_id', $request->user()->id)->firstOrFail();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Riwayat pekerjaan alumni berhasil diambil',
-            'data'    => $histories->map(fn ($wh) => $this->formatWorkHistory($wh))->toArray(),
-        ]);
-    }
-
-    // ─── POST /api/v1/alumni/work-histories/{alumni} ─────────────────────────
-
-    /**
-     * Tambah riwayat pekerjaan baru.
-     * {alumni} di route diisi dari user yang login (alumni self-access).
-     */
-    public function store(Request $request, Alumni $alumni): JsonResponse
-    {
-        // Alumni hanya bisa tambah riwayat miliknya sendiri
-        if ($request->user()->id !== $alumni->user_id) {
+        // Batasi: maksimal 20 riwayat per alumni
+        if ($alumni->workHistories()->count() >= 20) {
             return response()->json([
-                'success'    => false,
-                'message'    => 'Anda tidak memiliki akses.',
-                'error_code' => 'FORBIDDEN',
-            ], 403);
+                'success' => false,
+                'message' => 'Maksimal 20 riwayat pekerjaan per alumni.',
+            ], 422);
         }
 
-        $validated = $request->validate($this->workHistoryRules());
-
-        // Jika is_current = true, set is_current = false untuk semua record lain
-        if (!empty($validated['is_current'])) {
-            $alumni->workHistories()
-                ->where('is_current', true)
-                ->update(['is_current' => false]);
-        }
-
-        $workHistory = $alumni->workHistories()->create($validated);
-
-        AuditLog::record(
-            action   : 'create',
-            module   : 'work_history',
-            modelId  : $workHistory->id,
-            oldValues: null,
-            newValues: $workHistory->toArray(),
-            modelType: AlumniWorkHistory::class,
-        );
+        $history = $alumni->workHistories()->create(array_merge($data, [
+            'alumni_id' => $alumni->id,
+        ]));
 
         return response()->json([
             'success' => true,
-            'message' => 'Riwayat pekerjaan berhasil ditambahkan',
-            'data'    => $this->formatWorkHistory($workHistory),
+            'message' => 'Riwayat pekerjaan berhasil ditambahkan.',
+            'data'    => $history,
         ], 201);
     }
 
-    // ─── PUT /api/v1/alumni/work-histories/{alumni}/{workHistory} ────────────
-
-    /**
-     * Update riwayat pekerjaan.
-     */
-    public function update(Request $request, Alumni $alumni, AlumniWorkHistory $workHistory): JsonResponse
+    // ─── PUT /api/v1/alumni/work-histories/{workHistory} ──────────────────────
+    public function update(Request $request, AlumniWorkHistory $workHistory): JsonResponse
     {
-        // Pastikan workHistory milik alumni yang benar
+        // Pastikan riwayat ini milik alumni yang sedang login
+        $alumni = Alumni::where('user_id', $request->user()->id)->firstOrFail();
+
         if ($workHistory->alumni_id !== $alumni->id) {
-            return response()->json([
-                'success'    => false,
-                'message'    => 'Data tidak ditemukan.',
-                'error_code' => 'NOT_FOUND',
-            ], 404);
+            abort(403, 'Akses ditolak.');
         }
 
-        // Alumni hanya bisa update miliknya sendiri
-        if ($request->user()->id !== $alumni->user_id) {
-            return response()->json([
-                'success'    => false,
-                'message'    => 'Anda tidak memiliki akses.',
-                'error_code' => 'FORBIDDEN',
-            ], 403);
-        }
-
-        $rules     = $this->workHistoryRules();
-        $rulesOpt  = array_map(fn ($r) => array_merge(['sometimes'], (array) $r), $rules);
-        $validated = $request->validate($rulesOpt);
-
-        $old = $workHistory->toArray();
-
-        if (!empty($validated['is_current'])) {
-            $alumni->workHistories()
-                ->where('id', '!=', $workHistory->id)
-                ->where('is_current', true)
-                ->update(['is_current' => false]);
-        }
-
-        $workHistory->update($validated);
-
-        AuditLog::record(
-            action   : 'update',
-            module   : 'work_history',
-            modelId  : $workHistory->id,
-            oldValues: $old,
-            newValues: $workHistory->fresh()->toArray(),
-            modelType: AlumniWorkHistory::class,
-        );
+        $data = $request->validate($this->rules(update: true));
+        $workHistory->update($data);
 
         return response()->json([
             'success' => true,
-            'message' => 'Riwayat pekerjaan berhasil diperbarui',
-            'data'    => $this->formatWorkHistory($workHistory->fresh()),
+            'message' => 'Riwayat pekerjaan berhasil diperbarui.',
+            'data'    => $workHistory->fresh(),
         ]);
     }
 
-    // ─── DELETE /api/v1/alumni/work-histories/{alumni}/{workHistory} ─────────
-
-    /**
-     * Hapus riwayat pekerjaan.
-     */
-    public function destroy(Request $request, Alumni $alumni, AlumniWorkHistory $workHistory): JsonResponse
+    // ─── DELETE /api/v1/alumni/work-histories/{workHistory} ───────────────────
+    public function destroy(Request $request, AlumniWorkHistory $workHistory): JsonResponse
     {
+        $alumni = Alumni::where('user_id', $request->user()->id)->firstOrFail();
+
         if ($workHistory->alumni_id !== $alumni->id) {
-            return response()->json([
-                'success'    => false,
-                'message'    => 'Data tidak ditemukan.',
-                'error_code' => 'NOT_FOUND',
-            ], 404);
+            abort(403, 'Akses ditolak.');
         }
-
-        if ($request->user()->id !== $alumni->user_id) {
-            return response()->json([
-                'success'    => false,
-                'message'    => 'Anda tidak memiliki akses.',
-                'error_code' => 'FORBIDDEN',
-            ], 403);
-        }
-
-        AuditLog::record(
-            action   : 'delete',
-            module   : 'work_history',
-            modelId  : $workHistory->id,
-            oldValues: $workHistory->toArray(),
-            newValues: null,
-            modelType: AlumniWorkHistory::class,
-        );
 
         $workHistory->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Riwayat pekerjaan berhasil dihapus',
+            'message' => 'Riwayat pekerjaan berhasil dihapus.',
         ]);
     }
-
-    // ─── PRIVATE HELPERS ─────────────────────────────────────────────────────
 
     /**
      * Aturan validasi riwayat pekerjaan.
      *
      * @return array<string,mixed>
      */
-    private function workHistoryRules(): array
+    private function rules(bool $update = false): array
     {
-        return [
-            'company_name'         => ['required', 'string', 'max:255'],
-            'position'             => ['required', 'string', 'max:255'],
-            'employment_type'      => ['nullable', Rule::in(['full_time', 'part_time', 'freelance', 'internship', 'contract'])],
-            'industry_sector'      => ['nullable', 'string', 'max:100'],
-            'job_description'      => ['nullable', 'string', 'max:1000'],
-            'city'                 => ['nullable', 'string', 'max:100'],
-            'province'             => ['nullable', 'string', 'max:100'],
-            'country'              => ['nullable', 'string', 'max:100'],
-            'salary_range_id'      => ['nullable', 'integer', 'exists:salary_ranges,id'],
-            'start_date'           => ['required', 'date'],
-            'end_date'             => ['nullable', 'date', 'after:start_date'],
-            'is_current'           => ['boolean'],
-            'is_relevant_to_study' => ['boolean'],
-            'waiting_months'       => ['nullable', 'integer', 'min:0', 'max:120'],
-        ];
-    }
+        $sometimes = $update ? 'sometimes' : 'required';
 
-    /**
-     * Format output riwayat pekerjaan.
-     *
-     * @return array<string,mixed>
-     */
-    private function formatWorkHistory(AlumniWorkHistory $wh): array
-    {
         return [
-            'id'                   => $wh->id,
-            'company_name'         => $wh->company_name,
-            'position'             => $wh->position,
-            'employment_type'      => $wh->employment_type,
-            'industry_sector'      => $wh->industry_sector,
-            'job_description'      => $wh->job_description,
-            'city'                 => $wh->city,
-            'province'             => $wh->province,
-            'country'              => $wh->country,
-            'salary_range_id'      => $wh->salary_range_id,
-            'start_date'           => $wh->start_date?->toDateString(),
-            'end_date'             => $wh->end_date?->toDateString(),
-            'is_current'           => (bool) $wh->is_current,
-            'is_relevant_to_study' => (bool) $wh->is_relevant_to_study,
-            'waiting_months'       => $wh->waiting_months,
+            'company_name'    => [$sometimes, 'string', 'max:150'],
+            'position'        => [$sometimes, 'string', 'max:100'],
+            'industry_sector_id' => ['nullable', 'integer', 'exists:industry_sectors,id'],
+            'employment_type' => ['nullable', Rule::in(['full_time', 'part_time', 'contract', 'internship', 'freelance'])],
+            'city'            => ['nullable', 'string', 'max:100'],
+            'province'        => ['nullable', 'string', 'max:100'],
+            'country'         => ['nullable', 'string', 'max:100'],
+            'salary_range_id' => ['nullable', 'integer', 'exists:salary_ranges,id'],
+            'start_date'      => [$sometimes, 'date'],
+            'end_date'        => ['nullable', 'date', 'after:start_date'],
+            'is_current'      => ['boolean'],
+            'description'     => ['nullable', 'string', 'max:1000'],
+            'match_with_major'=> ['nullable', Rule::in(['very_relevant', 'relevant', 'less_relevant', 'not_relevant'])],
         ];
-    }
-
-    private function alumniNotFound(): JsonResponse
-    {
-        return response()->json([
-            'success'    => false,
-            'message'    => 'Data alumni tidak ditemukan.',
-            'error_code' => 'ALUMNI_NOT_FOUND',
-        ], 404);
     }
 }

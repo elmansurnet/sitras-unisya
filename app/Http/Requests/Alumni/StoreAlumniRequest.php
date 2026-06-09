@@ -5,16 +5,12 @@ namespace App\Http\Requests\Alumni;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-/**
- * StoreAlumniRequest
- * Validasi untuk POST /api/v1/admin/alumni
- * Sesuai skema tabel alumni di 02_DATABASE.md §2.3
- */
 class StoreAlumniRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() || $this->user()?->isSuperadmin();
+        // Hanya superadmin & admin — dihandle middleware 'role:superadmin,admin'
+        return true;
     }
 
     /**
@@ -23,40 +19,41 @@ class StoreAlumniRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Identitas
-            'nim'                    => ['required', 'string', 'max:20', 'unique:alumni,nim'],
-            'nik'                    => ['nullable', 'string', 'size:16', 'unique:alumni,nik'],
-            'full_name'              => ['required', 'string', 'max:255'],
-            'gender'                 => ['required', Rule::in(['L', 'P'])],
-            'birth_place'            => ['nullable', 'string', 'max:100'],
-            'birth_date'             => ['nullable', 'date', 'before:today'],
-            'religion'               => ['nullable', 'string', 'max:50'],
-            'marital_status'         => ['nullable', Rule::in(['belum_menikah', 'menikah', 'cerai'])],
+            // Akun user
+            'email'             => ['required', 'email:rfc,dns', 'max:150', 'unique:users,email'],
+            'password'          => ['nullable', 'string', 'min:8'],
 
-            // Akademik
-            'study_program_id'       => ['required', 'integer', 'exists:study_programs,id'],
-            'graduation_year_id'     => ['required', 'integer', 'exists:graduation_years,id'],
-            'thesis_title'           => ['nullable', 'string', 'max:500'],
-            'gpa'                    => ['nullable', 'numeric', 'min:0', 'max:4.00'],
-            'graduation_predicate'   => ['nullable', Rule::in(['Memuaskan', 'Sangat Memuaskan', 'Cumlaude'])],
+            // Data pribadi
+            'nim'               => ['required', 'string', 'max:20', 'unique:alumni,nim'],
+            'full_name'         => ['required', 'string', 'max:150'],
+            'nik'               => ['nullable', 'string', 'size:16', 'unique:alumni,nik'],
+            'birth_place'       => ['nullable', 'string', 'max:100'],
+            'birth_date'        => ['nullable', 'date', 'before:today'],
+            'gender'            => ['nullable', Rule::in(['M', 'F'])],
+            'religion'          => ['nullable', 'string', 'max:50'],
+            'phone'             => ['nullable', 'string', 'max:20'],
 
             // Alamat
-            'address_street'         => ['nullable', 'string', 'max:255'],
-            'address_village'        => ['nullable', 'string', 'max:100'],
-            'address_district'       => ['nullable', 'string', 'max:100'],
-            'address_city'           => ['nullable', 'string', 'max:100'],
-            'address_province'       => ['nullable', 'string', 'max:100'],
-            'address_postal_code'    => ['nullable', 'string', 'max:10'],
-            'address_latitude'       => ['nullable', 'numeric', 'min:-90', 'max:90'],
-            'address_longitude'      => ['nullable', 'numeric', 'min:-180', 'max:180'],
+            'address_street'    => ['nullable', 'string', 'max:255'],
+            'address_village'   => ['nullable', 'string', 'max:100'],
+            'address_district'  => ['nullable', 'string', 'max:100'],
+            'city'              => ['nullable', 'string', 'max:100'],
+            'province'          => ['nullable', 'string', 'max:100'],
+            'postal_code'       => ['nullable', 'string', 'max:10'],
+            'latitude'          => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude'         => ['nullable', 'numeric', 'between:-180,180'],
 
-            // Kontak (email & phone di tabel users)
-            'email'                  => ['required', 'email', 'max:255', 'unique:users,email'],
-            'phone'                  => ['nullable', 'string', 'max:20'],
+            // Akademik
+            'study_program_id'  => ['required', 'integer', 'exists:study_programs,id'],
+            'graduation_year_id'=> ['required', 'integer', 'exists:graduation_years,id'],
+            'gpa'               => ['required', 'numeric', 'between:0.00,4.00'],
+            'graduation_predicate' => ['nullable', 'string', 'max:50'],
+            'thesis_title'      => ['nullable', 'string', 'max:500'],
 
-            // Sosial
-            'linkedin_url'           => ['nullable', 'url', 'max:255'],
-            'instagram_url'          => ['nullable', 'url', 'max:255'],
+            // Karir & sosial
+            'employment_status' => ['nullable', Rule::in(['employed', 'self_employed', 'entrepreneur', 'unemployed', 'continuing_study', 'not_seeking'])],
+            'linkedin_url'      => ['nullable', 'url', 'max:255'],
+            'skills'            => ['nullable', 'string'],
         ];
     }
 
@@ -66,13 +63,11 @@ class StoreAlumniRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'nim.unique'           => 'NIM sudah terdaftar.',
-            'nik.size'             => 'NIK harus 16 digit.',
-            'nik.unique'           => 'NIK sudah terdaftar.',
-            'email.unique'         => 'Email sudah digunakan.',
-            'gpa.max'              => 'IPK maksimal 4.00.',
-            'study_program_id.exists' => 'Program studi tidak ditemukan.',
-            'graduation_year_id.exists' => 'Angkatan tidak ditemukan.',
+            'nim.unique'    => 'NIM sudah terdaftar.',
+            'nik.unique'    => 'NIK sudah terdaftar.',
+            'email.unique'  => 'Email sudah terdaftar.',
+            'gpa.between'   => 'IPK harus antara 0.00 hingga 4.00.',
+            'gender.in'     => 'Jenis kelamin harus M atau F.',
         ];
     }
 }

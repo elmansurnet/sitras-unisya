@@ -4,72 +4,59 @@ namespace App\Policies;
 
 use App\Models\Alumni;
 use App\Models\User;
+use Illuminate\Auth\Access\HandlesAuthorization;
 
-/**
- * AlumniPolicy
- * Matriks izin sesuai 07_SECURITY.md §3.3:
- * - viewAny, view, create, update : superadmin, admin
- * - delete                        : superadmin saja
- * - viewOwn, updateOwn            : alumni (pemilik data)
- */
 class AlumniPolicy
 {
+    use HandlesAuthorization;
+
     /**
-     * Superadmin melewati semua gate.
+     * Superadmin & admin selalu bisa melakukan semua aksi.
+     * Alumni hanya bisa akses data diri sendiri.
      */
     public function before(User $user, string $ability): ?bool
     {
-        if ($user->isSuperadmin()) {
+        if ($user->isSuperadmin() || $user->isAdmin()) {
             return true;
         }
-        return null;
+
+        return null; // lanjutkan ke method spesifik
     }
 
     /**
-     * Lihat daftar alumni (admin dashboard).
+     * Lihat daftar alumni (admin only — sudah di-handle `before`).
      */
     public function viewAny(User $user): bool
     {
-        return $user->isAdmin();
+        return false;
     }
 
     /**
-     * Lihat detail alumni tertentu.
-     * Admin bisa lihat semua; alumni hanya bisa lihat miliknya sendiri.
+     * Alumni dapat melihat profil diri sendiri.
      */
     public function view(User $user, Alumni $alumni): bool
     {
-        if ($user->isAdmin()) {
-            return true;
-        }
-
         return $user->id === $alumni->user_id;
     }
 
     /**
-     * Tambah alumni baru (admin only).
+     * Hanya admin yang bisa membuat alumni baru.
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return false;
     }
 
     /**
-     * Update data alumni.
-     * Admin bisa update semua; alumni hanya miliknya sendiri.
+     * Alumni hanya bisa update profil diri sendiri.
      */
     public function update(User $user, Alumni $alumni): bool
     {
-        if ($user->isAdmin()) {
-            return true;
-        }
-
         return $user->id === $alumni->user_id;
     }
 
     /**
-     * Hapus alumni — superadmin saja (ditangani before() untuk superadmin).
-     * Admin dan alumni tidak boleh.
+     * Hanya admin yang bisa delete alumni (handled by before()).
      */
     public function delete(User $user, Alumni $alumni): bool
     {
@@ -77,38 +64,10 @@ class AlumniPolicy
     }
 
     /**
-     * Import alumni massal (admin).
-     */
-    public function import(User $user): bool
-    {
-        return $user->isAdmin();
-    }
-
-    /**
-     * Export alumni (admin).
-     */
-    public function export(User $user): bool
-    {
-        return $user->isAdmin();
-    }
-
-    /**
-     * Upload foto profil — alumni miliknya sendiri atau admin.
+     * Upload foto: alumni hanya bisa upload foto diri sendiri.
      */
     public function uploadPhoto(User $user, Alumni $alumni): bool
     {
-        if ($user->isAdmin()) {
-            return true;
-        }
-
         return $user->id === $alumni->user_id;
-    }
-
-    /**
-     * Kirim undangan survei ke alumni (admin).
-     */
-    public function sendInvitation(User $user): bool
-    {
-        return $user->isAdmin();
     }
 }

@@ -5,18 +5,11 @@ namespace App\Http\Requests\Alumni;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-/**
- * UpdateAlumniRequest
- * Validasi untuk PUT /api/v1/admin/alumni/{id}
- * Semua field opsional; unique check ignore record saat ini.
- */
 class UpdateAlumniRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Admin update semua; alumni update miliknya sendiri (dicek di policy)
-        $user = $this->user();
-        return $user?->isAdmin() || $user?->isSuperadmin() || $user?->role === 'alumni';
+        return true;
     }
 
     /**
@@ -24,60 +17,52 @@ class UpdateAlumniRequest extends FormRequest
      */
     public function rules(): array
     {
-        // Ambil id alumni dari route parameter
-        $alumniId = $this->route('alumni')?->id ?? $this->route('alumni');
+        // Ambil alumni dari route parameter (bisa berupa Alumni model atau integer)
+        $alumniId = $this->route('alumni') instanceof \App\Models\Alumni
+            ? $this->route('alumni')->id
+            : (int) $this->route('alumni');
 
-        // Cari user_id dari record alumni untuk unique check di tabel users
-        $userId = null;
-        if ($alumniId) {
-            $alumni  = \App\Models\Alumni::find($alumniId);
-            $userId  = $alumni?->user_id;
-        }
+        // Jika alumni adalah alumni yang sedang login, ambil ID-nya dari alumniId milik user
+        // Fallback: gunakan ID dari route
+        $userId = $this->user()?->id;
 
         return [
-            'nim'                    => ['sometimes', 'string', 'max:20', Rule::unique('alumni', 'nim')->ignore($alumniId)],
-            'nik'                    => ['sometimes', 'nullable', 'string', 'size:16', Rule::unique('alumni', 'nik')->ignore($alumniId)],
-            'full_name'              => ['sometimes', 'string', 'max:255'],
-            'gender'                 => ['sometimes', Rule::in(['L', 'P'])],
-            'birth_place'            => ['sometimes', 'nullable', 'string', 'max:100'],
-            'birth_date'             => ['sometimes', 'nullable', 'date', 'before:today'],
-            'religion'               => ['sometimes', 'nullable', 'string', 'max:50'],
-            'marital_status'         => ['sometimes', 'nullable', Rule::in(['belum_menikah', 'menikah', 'cerai'])],
+            // Email opsional saat update — uniqueness dikecualikan record ini
+            'email'             => ['sometimes', 'email:rfc', 'max:150', Rule::unique('users', 'email')->ignore($this->user()?->id)],
 
-            'study_program_id'       => ['sometimes', 'integer', 'exists:study_programs,id'],
-            'graduation_year_id'     => ['sometimes', 'integer', 'exists:graduation_years,id'],
-            'thesis_title'           => ['sometimes', 'nullable', 'string', 'max:500'],
-            'gpa'                    => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:4.00'],
-            'graduation_predicate'   => ['sometimes', 'nullable', Rule::in(['Memuaskan', 'Sangat Memuaskan', 'Cumlaude'])],
+            // Data pribadi (semua optional di update)
+            'full_name'         => ['sometimes', 'string', 'max:150'],
+            'nik'               => ['sometimes', 'nullable', 'string', 'size:16', Rule::unique('alumni', 'nik')->ignore($alumniId)],
+            'birth_place'       => ['sometimes', 'nullable', 'string', 'max:100'],
+            'birth_date'        => ['sometimes', 'nullable', 'date', 'before:today'],
+            'gender'            => ['sometimes', 'nullable', Rule::in(['M', 'F'])],
+            'religion'          => ['sometimes', 'nullable', 'string', 'max:50'],
+            'phone'             => ['sometimes', 'nullable', 'string', 'max:20'],
 
-            'address_street'         => ['sometimes', 'nullable', 'string', 'max:255'],
-            'address_village'        => ['sometimes', 'nullable', 'string', 'max:100'],
-            'address_district'       => ['sometimes', 'nullable', 'string', 'max:100'],
-            'address_city'           => ['sometimes', 'nullable', 'string', 'max:100'],
-            'address_province'       => ['sometimes', 'nullable', 'string', 'max:100'],
-            'address_postal_code'    => ['sometimes', 'nullable', 'string', 'max:10'],
-            'address_latitude'       => ['sometimes', 'nullable', 'numeric', 'min:-90', 'max:90'],
-            'address_longitude'      => ['sometimes', 'nullable', 'numeric', 'min:-180', 'max:180'],
+            // Alamat
+            'address_street'    => ['sometimes', 'nullable', 'string', 'max:255'],
+            'address_village'   => ['sometimes', 'nullable', 'string', 'max:100'],
+            'address_district'  => ['sometimes', 'nullable', 'string', 'max:100'],
+            'city'              => ['sometimes', 'nullable', 'string', 'max:100'],
+            'province'          => ['sometimes', 'nullable', 'string', 'max:100'],
+            'postal_code'       => ['sometimes', 'nullable', 'string', 'max:10'],
+            'latitude'          => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
+            'longitude'         => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
 
-            'email'                  => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($userId)],
-            'phone'                  => ['sometimes', 'nullable', 'string', 'max:20'],
+            // Akademik — admin bisa update, alumni tidak bisa ubah nim/gpa
+            'study_program_id'  => ['sometimes', 'integer', 'exists:study_programs,id'],
+            'graduation_year_id'=> ['sometimes', 'integer', 'exists:graduation_years,id'],
+            'gpa'               => ['sometimes', 'numeric', 'between:0.00,4.00'],
+            'graduation_predicate' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'thesis_title'      => ['sometimes', 'nullable', 'string', 'max:500'],
 
-            'linkedin_url'           => ['sometimes', 'nullable', 'url', 'max:255'],
-            'instagram_url'          => ['sometimes', 'nullable', 'url', 'max:255'],
-        ];
-    }
+            // Karir & sosial
+            'employment_status' => ['sometimes', 'nullable', Rule::in(['employed', 'self_employed', 'entrepreneur', 'unemployed', 'continuing_study', 'not_seeking'])],
+            'linkedin_url'      => ['sometimes', 'nullable', 'url', 'max:255'],
+            'skills'            => ['sometimes', 'nullable', 'string'],
 
-    /**
-     * @return array<string,string>
-     */
-    public function messages(): array
-    {
-        return [
-            'nim.unique'   => 'NIM sudah digunakan alumni lain.',
-            'nik.size'     => 'NIK harus 16 digit.',
-            'nik.unique'   => 'NIK sudah digunakan alumni lain.',
-            'email.unique' => 'Email sudah digunakan.',
-            'gpa.max'      => 'IPK maksimal 4.00.',
+            // Admin-only fields
+            'is_active'         => ['sometimes', 'boolean'],
         ];
     }
 }

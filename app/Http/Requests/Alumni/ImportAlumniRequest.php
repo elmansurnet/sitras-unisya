@@ -3,18 +3,12 @@
 namespace App\Http\Requests\Alumni;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
-/**
- * ImportAlumniRequest
- * Validasi untuk POST /api/v1/admin/alumni/import
- * File: .xlsx/.csv max 10MB sesuai 05_API.md §3.6
- */
 class ImportAlumniRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() || $this->user()?->isSuperadmin();
+        return true;
     }
 
     /**
@@ -26,11 +20,13 @@ class ImportAlumniRequest extends FormRequest
             'file' => [
                 'required',
                 'file',
-                'mimes:xlsx,csv,xls',
-                'max:10240', // 10 MB
+                // Max 5MB
+                'max:5120',
+                // Validasi MIME type eksplisit (OWASP A01: broken access control)
+                'mimes:xlsx,xls,csv',
+                // Validasi MIME type di level konten (bukan hanya ekstensi)
+                'mimetypes:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain',
             ],
-            'study_program_id'   => ['nullable', 'integer', 'exists:study_programs,id'],
-            'graduation_year_id' => ['nullable', 'integer', 'exists:graduation_years,id'],
         ];
     }
 
@@ -40,9 +36,10 @@ class ImportAlumniRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'file.required' => 'File import wajib diupload.',
-            'file.mimes'    => 'File harus berformat .xlsx, .xls, atau .csv.',
-            'file.max'      => 'Ukuran file maksimal 10 MB.',
+            'file.required'  => 'File import wajib diunggah.',
+            'file.mimes'     => 'Format file harus xlsx, xls, atau csv.',
+            'file.max'       => 'Ukuran file maksimal 5MB.',
+            'file.mimetypes' => 'Tipe konten file tidak valid.',
         ];
     }
 }
