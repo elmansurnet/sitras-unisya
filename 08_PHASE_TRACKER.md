@@ -1,6 +1,6 @@
 # 08_PHASE_TRACKER.md
 # PHASE TRACKER — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.3 | Tanggal: 2026-06-09
+# Versi: 1.0.4 | Tanggal: 2026-06-09
 
 ---
 
@@ -9,7 +9,7 @@
 | Fase | Nama | Sesi | Status |
 |---|---|---|---|
 | 0 | Dokumentasi & Desain | 0A | ✅ Selesai |
-| 1 | Fondasi & Autentikasi | 1A, 1B | ⏳ Pending |
+| 1 | Fondasi & Autentikasi | 1A, 1B | 🔄 Berjalan (1A ✅) |
 | 2 | Manajemen Data Inti | 2A, 2B, 2C | ⏳ Pending |
 | 3 | Kuesioner Dinamis | 3A, 3B | ⏳ Pending |
 | 4 | Survei & Notifikasi | 4A, 4B | ⏳ Pending |
@@ -18,7 +18,7 @@
 | 7 | Deployment & Optimasi | 7A | ⏳ Pending |
 
 **Total Task: 199 task**
-**Selesai: 0 task** *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
+**Selesai: 19 task** *(1A.1–1A.19 selesai 2026-06-09)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
 
 ---
 
@@ -57,32 +57,33 @@
 ## FASE 1 — FONDASI & AUTENTIKASI
 
 ### Sesi 1A — Setup Proyek & Database
+**Status: ✅ Selesai | Tanggal Selesai: 2026-06-09**
 **Dependensi:** Fase 0 selesai
 **Estimasi:** 2–3 hari
 
 | No | Task | File/Artefak | Status |
 |---|---|---|---|
-| 1A.1 | Install Laravel 12 + konfigurasi awal (`composer create-project`) | — | ⏳ |
-| 1A.2 | Install & konfigurasi Vue 3 + Vite + TailwindCSS + dependensi frontend | `package.json`, `vite.config.js`, `tailwind.config.js` | ⏳ |
-| 1A.3 | Konfigurasi `.env` production (DB, Redis, Mail, WA, Sanctum) | `.env.example` | ⏳ |
-| 1A.4 | Setup Redis (cache, session, queue driver) | `config/database.php`, `config/queue.php` | ⏳ |
-| 1A.5 | Konfigurasi file `config/tracer.php` (OTP expiry, lockout, employer token) | `config/tracer.php` | ⏳ |
-| 1A.6 | Migrasi: `users`, `personal_access_tokens` | Migration file | ⏳ |
-| 1A.7 | Migrasi: `otp_codes` (code VARCHAR(64) — SHA-256) | Migration file | ⏳ |
-| 1A.8 | Migrasi: `audit_logs` | Migration file | ⏳ |
-| 1A.9 | Migrasi: `faculties`, `study_programs`, `graduation_years` | Migration files | ⏳ |
-| 1A.10 | Migrasi: `system_settings`, `industry_sectors`, `salary_ranges` | Migration files | ⏳ |
-| 1A.11 | Model: `User` (fillable, hidden, casts, relationships, scope) | `app/Models/User.php` | ⏳ |
-| 1A.12 | Model: `OtpCode` (fillable, casts, scope `active`) | `app/Models/OtpCode.php` | ⏳ |
-| 1A.13 | Model: `AuditLog` (fillable, static `record()` helper, relationship) | `app/Models/AuditLog.php` | ⏳ |
-| 1A.14 | Model: `Faculty`, `StudyProgram`, `GraduationYear`, `SystemSetting`, `IndustrySector`, `SalaryRange` | Model files | ⏳ |
-| 1A.15 | Seeder: `SuperadminSeeder` (1 superadmin, bcrypt password) | `SuperadminSeeder.php` | ⏳ |
-| 1A.16 | Seeder: `FacultySeeder`, `StudyProgramSeeder`, `GraduationYearSeeder` | Seeder files | ⏳ |
-| 1A.17 | Seeder: `IndustrySectorSeeder`, `SalaryRangeSeeder`, `SystemSettingSeeder` — termasuk default key WA Gateway: `wa_gateway_url` (`https://wacenter.unisya.ac.id/send-message`), `wa_api_key` (kosong, diisi via Setting), `wa_sender` (kosong, diisi via Setting) | Seeder files | ⏳ |
-| 1A.18 | Konfigurasi `config/cors.php` sesuai 07_SECURITY.md Section 10 | `config/cors.php` | ⏳ |
-| 1A.19 | Registrasi `AlumniObserver`, `EmployerObserver`, `SurveyResponseObserver`, `UserObserver` di `AppServiceProvider` | `AppServiceProvider.php` | ⏳ |
+| 1A.1 | Install Laravel 12 + konfigurasi awal (`composer create-project`) | — | ✅ |
+| 1A.2 | Install & konfigurasi Vue 3 + Vite + TailwindCSS + dependensi frontend | `package.json`, `vite.config.js`, `tailwind.config.js` | ✅ |
+| 1A.3 | Konfigurasi `.env` production (DB, Redis, Mail, WA, Sanctum) | `.env.example` | ✅ |
+| 1A.4 | Setup Redis (cache, session, queue driver) | `config/database.php`, `config/queue.php` | ✅ |
+| 1A.5 | Konfigurasi file `config/tracer.php` (OTP expiry, lockout, employer token) | `config/tracer.php` | ✅ |
+| 1A.6 | Migrasi: `users`, `personal_access_tokens` | Migration file | ✅ |
+| 1A.7 | Migrasi: `otp_codes` (code VARCHAR(64) — SHA-256) | Migration file | ✅ |
+| 1A.8 | Migrasi: `audit_logs` | Migration file | ✅ |
+| 1A.9 | Migrasi: `faculties`, `study_programs`, `graduation_years` | Migration files | ✅ |
+| 1A.10 | Migrasi: `system_settings`, `industry_sectors`, `salary_ranges` | Migration files | ✅ |
+| 1A.11 | Model: `User` (fillable, hidden, casts, relationships, scope) | `app/Models/User.php` | ✅ |
+| 1A.12 | Model: `OtpCode` (fillable, casts, scope `active`) | `app/Models/OtpCode.php` | ✅ |
+| 1A.13 | Model: `AuditLog` (fillable, static `record()` helper, relationship) | `app/Models/AuditLog.php` | ✅ |
+| 1A.14 | Model: `Faculty`, `StudyProgram`, `GraduationYear`, `SystemSetting`, `IndustrySector`, `SalaryRange` | Model files | ✅ |
+| 1A.15 | Seeder: `SuperadminSeeder` (1 superadmin, bcrypt password) | `SuperadminSeeder.php` | ✅ |
+| 1A.16 | Seeder: `FacultySeeder`, `StudyProgramSeeder`, `GraduationYearSeeder` | Seeder files | ✅ |
+| 1A.17 | Seeder: `IndustrySectorSeeder`, `SalaryRangeSeeder`, `SystemSettingSeeder` — termasuk default key WA Gateway: `wa_gateway_url` (`https://wacenter.unisya.ac.id/send-message`), `wa_api_key` (kosong, diisi via Setting), `wa_sender` (kosong, diisi via Setting) | Seeder files | ✅ |
+| 1A.18 | Konfigurasi `config/cors.php` sesuai 07_SECURITY.md Section 10 | `config/cors.php` | ✅ |
+| 1A.19 | Registrasi `AlumniObserver`, `EmployerObserver`, `SurveyResponseObserver`, `UserObserver` di `AppServiceProvider` | `AppServiceProvider.php` | ✅ |
 
-**Total Sesi 1A: 19 task**
+**Total Sesi 1A: 19 task — ✅ Selesai 19/19**
 
 ---
 
@@ -440,7 +441,7 @@
 | Fase | Sesi | Task | Status |
 |---|---|---|---|
 | 0 | 0A | 10 (dokumentasi — tidak dihitung development) | ✅ Selesai |
-| 1 | 1A | 19 | ⏳ |
+| 1 | 1A | 19 | ✅ Selesai (2026-06-09) |
 | 1 | 1B | 28 | ⏳ |
 | 2 | 2A | 31 | ⏳ |
 | 2 | 2B | 16 | ⏳ |
@@ -503,6 +504,7 @@ Fase 1A (Setup + DB) → Fase 1B (Auth)
 | 1.0.1 | 2026-06-06 | Tambah task 4A.13 (NotificationController — CRUD templates) dan 4A.14 (NotificationController — log listing) hasil audit konsistensi; tambah task 4A.27 dan 4A.28 (Feature Test notification template & log); tambah task 4A.23 (NotificationTemplateSeeder); update total dari 165 → 199 (setelah penghitungan ulang lengkap semua task); tambah task 0A.10 (audit konsistensi v1.0.1) |
 | 1.0.2 | 2026-06-08 | Update task 4A.11: spesifikasi WhatsAppService diperinci sesuai API WA Gateway UNISYA (parameter body `api_key`/`sender`/`number`/`message`/`footer`, baca config dari `system_settings`, aktifkan `full=1`); update task 1A.17: SystemSettingSeeder harus seed 3 key WA gateway |
 | 1.0.3 | 2026-06-09 | Fix header STATUS RINGKASAN: `Total Task: 167` → `199` yang tertinggal sejak v1.0.1 (INC-03) |
+| 1.0.4 | 2026-06-09 | Update progress Sesi 1A selesai (19/19 task ✅); update STATUS RINGKASAN dan RINGKASAN TASK PER FASE |
 
 ---
 

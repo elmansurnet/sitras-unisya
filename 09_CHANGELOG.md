@@ -24,6 +24,108 @@ Setiap entri changelog mengikuti format:
 
 ---
 
+## [1.0.4] — 2026-06-09
+
+> **Sumber:** Penyelesaian Sesi 1A — Setup Proyek & Database.
+> Engineer: Claude (Lead Engineer SITRAS UNISYA).
+> **Perubahan berisi penambahan file kode produksi — bukan perubahan dokumentasi spesifikasi.**
+
+---
+
+### Added — File Kode Produksi Sesi 1A
+
+#### Added — Migrations (10 file)
+- `database/migrations/0001_01_01_000000_create_users_table.php` — Tabel `users` (ENUM role 4 nilai, `login_attempts` TINYINT UNSIGNED, `locked_until` TIMESTAMP NULL, SoftDeletes, index role+phone) + tabel `sessions`
+- `database/migrations/2026_06_09_000001_create_personal_access_tokens_table.php` — Tabel `personal_access_tokens` standar Sanctum
+- `database/migrations/2026_06_09_000002_create_otp_codes_table.php` — Tabel `otp_codes`; **`code VARCHAR(64)` — SHA-256 hex digest (kritis: bukan VARCHAR(10))**
+- `database/migrations/2026_06_09_000003_create_audit_logs_table.php` — Tabel `audit_logs`; append-only, tidak ada `updated_at`, index: user_id, action, module, created_at, (model_type, model_id)
+- `database/migrations/2026_06_09_000004_create_faculties_table.php` — Tabel `faculties`
+- `database/migrations/2026_06_09_000005_create_study_programs_table.php` — Tabel `study_programs` + FK ke `faculties`
+- `database/migrations/2026_06_09_000006_create_graduation_years_table.php` — Tabel `graduation_years`
+- `database/migrations/2026_06_09_000007_create_system_settings_table.php` — Tabel `system_settings`
+- `database/migrations/2026_06_09_000008_create_industry_sectors_table.php` — Tabel `industry_sectors`
+- `database/migrations/2026_06_09_000009_create_salary_ranges_table.php` — Tabel `salary_ranges`
+
+#### Added — Models (9 file)
+- `app/Models/User.php` — `$fillable`, `$hidden` (password, remember_token), `$casts` (datetime, bool, hashed), SoftDeletes, `HasApiTokens`; relationships: alumni, employer, otpCodes, auditLogs; methods: `isLocked()`, `incrementLoginAttempts()`, `resetLoginAttempts()`, `isSuperadmin()`, `isAdmin()`
+- `app/Models/OtpCode.php` — `$fillable`, `$casts`, `scopeActive()` (is_used=0, expires_at > now, attempts < 3)
+- `app/Models/AuditLog.php` — Append-only (`UPDATED_AT = null`), `$fillable`, `$casts` (old/new_values → array), `withTrashed()` pada relationship user; static `AuditLog::record(action, module, modelId, oldValues, newValues, modelType)` sesuai `07_SECURITY.md §8.3`
+- `app/Models/Faculty.php` — `hasMany(StudyProgram)`
+- `app/Models/StudyProgram.php` — `belongsTo(Faculty)`, `hasMany(Alumni)`
+- `app/Models/GraduationYear.php`
+- `app/Models/SystemSetting.php`
+- `app/Models/IndustrySector.php`
+- `app/Models/SalaryRange.php`
+
+#### Added — Seeders (8 file)
+- `database/seeders/SuperadminSeeder.php` — 1 superadmin: `superadmin@unisya.ac.id`, bcrypt cost 12
+- `database/seeders/FacultySeeder.php` — 3+ fakultas konteks UNISYA
+- `database/seeders/StudyProgramSeeder.php` — 8+ prodi, FK ke fakultas
+- `database/seeders/GraduationYearSeeder.php` — Angkatan 2020–2024
+- `database/seeders/IndustrySectorSeeder.php`
+- `database/seeders/SalaryRangeSeeder.php`
+- `database/seeders/SystemSettingSeeder.php` — Seed 3 key WA Gateway: `wa_gateway_url` (`https://wacenter.unisya.ac.id/send-message`), `wa_api_key` (kosong), `wa_sender` (kosong); juga key: `university_name`, `university_tagline`, `smtp_*`
+- `database/seeders/DatabaseSeeder.php` — Memanggil semua seeder di atas
+
+#### Added — Config (3 file baru)
+- `config/tracer.php` — Key: `otp.expiry_minutes` (5), `otp.max_attempts` (3), `otp.resend_cooldown_seconds` (60), `login.max_attempts` (5), `login.lockout_minutes` (15), `employer_token.expiry_days` (30); baca dari `.env` dengan default values
+- `config/whatsapp.php` — Key: `gateway_url`, `api_key`, `sender`; baca dari `system_settings` via runtime
+- `config/cors.php` — `allowed_origins: [env('FRONTEND_URL')]`, `supports_credentials: true`, `max_age: 86400`, sesuai `07_SECURITY.md §10`
+
+#### Changed — Config (3 file diupdate)
+- `config/database.php` — Redis connection ditambahkan
+- `config/queue.php` — Redis driver, queue: high, default, low
+- `config/session.php` — Redis driver
+
+#### Added — Observers (4 file placeholder)
+- `app/Observers/AlumniObserver.php` — Placeholder; diisi sesi 2B saat model Alumni tersedia
+- `app/Observers/EmployerObserver.php` — Placeholder; diisi sesi 2C
+- `app/Observers/SurveyResponseObserver.php` — Placeholder; diisi sesi 3B
+- `app/Observers/UserObserver.php` — Placeholder; diisi sesi 1B+
+
+#### Changed — App Provider
+- `app/Providers/AppServiceProvider.php` — Registrasi `User::observe(UserObserver::class)` aktif; observer lain dikomentari dengan keterangan sesi aktivasi; tambah `Model::shouldBeStrict(!app()->isProduction())` dan `URL::forceScheme('https')` untuk production
+
+#### Changed — Frontend Config
+- `vite.config.js` — Konfigurasi Vue 3 + `@vitejs/plugin-vue`
+- `tailwind.config.js` — Custom design tokens sesuai `06_UI_UX.md §1.2`
+- `package.json` — Dependencies: `vue@3`, `@vitejs/plugin-vue`, `tailwindcss`, `postcss`, `autoprefixer`, `pinia`, `vue-router@4`, `axios`
+- `package.json` — Dependencies frontend lengkap; **Fix #1**: upgrade `apexcharts` dari `^3.54.0` → `^5.0.0` untuk memenuhi peer dependency `vue3-apexcharts@1.8.0` yang membutuhkan `apexcharts >= 4.0.0`; **Fix #2**: upgrade `@vitejs/plugin-vue` dari `^5.2.3` → `^6.0.0` karena `vite@7.x` membutuhkan `@vitejs/plugin-vue >= 6.0.0`; tidak ada breaking change karena belum ada kode chart maupun kode Vue yang ditulis di fase ini
+
+#### Changed — Environment
+- `.env.example` — Tambah: `WHATSAPP_GATEWAY_URL`, `WHATSAPP_API_KEY`, `WHATSAPP_SENDER`, `OTP_EXPIRY_MINUTES=5`, `OTP_MAX_ATTEMPTS=3`, `OTP_RESEND_COOLDOWN_SECONDS=60`, `LOGIN_MAX_ATTEMPTS=5`, `LOGIN_LOCKOUT_MINUTES=15`, `FRONTEND_URL`
+
+---
+
+### Ringkasan File Terdampak v1.0.4
+
+| File | Aksi | Keterangan |
+|---|---|---|
+| 10 migration files | Added | Tabel users, sessions, personal_access_tokens, otp_codes, audit_logs, faculties, study_programs, graduation_years, system_settings, industry_sectors, salary_ranges |
+| 9 model files | Added | User, OtpCode, AuditLog, Faculty, StudyProgram, GraduationYear, SystemSetting, IndustrySector, SalaryRange |
+| 8 seeder files | Added | Superadmin, Faculty, StudyProgram, GraduationYear, IndustrySector, SalaryRange, SystemSetting, DatabaseSeeder |
+| `config/tracer.php` | Added | Konfigurasi OTP, login lockout, employer token |
+| `config/whatsapp.php` | Added | Konfigurasi WA Gateway |
+| `config/cors.php` | Changed | CORS sesuai spec security |
+| `config/database.php` | Changed | Redis connection |
+| `config/queue.php` | Changed | Redis driver, multi-queue |
+| `config/session.php` | Changed | Redis driver |
+| 4 observer files | Added | Placeholder observers |
+| `app/Providers/AppServiceProvider.php` | Changed | Observer registration + security config |
+| `vite.config.js` | Changed | Vue 3 plugin |
+| `tailwind.config.js` | Changed | Custom design tokens |
+| `package.json` | Changed | Dependencies frontend; 2 hotfix peer dependency: apexcharts ^3→^5, @vitejs/plugin-vue ^5→^6 |
+| `.env.example` | Changed | Tambah env keys WA, OTP, login |
+| `08_PHASE_TRACKER.md` | Changed | Sesi 1A 19/19 task → ✅; counter selesai 0→19 |
+| `09_CHANGELOG.md` | Added | Entri ini |
+
+**Total: 37 file ditambah/diubah | 1A complete: 19/19 task ✅**
+**Task selesai keseluruhan: 19/199**
+
+---
+
+---
+
 ## [1.0.3] — 2026-06-09
 
 > **Sumber:** Audit konsistensi dokumen v1.0.3 sebelum development dimulai.
