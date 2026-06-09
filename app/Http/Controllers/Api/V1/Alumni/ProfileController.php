@@ -4,73 +4,86 @@ namespace App\Http\Controllers\Api\V1\Alumni;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Alumni\UpdateAlumniRequest;
+use App\Models\Alumni;
+use App\Repositories\AlumniRepository;
 use App\Services\AlumniService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
+/**
+ * Alumni/ProfileController
+ *
+ * Alumni mengelola profil mereka sendiri.
+ * Endpoint dilindungi: auth:sanctum + EnsureAccountActive + CheckRole:alumni
+ *
+ * Routes (05_API.md §2.2):
+ *   GET   /api/v1/alumni/profile          → show
+ *   PUT   /api/v1/alumni/profile          → update
+ *   POST  /api/v1/alumni/profile/photo    → uploadPhoto
+ */
 class ProfileController extends Controller
 {
     public function __construct(
-        private readonly AlumniService $service,
+        private readonly AlumniRepository $alumniRepo,
+        private readonly AlumniService    $alumniService,
     ) {}
 
     /**
-     * GET /api/v1/alumni/profile
-     * Lihat profil alumni yang sedang login.
+     * GET /alumni/profile
+     * Profil alumni yang sedang login.
      */
     public function show(Request $request): JsonResponse
     {
-        $alumni = $request->user()
-            ->alumni
-            ->load([
-                'studyProgram:id,name,code,degree_level',
-                'studyProgram.faculty:id,name',
-                'graduationYear:id,year,semester,academic_year',
-                'workHistories',
-            ]);
+        $alumni = $this->alumniRepo->findByUserId($request->user()->id);
 
         if (!$alumni) {
             return response()->json([
-                'status'  => 'error',
-                'message' => 'Data profil alumni tidak ditemukan.',
-                'data'    => null,
+                'success' => false,
+                'message' => 'Profil alumni tidak ditemukan.',
             ], 404);
         }
 
+        $alumni->load([
+            'studyProgram.faculty',
+            'graduationYear',
+        ]);
+
         return response()->json([
-            'status'  => 'success',
-            'message' => 'Profil alumni berhasil diambil.',
+            'success' => true,
             'data'    => $alumni,
         ]);
     }
 
     /**
-     * PUT /api/v1/alumni/profile
-     * Update profil alumni yang sedang login.
+     * PUT /alumni/profile
+     * Update profil alumni sendiri.
      */
     public function update(UpdateAlumniRequest $request): JsonResponse
     {
-        $alumni  = $request->user()->alumni;
+        $alumni = $this->alumniRepo->findByUserId($request->user()->id);
 
         if (!$alumni) {
             return response()->json([
-                'status'  => 'error',
-                'message' => 'Data profil alumni tidak ditemukan.',
-                'data'    => null,
+                'success' => false,
+                'message' => 'Profil alumni tidak ditemukan.',
             ], 404);
         }
 
-        $alumni = $this->service->update($alumni, $request->validated());
+        $updated = $this->alumniService->update(
+            $alumni,
+            $request->validated(),
+            $request->user()->id,
+        );
 
         return response()->json([
-            'status'  => 'success',
+            'success' => true,
             'message' => 'Profil berhasil diperbarui.',
-            'data'    => $alumni,
+            'data'    => $updated,
         ]);
     }
 
     /**
-     * POST /api/v1/alumni/profile/photo
+     * POST /alumni/profile/photo
      * Upload foto profil.
      */
     public function uploadPhoto(Request $request): JsonResponse
@@ -84,21 +97,22 @@ class ProfileController extends Controller
             ],
         ]);
 
-        $alumni = $request->user()->alumni;
+        $alumni = $this->alumniRepo->findByUserId($request->user()->id);
 
         if (!$alumni) {
             return response()->json([
-                'status'  => 'error',
-                'message' => 'Data profil alumni tidak ditemukan.',
-                'data'    => null,
+                'success' => false,
+                'message' => 'Profil alumni tidak ditemukan.',
             ], 404);
         }
 
-        $path = $this->service->uploadPhoto($alumni, $request->file('photo'));
+        $this->authorize('uploadPhoto', $alumni);
+
+        $path = $this->alumniService->uploadPhoto($alumni, $request->file('photo'));
 
         return response()->json([
-            'status'  => 'success',
-            'message' => 'Foto profil berhasil diunggah.',
+            'success' => true,
+            'message' => 'Foto profil berhasil diupload.',
             'data'    => ['photo_path' => $path],
         ]);
     }

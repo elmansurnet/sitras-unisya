@@ -4,76 +4,111 @@ namespace App\Policies;
 
 use App\Models\Alumni;
 use App\Models\User;
-use Illuminate\Auth\Access\HandlesAuthorization;
 
+/**
+ * AlumniPolicy — Otorisasi akses resource Alumni.
+ *
+ * Matriks izin (07_SECURITY.md §3.3):
+ * ┌──────────────────┬─────────────┬───────┬─────────┬──────────┐
+ * │ Action           │ superadmin  │ admin │  alumni │ employer │
+ * ├──────────────────┼─────────────┼───────┼─────────┼──────────┤
+ * │ viewAny          │ ✅          │ ✅    │ ❌      │ ❌       │
+ * │ view             │ ✅          │ ✅    │ own ✅  │ ❌       │
+ * │ create           │ ✅          │ ✅    │ ❌      │ ❌       │
+ * │ update           │ ✅          │ ✅    │ own ✅  │ ❌       │
+ * │ delete           │ ✅          │ ✅    │ ❌      │ ❌       │
+ * │ import           │ ✅          │ ✅    │ ❌      │ ❌       │
+ * │ export           │ ✅          │ ✅    │ ❌      │ ❌       │
+ * │ uploadPhoto      │ ✅          │ ✅    │ own ✅  │ ❌       │
+ * └──────────────────┴─────────────┴───────┴─────────┴──────────┘
+ */
 class AlumniPolicy
 {
-    use HandlesAuthorization;
+    /**
+     * Superadmin bypass semua gate.
+     */
+    public function before(User $user, string $ability): ?bool
+    {
+        if ($user->isSuperadmin()) {
+            return true;
+        }
+
+        return null;
+    }
 
     /**
-     * Superadmin dan Admin bisa lihat daftar alumni.
+     * Lihat daftar semua alumni — hanya admin.
      */
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['superadmin', 'admin'], true);
+        return $user->isAdmin();
     }
 
     /**
-     * Admin/Superadmin bisa lihat detail alumni mana pun.
-     * Alumni hanya bisa lihat data miliknya sendiri.
+     * Lihat detail satu alumni — admin atau alumni pemilik data.
      */
     public function view(User $user, Alumni $alumni): bool
     {
-        if (in_array($user->role, ['superadmin', 'admin'], true)) {
+        if ($user->isAdmin()) {
             return true;
         }
 
-        // Alumni melihat datanya sendiri
-        return $user->role === 'alumni' && $user->id === $alumni->user_id;
+        return $user->id === $alumni->user_id;
     }
 
     /**
-     * Hanya Superadmin dan Admin yang bisa membuat alumni.
+     * Buat alumni baru — hanya admin.
      */
     public function create(User $user): bool
     {
-        return in_array($user->role, ['superadmin', 'admin'], true);
+        return $user->isAdmin();
     }
 
     /**
-     * Admin/Superadmin bisa update siapa pun.
-     * Alumni hanya bisa update datanya sendiri.
+     * Update alumni — admin atau alumni pemilik data.
      */
     public function update(User $user, Alumni $alumni): bool
     {
-        if (in_array($user->role, ['superadmin', 'admin'], true)) {
+        if ($user->isAdmin()) {
             return true;
         }
 
-        return $user->role === 'alumni' && $user->id === $alumni->user_id;
+        return $user->id === $alumni->user_id;
     }
 
     /**
-     * Hanya Superadmin yang bisa hapus alumni.
+     * Hapus alumni — hanya admin.
      */
     public function delete(User $user, Alumni $alumni): bool
     {
-        return $user->role === 'superadmin';
+        return $user->isAdmin();
     }
 
     /**
-     * Hanya Superadmin yang bisa restore alumni yang soft-deleted.
+     * Import batch alumni dari Excel — hanya admin.
      */
-    public function restore(User $user, Alumni $alumni): bool
+    public function import(User $user): bool
     {
-        return $user->role === 'superadmin';
+        return $user->isAdmin();
     }
 
     /**
-     * Hanya Superadmin yang bisa force-delete.
+     * Export data alumni ke Excel — hanya admin.
      */
-    public function forceDelete(User $user, Alumni $alumni): bool
+    public function export(User $user): bool
     {
-        return $user->role === 'superadmin';
+        return $user->isAdmin();
+    }
+
+    /**
+     * Upload foto profil — admin atau alumni pemilik data.
+     */
+    public function uploadPhoto(User $user, Alumni $alumni): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return $user->id === $alumni->user_id;
     }
 }

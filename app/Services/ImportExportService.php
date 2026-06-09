@@ -2,259 +2,242 @@
 
 namespace App\Services;
 
-use App\Models\Alumni;
-use App\Models\GraduationYear;
-use App\Models\StudyProgram;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
-use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\ToCollection;
-use Maatwebsite\Excel\Concerns\WithFirstRowAsHeader;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 class ImportExportService
 {
     /**
-     * Kolom wajib di file Excel import alumni.
+     * Kolom wajib per tipe import.
      */
     private const REQUIRED_COLUMNS = [
-        'nim', 'full_name', 'gender', 'study_program_code', 'graduation_year',
+        'alumni' => [
+            'nim', 'full_name', 'email',
+            'study_program_id', 'graduation_year_id', 'gpa',
+        ],
     ];
 
     /**
-     * Parse file Excel ke array of associative array.
-     *
-     * @param UploadedFile $file
-     * @return Collection<int, array>
+     * Header kolom template Excel per tipe.
      */
-    public function parseExcel(UploadedFile $file): Collection
-    {
-        $importer = new class implements ToCollection, WithFirstRowAsHeader {
-            public Collection $rows;
-
-            public function collection(Collection $collection): void
-            {
-                $this->rows = $collection;
-            }
-        };
-
-        Excel::import($importer, $file);
-
-        return $importer->rows ?? collect();
-    }
+    private const TEMPLATE_HEADERS = [
+        'alumni' => [
+            'A' => ['label' => 'NIM *',           'example' => '20210001'],
+            'B' => ['label' => 'Nama Lengkap *',   'example' => 'Ahmad Fauzan'],
+            'C' => ['label' => 'Email *',           'example' => 'ahmad@email.com'],
+            'D' => ['label' => 'ID Program Studi *','example' => '1'],
+            'E' => ['label' => 'ID Tahun Lulus *', 'example' => '1'],
+            'F' => ['label' => 'IPK *',             'example' => '3.75'],
+            'G' => ['label' => 'NIK',               'example' => '3509010101010001'],
+            'H' => ['label' => 'Tempat Lahir',      'example' => 'Lumajang'],
+            'I' => ['label' => 'Tanggal Lahir',     'example' => '2000-01-01'],
+            'J' => ['label' => 'Jenis Kelamin',     'example' => 'M'],
+            'K' => ['label' => 'Agama',             'example' => 'Islam'],
+            'L' => ['label' => 'Alamat Jalan',      'example' => 'Jl. Ahmad Yani No.1'],
+            'M' => ['label' => 'Kelurahan',         'example' => 'Citrodiwangsan'],
+            'N' => ['label' => 'Kecamatan',         'example' => 'Lumajang'],
+            'O' => ['label' => 'Kota/Kabupaten',   'example' => 'Lumajang'],
+            'P' => ['label' => 'Provinsi',          'example' => 'Jawa Timur'],
+            'Q' => ['label' => 'Kode Pos',          'example' => '67311'],
+            'R' => ['label' => 'No. Telepon',       'example' => '08123456789'],
+            'S' => ['label' => 'Predikat Kelulusan','example' => 'Cumlaude'],
+            'T' => ['label' => 'Judul Skripsi',     'example' => 'Analisis...'],
+            'U' => ['label' => 'URL LinkedIn',      'example' => 'https://linkedin.com/in/...'],
+        ],
+    ];
 
     /**
-     * Validasi baris dari Excel.
+     * Parse file Excel menjadi array of rows (array asosiatif).
+     * Baris pertama dianggap sebagai header.
      *
-     * @param  Collection $rows
-     * @return array{ valid: array, errors: array }
+     * @return array<int, array<string, string>>
      */
-    public function validateRows(Collection $rows): array
+    public function parseExcel(UploadedFile $file): array
     {
-        $valid  = [];
-        $errors = [];
+        $data = Excel::toArray([], $file);
 
-        // Cache data referensi untuk efisiensi
-        $studyPrograms   = StudyProgram::pluck('id', 'code')->toArray();
-        $graduationYears = GraduationYear::pluck('id', 'year')->toArray();
-        $existingNims    = Alumni::withTrashed()->pluck('nim')->toArray();
+        if (empty($data) || empty($data[0])) {
+            return [];
+        }
 
-        foreach ($rows as $index => $row) {
-            $rowNum = $index + 2; // baris Excel (header = row 1)
-            $row    = array_map(fn ($v) => trim((string) $v), $row->toArray());
-            $rowErrors = [];
+        $sheet = $data[0];
+        // Baris pertama = header
+        $rawHeaders = array_shift($sheet);
+        $headers    = array_map(fn ($h) => Str::snake(trim((string) $h)), $rawHeaders);
 
-            // Cek kolom wajib
-            foreach (self::REQUIRED_COLUMNS as $col) {
-                if (empty($row[$col])) {
-                    $rowErrors[] = "Kolom `{$col}` wajib diisi.";
-                }
-            }
-
-            // Validasi NIM unik
-            if (!empty($row['nim']) && in_array($row['nim'], $existingNims, true)) {
-                $rowErrors[] = "NIM `{$row['nim']}` sudah terdaftar.";
-            }
-
-            // Validasi gender
-            if (!empty($row['gender']) && !in_array(strtoupper($row['gender']), ['L', 'P'], true)) {
-                $rowErrors[] = "Kolom `gender` harus berisi L atau P.";
-            }
-
-            // Resolusi study_program_id
-            $studyProgramId = null;
-            if (!empty($row['study_program_code'])) {
-                $studyProgramId = $studyPrograms[$row['study_program_code']] ?? null;
-                if (!$studyProgramId) {
-                    $rowErrors[] = "Kode prodi `{$row['study_program_code']}` tidak ditemukan.";
-                }
-            }
-
-            // Resolusi graduation_year_id
-            $graduationYearId = null;
-            if (!empty($row['graduation_year'])) {
-                $graduationYearId = $graduationYears[(int) $row['graduation_year']] ?? null;
-                if (!$graduationYearId) {
-                    $rowErrors[] = "Tahun lulus `{$row['graduation_year']}` tidak ditemukan.";
-                }
-            }
-
-            if ($rowErrors) {
-                $errors[] = [
-                    'row'    => $rowNum,
-                    'nim'    => $row['nim'] ?? '-',
-                    'errors' => $rowErrors,
-                ];
+        $rows = [];
+        foreach ($sheet as $index => $row) {
+            // Skip baris kosong
+            if (empty(array_filter($row, fn ($v) => $v !== null && $v !== ''))) {
                 continue;
             }
 
-            $valid[] = [
-                'nim'                => $row['nim'],
-                'full_name'          => $row['full_name'],
-                'gender'             => strtoupper($row['gender']),
-                'study_program_id'   => $studyProgramId,
-                'graduation_year_id' => $graduationYearId,
-                'email'              => $row['email']              ?? null,
-                'phone'              => $row['phone']              ?? null,
-                'birth_place'        => $row['birth_place']        ?? null,
-                'birth_date'         => $row['birth_date']         ?? null,
-                'gpa'                => isset($row['gpa']) && $row['gpa'] !== ''
-                                        ? (float) $row['gpa']
-                                        : null,
-                'thesis_title'       => $row['thesis_title']       ?? null,
-                'address_city'       => $row['address_city']       ?? null,
-                'address_province'   => $row['address_province']   ?? null,
-                'survey_status'      => 'belum_disurvei',
-            ];
-
-            // Tambah NIM ke existing list agar duplikat dalam batch tertangkap
-            $existingNims[] = $row['nim'];
-        }
-
-        return compact('valid', 'errors');
-    }
-
-    /**
-     * Insert batch alumni yang sudah tervalidasi.
-     * Setiap alumni dibuat beserta user-nya.
-     */
-    public function batchInsert(array $rows, string $batchId): void
-    {
-        foreach ($rows as $row) {
-            $user = \App\Models\User::create([
-                'name'      => $row['full_name'],
-                'email'     => $row['email'] ?? null,
-                'phone'     => $row['phone'] ?? null,
-                'role'      => 'alumni',
-                'is_active' => true,
-            ]);
-
-            Alumni::create(array_merge($row, [
-                'user_id'      => $user->id,
-                'import_batch' => $batchId,
-            ]));
-        }
-    }
-
-    /**
-     * Generate template Excel kosong untuk import.
-     * Return path file di storage private.
-     */
-    public function generateTemplate(): string
-    {
-        $export = new class implements FromCollection, WithHeadings {
-            public function collection(): Collection
-            {
-                return collect([[
-                    'A001',
-                    'Contoh Nama Alumni',
-                    'L',
-                    'PAI',
-                    '2023',
-                    'alumni@email.com',
-                    '08123456789',
-                    'Lumajang',
-                    '2000-01-01',
-                    '3.75',
-                    'Judul Tugas Akhir',
-                    'Lumajang',
-                    'Jawa Timur',
-                ]]);
+            $assoc = [];
+            foreach ($headers as $colIdx => $headerKey) {
+                $assoc[$headerKey] = isset($row[$colIdx]) ? trim((string) $row[$colIdx]) : null;
             }
 
-            public function headings(): array
-            {
-                return [
-                    'nim',
-                    'full_name',
-                    'gender',
-                    'study_program_code',
-                    'graduation_year',
-                    'email',
-                    'phone',
-                    'birth_place',
-                    'birth_date',
-                    'gpa',
-                    'thesis_title',
-                    'address_city',
-                    'address_province',
-                ];
-            }
-        };
+            $assoc['_row_number'] = $index + 2; // +2 karena header di baris 1
+            $rows[]               = $assoc;
+        }
 
-        $filename = 'templates/alumni-import-template.xlsx';
-        Excel::store($export, $filename, 'private');
-
-        return $filename;
+        return $rows;
     }
 
     /**
-     * Export alumni ke Excel.
-     * Return path file di storage private.
+     * Validasi rows hasil parseExcel.
      *
-     * @param  array|\Illuminate\Support\Collection $alumni
+     * @param  array<int, array<string, mixed>> $rows
+     * @param  string                           $type  'alumni'
+     * @return array{valid: array<int, array<string, mixed>>, errors: array<int, string>}
      */
-    public function exportExcel(iterable $alumni): string
+    public function validateRows(array $rows, string $type): array
     {
-        $export = new class ($alumni) implements FromCollection, WithHeadings {
-            public function __construct(private readonly iterable $alumni) {}
+        $required = self::REQUIRED_COLUMNS[$type] ?? [];
+        $valid    = [];
+        $errors   = [];
 
-            public function collection(): Collection
-            {
-                return collect($this->alumni)->map(fn ($a) => [
-                    $a->nim,
-                    $a->full_name,
-                    $a->gender,
-                    $a->studyProgram?->code,
-                    $a->studyProgram?->name,
-                    $a->graduationYear?->year,
-                    $a->email,
-                    $a->user?->phone ?? $a->phone,
-                    $a->gpa !== null ? (float) $a->gpa : null,
-                    $a->survey_status,
-                    $a->address_city,
-                    $a->address_province,
-                    $a->created_at?->toDateString(),
-                ]);
+        foreach ($rows as $row) {
+            $rowNum    = $row['_row_number'] ?? '?';
+            $rowErrors = [];
+
+            foreach ($required as $col) {
+                if (empty($row[$col])) {
+                    $rowErrors[] = "Kolom '{$col}' wajib diisi";
+                }
             }
 
-            public function headings(): array
-            {
-                return [
-                    'NIM', 'Nama Lengkap', 'Jenis Kelamin',
-                    'Kode Prodi', 'Nama Prodi', 'Tahun Lulus',
-                    'Email', 'Telepon', 'IPK',
-                    'Status Survei', 'Kota', 'Provinsi', 'Tanggal Daftar',
-                ];
+            // Validasi format email
+            if (!empty($row['email']) && !filter_var($row['email'], FILTER_VALIDATE_EMAIL)) {
+                $rowErrors[] = "Format email tidak valid";
             }
-        };
 
-        $filename = 'exports/alumni-export-' . now()->format('Ymd-His') . '.xlsx';
-        Excel::store($export, $filename, 'private');
+            // Validasi IPK
+            if (!empty($row['gpa'])) {
+                $gpa = (float) $row['gpa'];
+                if ($gpa < 0 || $gpa > 4.0) {
+                    $rowErrors[] = "IPK harus antara 0.00 – 4.00";
+                }
+            }
 
-        return $filename;
+            if (!empty($rowErrors)) {
+                $errors[] = "Baris {$rowNum}: " . implode(', ', $rowErrors);
+            } else {
+                // Buang meta key sebelum masuk valid
+                $cleanRow = collect($row)->except('_row_number')->toArray();
+                $valid[]  = $cleanRow;
+            }
+        }
+
+        return ['valid' => $valid, 'errors' => $errors];
+    }
+
+    /**
+     * Generate template Excel untuk diunduh.
+     * Simpan di storage/app/private/templates/{type}_import_template.xlsx.
+     *
+     * @return string  path relatif di storage
+     */
+    public function generateTemplate(string $type): string
+    {
+        $headers   = self::TEMPLATE_HEADERS[$type] ?? [];
+        $path      = "templates/{$type}_import_template.xlsx";
+        $storagePath = storage_path('app/private/' . $path);
+
+        // Buat direktori jika belum ada
+        if (!is_dir(dirname($storagePath))) {
+            mkdir(dirname($storagePath), 0755, true);
+        }
+
+        $spreadsheet = new Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Template');
+
+        // Baris 1: Label kolom (bold, background hijau muda)
+        // Baris 2: Contoh data (italic, warna abu)
+        $col = 1;
+        foreach ($headers as $colLetter => $info) {
+            $sheet->setCellValueByColumnAndRow($col, 1, $info['label']);
+            $sheet->setCellValueByColumnAndRow($col, 2, $info['example']);
+
+            // Style header
+            $cellHeader = $colLetter . '1';
+            $sheet->getStyle($cellHeader)->getFont()->setBold(true);
+            $sheet->getStyle($cellHeader)->getFill()
+                ->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()->setRGB('D4EDDA');
+            $sheet->getStyle($cellHeader)->getAlignment()
+                ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            // Style example
+            $cellExample = $colLetter . '2';
+            $sheet->getStyle($cellExample)->getFont()->setItalic(true);
+            $sheet->getStyle($cellExample)->getFont()->getColor()->setRGB('6C757D');
+
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+            $col++;
+        }
+
+        // Freeze baris header
+        $sheet->freezePane('A3');
+
+        $writer = new XlsxWriter($spreadsheet);
+        $writer->save($storagePath);
+
+        return $path;
+    }
+
+    /**
+     * Export data ke Excel.
+     * Dipanggil dari GenerateReportExport job.
+     *
+     * @param  array<int, array<string, mixed>> $data
+     * @param  array<string, string>            $headers  kolom => label
+     * @param  string                           $storagePath  path lengkap di filesystem
+     */
+    public function exportToExcel(array $data, array $headers, string $storagePath): void
+    {
+        if (!is_dir(dirname($storagePath))) {
+            mkdir(dirname($storagePath), 0755, true);
+        }
+
+        $spreadsheet = new Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
+
+        // Header row
+        $col = 1;
+        foreach ($headers as $label) {
+            $sheet->setCellValueByColumnAndRow($col++, 1, $label);
+        }
+        $headerRange = 'A1:' . $sheet->getHighestColumn() . '1';
+        $sheet->getStyle($headerRange)->getFont()->setBold(true);
+        $sheet->getStyle($headerRange)->getFill()
+            ->setFillType(Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('343A40');
+        $sheet->getStyle($headerRange)->getFont()->getColor()->setRGB('FFFFFF');
+
+        // Data rows
+        $row = 2;
+        foreach ($data as $record) {
+            $col = 1;
+            foreach (array_keys($headers) as $key) {
+                $sheet->setCellValueByColumnAndRow($col++, $row, $record[$key] ?? '');
+            }
+            $row++;
+        }
+
+        // Auto-size semua kolom
+        foreach (range(1, count($headers)) as $colIdx) {
+            $sheet->getColumnDimensionByColumn($colIdx)->setAutoSize(true);
+        }
+
+        $writer = new XlsxWriter($spreadsheet);
+        $writer->save($storagePath);
     }
 }

@@ -9,55 +9,63 @@ class StoreAlumniRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return in_array($this->user()?->role, ['superadmin', 'admin'], true);
+        return $this->user()?->can('create', \App\Models\Alumni::class) ?? false;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
         return [
-            // Identitas wajib
-            'nim'                => ['required', 'string', 'max:20', 'unique:alumni,nim'],
-            'full_name'          => ['required', 'string', 'max:255'],
-            'gender'             => ['required', Rule::in(['L', 'P'])],
-            'study_program_id'   => ['required', 'integer', 'exists:study_programs,id'],
-            'graduation_year_id' => ['required', 'integer', 'exists:graduation_years,id'],
+            // Akun user
+            'email'    => ['required', 'email:rfc,dns', 'max:255', 'unique:users,email'],
+            'password' => ['nullable', 'string', 'min:8', 'max:255'],
 
-            // Identitas opsional
-            'nik'                        => ['nullable', 'string', 'max:20'],
-            'birth_place'                => ['nullable', 'string', 'max:100'],
-            'birth_date'                 => ['nullable', 'date', 'before:today'],
-            'thesis_title'               => ['nullable', 'string'],
-            'gpa'                        => ['nullable', 'numeric', 'min:0', 'max:4'],
-            'graduation_predicate'       => ['nullable', 'string', 'max:50'],
+            // Identitas
+            'nim'                 => ['required', 'string', 'max:20', 'unique:alumni,nim'],
+            'full_name'           => ['required', 'string', 'max:255'],
+            'nik'                 => ['nullable', 'string', 'size:16', 'unique:alumni,nik'],
+            'birth_place'         => ['nullable', 'string', 'max:100'],
+            'birth_date'          => ['nullable', 'date', 'before:today'],
+            'gender'              => ['nullable', Rule::in(['M', 'F'])],
+            'religion'            => ['nullable', 'string', 'max:50'],
 
-            // Kontak
-            'email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
-            'phone' => ['nullable', 'string', 'max:20'],
+            // Akademik
+            'study_program_id'    => ['required', 'integer', 'exists:study_programs,id'],
+            'graduation_year_id'  => ['required', 'integer', 'exists:graduation_years,id'],
+            'gpa'                 => ['nullable', 'numeric', 'min:0', 'max:4.00'],
+            'graduation_predicate'=> ['nullable', 'string', 'max:50'],
+            'thesis_title'        => ['nullable', 'string', 'max:500'],
 
             // Alamat
-            'address_street'      => ['nullable', 'string'],
+            'address_street'      => ['nullable', 'string', 'max:255'],
             'address_village'     => ['nullable', 'string', 'max:100'],
             'address_district'    => ['nullable', 'string', 'max:100'],
             'address_city'        => ['nullable', 'string', 'max:100'],
             'address_province'    => ['nullable', 'string', 'max:100'],
             'address_postal_code' => ['nullable', 'string', 'max:10'],
-            'address_latitude'    => ['nullable', 'numeric', 'between:-90,90'],
-            'address_longitude'   => ['nullable', 'numeric', 'between:-180,180'],
 
-            // LinkedIn
-            'linkedin_url' => ['nullable', 'url', 'max:255'],
+            // Kontak & lainnya
+            'phone'               => ['nullable', 'string', 'max:20'],
+            'linkedin_url'        => ['nullable', 'url', 'max:255'],
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function messages(): array
     {
         return [
-            'nim.unique'                => 'NIM sudah terdaftar di sistem.',
-            'email.unique'              => 'Email sudah digunakan oleh pengguna lain.',
-            'study_program_id.exists'   => 'Program studi tidak ditemukan.',
+            'nim.unique'          => 'NIM sudah terdaftar.',
+            'nik.unique'          => 'NIK sudah terdaftar.',
+            'email.unique'        => 'Email sudah digunakan.',
+            'gpa.max'             => 'IPK tidak boleh lebih dari 4.00.',
+            'gender.in'           => 'Jenis kelamin harus M (Laki-laki) atau F (Perempuan).',
+            'birth_date.before'   => 'Tanggal lahir harus sebelum hari ini.',
+            'study_program_id.exists' => 'Program studi tidak ditemukan.',
             'graduation_year_id.exists' => 'Tahun lulus tidak ditemukan.',
-            'gpa.max'                   => 'IPK maksimal 4.00.',
-            'birth_date.before'         => 'Tanggal lahir harus sebelum hari ini.',
         ];
     }
 }

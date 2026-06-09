@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Models\AuditLog;
+use App\Models\Alumni;
 use App\Services\ImportExportService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -12,96 +12,122 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
+/**
+ * GenerateReportExport
+ *
+ * Queue job untuk generate file export Alumni ke Excel secara async.
+ * Queue: default
+ * Retry: 3 kali, backoff: 30 detik
+ *
+ * Digunakan oleh AlumniService::export() dan di sesi 5A oleh ReportService.
+ */
 class GenerateReportExport implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * Antrian: default
-     * Job ini digunakan untuk generate laporan Excel di background.
-     */
-    public string $queue = 'default';
+    public int $tries   = 3;
+    public int $backoff = 30;
 
     /**
-     * Maksimal percobaan ulang jika job gagal.
-     */
-    public int $tries = 3;
-
-    /**
-     * Timeout eksekusi (detik).
-     */
-    public int $timeout = 300; // 5 menit
-
-    /**
-     * @param string $reportType  Jenis laporan: 'alumni' | 'employer' | 'survey'
-     * @param array  $filters     Filter laporan (study_program_id, graduation_year_id, dll.)
-     * @param int    $requestedBy ID user yang meminta export
-     * @param string $notifyEmail Email untuk notifikasi selesai (opsional)
+     * @param  string               $type     'alumni' | (future: 'employer', 'survey')
+     * @param  array<string, mixed> $filters  Filter query yang sama seperti findWithFilters
+     * @param  string               $path     Path relatif di storage/app/private/{path}
+     * @param  int                  $userId   ID user yang merequest export
      */
     public function __construct(
-        public readonly string $reportType,
+        public readonly string $type,
         public readonly array  $filters,
-        public readonly int    $requestedBy,
-        public readonly string $notifyEmail = '',
+        public readonly string $path,
+        public readonly int    $userId,
     ) {}
 
-    public function handle(ImportExportService $importExport): void
+    public function handle(ImportExportService $exportService): void
     {
-        Log::info('[GenerateReportExport] Mulai generate laporan.', [
-            'type'         => $this->reportType,
-            'requested_by' => $this->requestedBy,
-        ]);
+        $storagePath = storage_path('app/private/' . $this->path);
 
-        $filePath = match ($this->reportType) {
-            'alumni'   => $this->generateAlumniReport($importExport),
-            default    => throw new \InvalidArgumentException(
-                "Report type '{$this->reportType}' belum didukung."
-            ),
-        };
+        try {
+            match ($this->type) {
+                'alumni' => $this->exportAlumni($exportService, $storagePath),
+                default  => throw new \InvalidArgumentException("Unknown export type: {$this->type}"),
+            };
 
-        AuditLog::record(
-            action: 'export',
-            module: 'Report',
-            modelId: null,
-            newValues: [
-                'report_type' => $this->reportType,
-                'file_path'   => $filePath,
-                'filters'     => $this->filters,
-            ],
-        );
+            Log::info('[GenerateReportExport] Export selesai', [
+                'type'    => $this->type,
+                'path'    => $this->path,
+                'user_id' => $this->userId,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('[GenerateReportExport] Export gagal', [
+                'type'    => $this->type,
+                'path'    => $this->path,
+                'user_id' => $this->userId,
+                'error'   => $e->getMessage(),
+            ]);
 
-        // Notifikasi via email jika diminta (implementasi di sesi 4A)
-        // if ($this->notifyEmail) { ... }
-
-        Log::info('[GenerateReportExport] Laporan selesai.', ['path' => $filePath]);
+            throw $e;
+        }
     }
 
-    public function failed(\Throwable $e): void
+    // ─── Private export handlers ───────────────────────────────────────────
+
+    private function exportAlumni(ImportExportService $exportService, string $storagePath): void
     {
-        Log::error('[GenerateReportExport] Job gagal.', [
-            'type'    => $this->reportType,
-            'error'   => $e->getMessage(),
-            'user_id' => $this->requestedBy,
+        $query = Alumni::with([
+            'studyProgram.faculty',
+            'graduationYear',
+            'user:id,email',
         ]);
-    }
 
-    private function generateAlumniReport(ImportExportService $importExport): string
-    {
-        $alumni = \App\Models\Alumni::with([
-            'studyProgram:id,name,code',
-            'graduationYear:id,year,semester',
-        ])
-        ->when(!empty($this->filters['study_program_id']), fn ($q) =>
-            $q->where('study_program_id', $this->filters['study_program_id'])
-        )
-        ->when(!empty($this->filters['graduation_year_id']), fn ($q) =>
-            $q->where('graduation_year_id', $this->filters['graduation_year_id'])
-        )
-        ->when(!empty($this->filters['survey_status']), fn ($q) =>
-            $q->where('survey_status', $this->filters['survey_status'])
-        )
-        ->get();
+        // Apply filters yang sama seperti AlumniRepository::applyFilters
+        if (!empty($this->filters['search'])) {
+            $search = '%' . $this->filters['search'] . '%';
+            $query->where(fn ($q) =>
+                $q->where('nim', 'like', $search)
+                  ->orWhere('full_name', 'like', $search)
+            );
+        }
+        if (!empty($this->filters['study_program_id'])) {
+            $query->where('study_program_id', $this->filters['study_program_id']);
+        }
+        if (!empty($this->filters['graduation_year_id'])) {
+            $query->where('graduation_year_id', $this->filters['graduation_year_id']);
+        }
+        if (isset($this->filters['is_active'])) {
+            $query->where('is_active', (bool) $this->filters['is_active']);
+        }
 
-        return $importExport->exportExcel($alumni);
+        $records = $query->orderBy('full_name')->get();
+
+        $headers = [
+            'nim'                  => 'NIM',
+            'full_name'            => 'Nama Lengkap',
+            'email_user'           => 'Email',
+            'study_program_name'   => 'Program Studi',
+            'faculty_name'         => 'Fakultas',
+            'graduation_year'      => 'Tahun Lulus',
+            'gpa'                  => 'IPK',
+            'graduation_predicate' => 'Predikat',
+            'address_city'         => 'Kota',
+            'address_province'     => 'Provinsi',
+            'phone'                => 'No. Telepon',
+            'is_active'            => 'Status',
+        ];
+
+        $data = $records->map(fn (Alumni $a) => [
+            'nim'                  => $a->nim,
+            'full_name'            => $a->full_name,
+            'email_user'           => $a->user?->email ?? '',
+            'study_program_name'   => $a->studyProgram?->name ?? '',
+            'faculty_name'         => $a->studyProgram?->faculty?->name ?? '',
+            'graduation_year'      => $a->graduationYear?->year ?? '',
+            'gpa'                  => $a->gpa,
+            'graduation_predicate' => $a->graduation_predicate ?? '',
+            'address_city'         => $a->address_city ?? '',
+            'address_province'     => $a->address_province ?? '',
+            'phone'                => $a->phone ?? '',
+            'is_active'            => $a->is_active ? 'Aktif' : 'Nonaktif',
+        ])->toArray();
+
+        $exportService->exportToExcel($data, $headers, $storagePath);
     }
 }
