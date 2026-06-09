@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.4 | Tanggal: 2026-06-09
+# Versi: 1.0.5 | Tanggal: 2026-06-09
 
 ---
 
@@ -21,6 +21,91 @@ Setiap entri changelog mengikuti format:
 - `Removed` — Konten yang dihapus
 - `Security` — Perbaikan keamanan
 - `Deprecated` — Fitur yang akan dihapus di versi mendatang
+
+---
+
+## [1.0.5] — 2026-06-09
+
+> **Sumber:** Penyelesaian Sesi 1B — Sistem Autentikasi Backend + Frontend.
+> Engineer: Claude (Lead Engineer SITRAS UNISYA).
+> **Perubahan berisi penambahan file kode produksi — bukan perubahan dokumentasi spesifikasi.**
+
+---
+
+### Added — File Kode Produksi Sesi 1B
+
+#### Added — Middleware (4 file)
+- `app/Http/Middleware/CheckRole.php` — Validasi role via parameter; support multi-role (`CheckRole:admin,superadmin`)
+- `app/Http/Middleware/EnsureAccountActive.php` — Cek `users.is_active = 1`; return 403 jika nonaktif
+- `app/Http/Middleware/ValidateEmployerToken.php` — Cek token exist, belum expired, belum used; set employer context ke request
+- `app/Http/Middleware/LogActivity.php` — Tulis ke `audit_logs` setiap request dari middleware grup admin
+
+#### Added — Services (2 file)
+- `app/Services/OtpService.php` — Generate `random_int(100000,999999)`, hash SHA-256, kirim via queue, verify dengan `hash_equals`, cooldown & max attempts check
+- `app/Services/AuthService.php` — Login admin (email+password), lockout logic (`incrementLoginAttempts`, `resetLoginAttempts`), employer token login
+
+#### Added — Controllers (3 file)
+- `app/Http/Controllers/Api/V1/Auth/OtpController.php` — `request()`, `verify()`; rate limit `otp-request` (3/menit per identifier)
+- `app/Http/Controllers/Api/V1/Auth/AuthController.php` — `loginAdmin()`, `loginEmployer()`, `logout()`, `me()`
+- `app/Http/Controllers/Api/V1/Public/PublicController.php` — `validateToken()`, master data (faculties, study programs, graduation years, sectors, salary ranges)
+
+#### Added — Form Requests (3 file)
+- `app/Http/Requests/Auth/LoginRequest.php` — Validasi email+password login admin
+- `app/Http/Requests/Auth/OtpRequestRequest.php` — Validasi identifier + channel (wa/email)
+- `app/Http/Requests/Auth/OtpVerifyRequest.php` — Validasi identifier + code (6 digit)
+
+#### Added — Jobs (2 file)
+- `app/Jobs/SendWhatsAppNotification.php` — Queue: high; kirim via WA Gateway UNISYA `wacenter.unisya.ac.id`; log ke `notification_logs`
+- `app/Jobs/SendEmailNotification.php` — Queue: high; kirim via Laravel Mail; log ke `notification_logs`
+
+#### Added — Routes
+- `routes/api.php` — Semua route `/api/v1/auth/*` dengan rate limiting tepat; route `/api/v1/public/*`
+
+#### Added — Frontend (11 file)
+- `resources/js/services/api.js` — Axios instance + request interceptor (Bearer token) + response interceptor (401 redirect)
+- `resources/js/stores/auth.js` — Pinia store: `user`, `token`, `login()`, `logout()`, `fetchMe()`, `isAuthenticated` computed
+- `resources/js/layouts/AuthLayout.vue` — Split panel kiri (branding) + kanan (slot form), responsif mobile stack
+- `resources/js/pages/auth/LoginPage.vue` — Form email+password admin; error handling lockout & nonaktif
+- `resources/js/pages/auth/OtpRequestPage.vue` — Form identifier + channel (WA/Email) untuk alumni
+- `resources/js/pages/auth/OtpVerifyPage.vue` — Form 6-digit OTP, countdown timer, tombol resend (cooldown 60 detik)
+- `resources/js/pages/auth/EmployerTokenPage.vue` — Validasi token employer, redirect ke survei jika valid
+- `resources/js/router/index.js` — Vue Router 4; router guards: `requiresAuth`, role check, redirect logic
+- `resources/js/layouts/AdminLayout.vue` — Topbar, sidebar dengan sub-menu collapsible, breadcrumb
+- `resources/js/layouts/AlumniLayout.vue` — Topbar navigasi alumni, avatar, responsif
+- `resources/js/layouts/EmployerLayout.vue` — Header minimal, nama perusahaan, logo UNISYA
+
+#### Added — Tests (3 file)
+- `tests/Feature/Auth/AdminLoginTest.php` — Berhasil, gagal, lockout, akun nonaktif
+- `tests/Feature/Auth/OtpTest.php` — Request + verify: berhasil, kedaluwarsa, max attempts, cooldown
+- `tests/Feature/Auth/EmployerTokenTest.php` — Valid, kedaluwarsa, sudah digunakan
+
+#### Changed — App Provider
+- `app/Providers/AppServiceProvider.php` — Tambah registrasi `RateLimiter` untuk `otp-request`, `auth`, `api`, `export`; daftarkan middleware alias `CheckRole`, `EnsureAccountActive`, `ValidateEmployerToken`, `LogActivity`
+
+#### Changed — Bootstrap
+- `bootstrap/app.php` — Daftarkan middleware alias baru ke kernel
+
+---
+
+### Ringkasan File Terdampak v1.0.5
+
+| File | Aksi | Keterangan |
+|---|---|---|
+| 4 middleware files | Added | CheckRole, EnsureAccountActive, ValidateEmployerToken, LogActivity |
+| 2 service files | Added | OtpService, AuthService |
+| 3 controller files | Added | OtpController, AuthController, PublicController |
+| 3 form request files | Added | LoginRequest, OtpRequestRequest, OtpVerifyRequest |
+| 2 job files | Added | SendWhatsAppNotification, SendEmailNotification |
+| `routes/api.php` | Changed | Route auth + public + rate limiting |
+| 11 frontend files | Added | api.js, auth.js store, 3 layouts, 5 halaman auth, router/index.js |
+| 3 test files | Added | AdminLoginTest, OtpTest, EmployerTokenTest |
+| `app/Providers/AppServiceProvider.php` | Changed | RateLimiter + middleware alias registration |
+| `bootstrap/app.php` | Changed | Middleware alias registration |
+| `08_PHASE_TRACKER.md` | Changed | Sesi 1B 28/28 task → ✅; counter selesai 19→47 |
+| `09_CHANGELOG.md` | Added | Entri ini |
+
+**Total: ~35 file ditambah/diubah | 1B complete: 28/28 task ✅**
+**Task selesai keseluruhan: 47/199**
 
 ---
 
@@ -690,7 +775,7 @@ Baris "Hapus Employer (soft delete)" tidak ada di matriks izin sebelumnya, padah
 | 22 | 🟢 Minor | [INC-06/07] Architecture: folder structure pages tidak mencantumkan nama file .vue | ✅ Fixed v1.0.3 |
 
 **Total: 22 inkonsistensi ditemukan sejak v1.0.0 — semua telah diperbaiki**
-**Status: ✅ Dokumen SITRAS UNISYA v1.0.3 CLEAR dan SIAP DEVELOPMENT**
+**Status: ✅ Dokumen SITRAS UNISYA v1.0.5 CLEAR | Development Progress: 47/199 task (Sesi 1A, 1B ✅)**
 
 ---
 
@@ -718,6 +803,8 @@ Baris "Hapus Employer (soft delete)" tidak ada di matriks izin sebelumnya, padah
 | 1.0.1 | 2026-06-06 | Tambah entri audit konsistensi lengkap — 14 inkonsistensi ditemukan dan diperbaiki; tambah tabel ringkasan inkonsistensi; tambah tabel file terdampak |
 | 1.0.2 | 2026-06-08 | Tambah entri audit kesesuaian WA Gateway UNISYA — 9 file direvisi |
 | 1.0.3 | 2026-06-09 | Tambah entri audit v1.0.3 — 8 inkonsistensi ditemukan dan diperbaiki (6 file direvisi); update tabel inkonsistensi global (22 total) |
+| 1.0.4 | 2026-06-09 | Tambah entri penyelesaian Sesi 1A — 37 file produksi ditambah/diubah; 19/199 task development selesai |
+| 1.0.5 | 2026-06-09 | Tambah entri penyelesaian Sesi 1B — ~35 file produksi (middleware, service, controller, job, frontend Vue); 28/28 task ✅ |
 
 ---
 

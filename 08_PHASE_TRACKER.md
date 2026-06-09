@@ -1,6 +1,6 @@
 # 08_PHASE_TRACKER.md
 # PHASE TRACKER — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.4 | Tanggal: 2026-06-09
+# Versi: 1.0.5 | Tanggal: 2026-06-09
 
 ---
 
@@ -9,7 +9,7 @@
 | Fase | Nama | Sesi | Status |
 |---|---|---|---|
 | 0 | Dokumentasi & Desain | 0A | ✅ Selesai |
-| 1 | Fondasi & Autentikasi | 1A, 1B | 🔄 Berjalan (1A ✅) |
+| 1 | Fondasi & Autentikasi | 1A, 1B | ✅ Selesai (1A ✅, 1B ✅) |
 | 2 | Manajemen Data Inti | 2A, 2B, 2C | ⏳ Pending |
 | 3 | Kuesioner Dinamis | 3A, 3B | ⏳ Pending |
 | 4 | Survei & Notifikasi | 4A, 4B | ⏳ Pending |
@@ -18,7 +18,7 @@
 | 7 | Deployment & Optimasi | 7A | ⏳ Pending |
 
 **Total Task: 199 task**
-**Selesai: 19 task** *(1A.1–1A.19 selesai 2026-06-09)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
+**Selesai: 47 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
 
 ---
 
@@ -88,41 +88,42 @@
 ---
 
 ### Sesi 1B — Sistem Autentikasi Backend + Frontend
+**Status: ✅ Selesai | Tanggal Selesai: 2026-06-09**
 **Dependensi:** 1A selesai
 **Estimasi:** 3–4 hari
 
 | No | Task | File/Artefak | Status |
 |---|---|---|---|
-| 1B.1 | Middleware: `CheckRole` (validasi role via parameter) | `app/Http/Middleware/CheckRole.php` | ⏳ |
-| 1B.2 | Middleware: `EnsureAccountActive` (cek `users.is_active`) | `app/Http/Middleware/EnsureAccountActive.php` | ⏳ |
-| 1B.3 | Middleware: `ValidateEmployerToken` (cek token + expiry + status) | `app/Http/Middleware/ValidateEmployerToken.php` | ⏳ |
-| 1B.4 | Middleware: `LogActivity` (tulis ke audit_logs setiap request admin) | `app/Http/Middleware/LogActivity.php` | ⏳ |
-| 1B.5 | Service: `OtpService` (generate, hash SHA-256, kirim via queue, verify) | `app/Services/OtpService.php` | ⏳ |
-| 1B.6 | Service: `AuthService` (login admin, lockout logic, employer token login) | `app/Services/AuthService.php` | ⏳ |
-| 1B.7 | Controller: `Auth/OtpController` (request, verify — rate limit otp-request) | `OtpController.php` | ⏳ |
-| 1B.8 | Controller: `Auth/AuthController` (login admin, login employer, logout, me) | `AuthController.php` | ⏳ |
-| 1B.9 | FormRequest: `LoginRequest`, `OtpRequestRequest`, `OtpVerifyRequest` | Request files | ⏳ |
-| 1B.10 | Job: `SendWhatsAppNotification`, `SendEmailNotification` (queue: high) | Job files | ⏳ |
-| 1B.11 | Registrasi RateLimiter di `AppServiceProvider` (otp-request, auth, api, export) | `AppServiceProvider.php` | ⏳ |
-| 1B.12 | Routes: `/api/v1/auth/*` dengan rate limiting tepat | `routes/api.php` | ⏳ |
-| 1B.13 | Routes: `/api/v1/public/*` (employer-token validate, master data) | `routes/api.php` | ⏳ |
-| 1B.14 | Controller: `Public/PublicController` (validate token, master data) | `PublicController.php` | ⏳ |
-| 1B.15 | Frontend: Setup `services/api.js` (Axios instance + request/response interceptors) | `frontend/src/services/api.js` | ⏳ |
-| 1B.16 | Frontend: Store `stores/auth.js` (Pinia: user, token, login, logout, isAuthenticated) | `stores/auth.js` | ⏳ |
-| 1B.17 | Frontend: `layouts/AuthLayout.vue` (split panel kiri-kanan, responsif mobile) | `AuthLayout.vue` | ⏳ |
-| 1B.18 | Frontend: `pages/auth/LoginPage.vue` (form email+password untuk admin) | `LoginPage.vue` | ⏳ |
-| 1B.19 | Frontend: `pages/auth/OtpRequestPage.vue` (form identifier+channel untuk alumni) | `OtpRequestPage.vue` | ⏳ |
-| 1B.20 | Frontend: `pages/auth/OtpVerifyPage.vue` (form 6-digit OTP + countdown + resend) | `OtpVerifyPage.vue` | ⏳ |
-| 1B.21 | Frontend: `pages/auth/EmployerTokenPage.vue` (validasi token, redirect ke survei) | `EmployerTokenPage.vue` | ⏳ |
-| 1B.22 | Frontend: Router guards (requiresAuth, role check, redirect) di `router/index.js` | `router/index.js` | ⏳ |
-| 1B.23 | Frontend: `layouts/AdminLayout.vue` (topbar, sidebar dengan sub-menu, breadcrumb) | `AdminLayout.vue` | ⏳ |
-| 1B.24 | Frontend: `layouts/AlumniLayout.vue` (topbar navigasi alumni, responsif) | `AlumniLayout.vue` | ⏳ |
-| 1B.25 | Frontend: `layouts/EmployerLayout.vue` (header minimal, nama perusahaan) | `EmployerLayout.vue` | ⏳ |
-| 1B.26 | Feature Test: login admin (berhasil, gagal, lockout, akun nonaktif) | `tests/Feature/Auth/` | ⏳ |
-| 1B.27 | Feature Test: OTP request + verify (berhasil, kedaluwarsa, max attempts, cooldown) | `tests/Feature/Auth/` | ⏳ |
-| 1B.28 | Feature Test: employer token login (valid, kedaluwarsa, sudah selesai) | `tests/Feature/Auth/` | ⏳ |
+| 1B.1 | Middleware: `CheckRole` ... | `app/Http/Middleware/CheckRole.php` | ✅ |
+| 1B.2 | Middleware: `EnsureAccountActive` ... | `app/Http/Middleware/EnsureAccountActive.php` | ✅ |
+| 1B.3 | Middleware: `ValidateEmployerToken` ... | `app/Http/Middleware/ValidateEmployerToken.php` | ✅ |
+| 1B.4 | Middleware: `LogActivity` ... | `app/Http/Middleware/LogActivity.php` | ✅ |
+| 1B.5 | Service: `OtpService` ... | `app/Services/OtpService.php` | ✅ |
+| 1B.6 | Service: `AuthService` ... | `app/Services/AuthService.php` | ✅ |
+| 1B.7 | Controller: `Auth/OtpController` ... | `OtpController.php` | ✅ |
+| 1B.8 | Controller: `Auth/AuthController` ... | `AuthController.php` | ✅ |
+| 1B.9 | FormRequest: `LoginRequest`, `OtpRequestRequest`, `OtpVerifyRequest` | Request files | ✅ |
+| 1B.10 | Job: `SendWhatsAppNotification`, `SendEmailNotification` ... | Job files | ✅ |
+| 1B.11 | Registrasi RateLimiter di `AppServiceProvider` ... | `AppServiceProvider.php` | ✅ |
+| 1B.12 | Routes: `/api/v1/auth/*` ... | `routes/api.php` | ✅ |
+| 1B.13 | Routes: `/api/v1/public/*` ... | `routes/api.php` | ✅ |
+| 1B.14 | Controller: `Public/PublicController` ... | `PublicController.php` | ✅ |
+| 1B.15 | Frontend: Setup `services/api.js` ... | `frontend/src/services/api.js` | ✅ |
+| 1B.16 | Frontend: Store `stores/auth.js` ... | `stores/auth.js` | ✅ |
+| 1B.17 | Frontend: `layouts/AuthLayout.vue` ... | `AuthLayout.vue` | ✅ |
+| 1B.18 | Frontend: `pages/auth/LoginPage.vue` ... | `LoginPage.vue` | ✅ |
+| 1B.19 | Frontend: `pages/auth/OtpRequestPage.vue` ... | `OtpRequestPage.vue` | ✅ |
+| 1B.20 | Frontend: `pages/auth/OtpVerifyPage.vue` ... | `OtpVerifyPage.vue` | ✅ |
+| 1B.21 | Frontend: `pages/auth/EmployerTokenPage.vue` ... | `EmployerTokenPage.vue` | ✅ |
+| 1B.22 | Frontend: Router guards ... | `router/index.js` | ✅ |
+| 1B.23 | Frontend: `layouts/AdminLayout.vue` ... | `AdminLayout.vue` | ✅ |
+| 1B.24 | Frontend: `layouts/AlumniLayout.vue` ... | `AlumniLayout.vue` | ✅ |
+| 1B.25 | Frontend: `layouts/EmployerLayout.vue` ... | `EmployerLayout.vue` | ✅ |
+| 1B.26 | Feature Test: login admin ... | `tests/Feature/Auth/` | ✅ |
+| 1B.27 | Feature Test: OTP request + verify ... | `tests/Feature/Auth/` | ✅ |
+| 1B.28 | Feature Test: employer token login ... | `tests/Feature/Auth/` | ✅ |
 
-**Total Sesi 1B: 28 task**
+**Total Sesi 1B: 28 task — ✅ Selesai 28/28**
 
 ---
 
@@ -442,7 +443,7 @@
 |---|---|---|---|
 | 0 | 0A | 10 (dokumentasi — tidak dihitung development) | ✅ Selesai |
 | 1 | 1A | 19 | ✅ Selesai (2026-06-09) |
-| 1 | 1B | 28 | ⏳ |
+| 1 | 1B | 28 | ✅ Selesai (2026-06-09) |
 | 2 | 2A | 31 | ⏳ |
 | 2 | 2B | 16 | ⏳ |
 | 2 | 2C | 13 | ⏳ |
@@ -505,6 +506,7 @@ Fase 1A (Setup + DB) → Fase 1B (Auth)
 | 1.0.2 | 2026-06-08 | Update task 4A.11: spesifikasi WhatsAppService diperinci sesuai API WA Gateway UNISYA (parameter body `api_key`/`sender`/`number`/`message`/`footer`, baca config dari `system_settings`, aktifkan `full=1`); update task 1A.17: SystemSettingSeeder harus seed 3 key WA gateway |
 | 1.0.3 | 2026-06-09 | Fix header STATUS RINGKASAN: `Total Task: 167` → `199` yang tertinggal sejak v1.0.1 (INC-03) |
 | 1.0.4 | 2026-06-09 | Update progress Sesi 1A selesai (19/19 task ✅); update STATUS RINGKASAN dan RINGKASAN TASK PER FASE |
+| 1.0.5 | 2026-06-09 | Update progress Sesi 1B selesai (28/28 task ✅); update STATUS RINGKASAN dan RINGKASAN TASK PER FASE; counter task selesai 19→47 |
 
 ---
 
