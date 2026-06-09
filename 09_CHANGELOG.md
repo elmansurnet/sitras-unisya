@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.5 | Tanggal: 2026-06-09
+# Versi: 1.0.6 | Tanggal: 2026-06-09
 
 ---
 
@@ -21,6 +21,95 @@ Setiap entri changelog mengikuti format:
 - `Removed` — Konten yang dihapus
 - `Security` — Perbaikan keamanan
 - `Deprecated` — Fitur yang akan dihapus di versi mendatang
+
+---
+
+## [1.0.6] — 2026-06-09
+
+> **Sumber:** Penyelesaian Backend Sesi 2A — Manajemen Alumni (task 2A.1–2A.14).
+> Engineer: Claude (Lead Engineer SITRAS UNISYA).
+> **Perubahan berisi penambahan file kode produksi — tidak ada perubahan dokumentasi spesifikasi.**
+
+---
+
+### Added — File Kode Produksi Sesi 2A (Backend)
+
+#### Added — Migrations (3 file)
+- `database/migrations/*_create_alumni_table.php` — Tabel `alumni` (30+ kolom, ENUM `survey_status`: belum_disurvei/terkirim/sedang_mengisi/selesai, FK ke users/study_programs/graduation_years, index lengkap, SoftDeletes)
+- `database/migrations/*_create_alumni_work_histories_table.php` — Tabel `alumni_work_histories` (ENUM `employment_type`, `job_relevance`, FK ke alumni/salary_ranges/industry_sectors)
+- `database/migrations/*_create_survey_responses_table.php` — Skeleton tabel `survey_responses` untuk Sesi 4A
+
+#### Added — Models (2 file)
+- `app/Models/Alumni.php` — `$fillable`, `$casts` (gpa→decimal:2, dates, boolean), SoftDeletes, relasi lengkap (user, studyProgram, graduationYear, workHistories, surveyResponses), method `isProfileComplete()`
+- `app/Models/AlumniWorkHistory.php` — `$fillable`, `$casts` (start_date, end_date→datetime), relasi ke Alumni, SalaryRange, IndustrySector
+
+#### Added — Repository (1 file)
+- `app/Repositories/AlumniRepository.php` — `paginate()` (search/filter/sort), `findWithRelations()`, `findByUserId()`, `all()` (untuk export), `stats()` (ringkasan per survey_status)
+
+#### Added — Services (2 file)
+- `app/Services/AlumniService.php` — `create()`, `update()`, `delete()` (DB transaction + AuditLog), `uploadPhoto()` (storage/app/private), `import()` (batch via ImportExportService), `export()` (dispatch GenerateReportExport), `sendInvitation()` (dispatch SendBulkInvitationJob)
+- `app/Services/ImportExportService.php` — `parseExcel()`, `validateRows()`, `batchInsert()`, `generateTemplate()`, `exportExcel()` via maatwebsite/excel
+
+#### Added — Policy (1 file)
+- `app/Policies/AlumniPolicy.php` — `viewAny`/`view`/`create`/`update` (superadmin+admin; alumni self-only), `delete` (superadmin only sesuai 07_SECURITY.md §3.3), `import`/`export` (superadmin+admin)
+
+#### Added — Form Requests (4 file)
+- `app/Http/Requests/Alumni/StoreAlumniRequest.php` — Validasi lengkap nim/nik/gpa/email unique, study_program/graduation_year exists
+- `app/Http/Requests/Alumni/UpdateAlumniRequest.php` — Validasi dengan `Rule::unique()->ignore()` untuk update
+- `app/Http/Requests/Alumni/ImportAlumniRequest.php` — file `mimes:xlsx,csv`, max 10MB
+- `app/Http/Requests/Alumni/SendInvitationRequest.php` — channel (whatsapp/email/both), questionnaire_id exists
+
+#### Added — Controllers (3 file)
+- `app/Http/Controllers/Api/V1/Admin/AlumniController.php` — `index` (paginate+filter), `show`, `store`, `update`, `destroy`, `import`, `export`, `importTemplate`, `stats`, `sendInvitation`; response format sesuai 05_API.md §3.1–3.9; Gate::authorize() di setiap action
+- `app/Http/Controllers/Api/V1/Alumni/ProfileController.php` — `show`, `update` (field terbatas alumni self), `uploadPhoto`; akses foto via temporary signed URL
+- `app/Http/Controllers/Api/V1/Alumni/WorkHistoryController.php` — `index`/`store`/`update`/`destroy` (self), `indexForAdmin`; `is_current` reset logic (hanya 1 pekerjaan aktif)
+
+#### Added — Jobs & Exports (3 file)
+- `app/Jobs/SendBulkInvitationJob.php` — Kirim undangan via WA Gateway UNISYA (POST ke `wacenter.unisya.ac.id`), update `survey_status`→`terkirim`, `AuditLog::record()`, retry 3x, queue: `high`
+- `app/Jobs/GenerateReportExport.php` — Generate Excel via maatwebsite/excel, simpan ke `storage/private/exports/`, queue: `default`
+- `app/Exports/AlumniExport.php` — Maatwebsite Excel export class: heading row, auto-size kolom, bold header
+
+#### Changed — Routes
+- `routes/api.php` — Tambah routes admin alumni (`/api/v1/admin/alumni/*`) dan alumni self-service (`/api/v1/alumni/*`); static routes (`/import`, `/export`, `/template`, `/stats`) didaftarkan SEBELUM `{alumni}` sesuai 05_API.md §INC-04 note
+
+#### Changed — App Provider
+- `app/Providers/AuthServiceProvider.php` — Register `AlumniPolicy` untuk `Alumni::class`
+
+---
+
+### Security
+- `AlumniPolicy::delete()` hanya superadmin sesuai 07_SECURITY.md §3.3
+- File upload disimpan ke `storage/app/private/`, akses via `temporaryUrl()` (signed URL)
+- `Gate::authorize()` digunakan di setiap controller action (bukan hanya middleware role)
+- `self-authorization` check di WorkHistoryController dan ProfileController (alumni hanya bisa akses milik sendiri)
+- Tidak ada raw SQL — semua query via Eloquent dengan parameter binding
+
+---
+
+### Ringkasan File Terdampak v1.0.6
+
+| File | Aksi | Keterangan |
+|---|---|---|
+| 3 migration files | Added | alumni, alumni_work_histories, survey_responses (skeleton) |
+| 2 model files | Added | Alumni (gpa decimal:2, SoftDeletes), AlumniWorkHistory |
+| `app/Repositories/AlumniRepository.php` | Added | paginate/filter/sort/stats |
+| `app/Services/AlumniService.php` | Added | CRUD + upload + import + export + invite |
+| `app/Services/ImportExportService.php` | Added | Excel parse/validate/batch/template |
+| `app/Policies/AlumniPolicy.php` | Added | Role-aware: delete=superadmin only |
+| 4 form request files | Added | Store, Update, Import, SendInvitation |
+| `Admin/AlumniController.php` | Added | 10 actions (CRUD + import + export + stats + invite) |
+| `Alumni/ProfileController.php` | Added | show + update + uploadPhoto |
+| `Alumni/WorkHistoryController.php` | Added | CRUD self + indexForAdmin |
+| `app/Jobs/SendBulkInvitationJob.php` | Added | WA blast via gateway UNISYA, queue: high |
+| `app/Jobs/GenerateReportExport.php` | Added | Excel export, queue: default |
+| `app/Exports/AlumniExport.php` | Added | Maatwebsite export class |
+| `routes/api.php` | Changed | Routes admin/alumni alumni dengan static-before-param ordering |
+| `app/Providers/AuthServiceProvider.php` | Changed | AlumniPolicy registration |
+| `08_PHASE_TRACKER.md` | Changed | Sesi 2A backend 14/31 task → ✅; counter selesai 47→61 |
+| `09_CHANGELOG.md` | Added | Entri ini |
+
+**Total: 17 file ditambah/diubah | 2A backend complete: 14/31 task ✅**
+**Task selesai keseluruhan: 61/199**
 
 ---
 

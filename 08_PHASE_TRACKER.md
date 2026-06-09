@@ -1,6 +1,6 @@
 # 08_PHASE_TRACKER.md
 # PHASE TRACKER — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.5 | Tanggal: 2026-06-09
+# Versi: 1.0.6 | Tanggal: 2026-06-09
 
 > File ini hanya bisa edit untuk update progress project dan task tidak boleh dikurangi untuk konsistensi project!
 
@@ -12,7 +12,7 @@
 |---|---|---|---|
 | 0 | Dokumentasi & Desain | 0A | ✅ Selesai |
 | 1 | Fondasi & Autentikasi | 1A, 1B | ✅ Selesai (1A ✅, 1B ✅) |
-| 2 | Manajemen Data Inti | 2A, 2B, 2C | ⏳ Pending |
+| 2 | Manajemen Data Inti | 2A, 2B, 2C | 🔄 Berjalan (2A backend ✅, frontend ⏳) |
 | 3 | Kuesioner Dinamis | 3A, 3B | ⏳ Pending |
 | 4 | Survei & Notifikasi | 4A, 4B | ⏳ Pending |
 | 5 | Analitik & Pelaporan | 5A, 5B | ⏳ Pending |
@@ -20,7 +20,7 @@
 | 7 | Deployment & Optimasi | 7A | ⏳ Pending |
 
 **Total Task: 199 task**
-**Selesai: 47 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
+**Selesai: 61 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.14 backend selesai 2026-06-09)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
 
 ---
 
@@ -132,25 +132,27 @@
 ## FASE 2 — MANAJEMEN DATA INTI
 
 ### Sesi 2A — Manajemen Alumni (Backend + Frontend)
+**Status: 🔄 Berjalan — Backend ✅ Selesai 14/31 | Frontend + Test ⏳ Pending**
+**Tanggal Backend Selesai: 2026-06-09**
 **Dependensi:** Fase 1 selesai
 **Estimasi:** 4–5 hari
 
 | No | Task | File/Artefak | Status |
 |---|---|---|---|
-| 2A.1 | Migrasi: `alumni`, `alumni_work_histories` | Migration files | ⏳ |
-| 2A.2 | Model: `Alumni` (fillable, casts, relationships ke user/studyProgram/graduationYear/workHistories) | `app/Models/Alumni.php` | ⏳ |
-| 2A.3 | Model: `AlumniWorkHistory` (fillable, casts, relationship ke alumni/employer) | `app/Models/AlumniWorkHistory.php` | ⏳ |
+| 2A.1 | Migrasi: `alumni`, `alumni_work_histories` | Migration files | ✅ |
+| 2A.2 | Model: `Alumni` (fillable, casts, relationships ke user/studyProgram/graduationYear/workHistories) | `app/Models/Alumni.php` | ✅ |
+| 2A.3 | Model: `AlumniWorkHistory` (fillable, casts, relationship ke alumni/employer) | `app/Models/AlumniWorkHistory.php` | ✅ |
 | 2A.4 | Observer: `AlumniObserver` (created, updated, deleted → audit_logs) | `AlumniObserver.php` | ⏳ |
-| 2A.5 | Repository: `AlumniRepository` (findByNim, findWithFilters, getMapCoordinates, getStats) | `AlumniRepository.php` | ⏳ |
-| 2A.6 | Service: `AlumniService` (create, update, delete, import, export, sendInvitation) | `app/Services/AlumniService.php` | ⏳ |
-| 2A.7 | Service: `ImportExportService` (parseExcel, validateRows, batchInsert, generateTemplate, exportExcel) | `ImportExportService.php` | ⏳ |
-| 2A.8 | Policy: `AlumniPolicy` (view, create, update, delete — role-aware) | `AlumniPolicy.php` | ⏳ |
-| 2A.9 | FormRequest: `StoreAlumniRequest`, `UpdateAlumniRequest`, `StoreWorkHistoryRequest` | Request files | ⏳ |
-| 2A.10 | Controller: `Admin/AlumniController` (index, show, store, update, destroy, import, export, importTemplate, sendInvitation) | `AlumniController.php` | ⏳ |
-| 2A.11 | Controller: `Alumni/ProfileController` (show, update, uploadPhoto) | `ProfileController.php` | ⏳ |
-| 2A.12 | Controller: `Alumni/WorkHistoryController` (index, store, update, destroy) | `WorkHistoryController.php` | ⏳ |
-| 2A.13 | Routes: `/api/v1/admin/alumni/*` + `/api/v1/alumni/*` | `routes/api.php` | ⏳ |
-| 2A.14 | Job: `GenerateReportExport` (queue: default, generate Excel export besar) | `GenerateReportExport.php` | ⏳ |
+| 2A.5 | Repository: `AlumniRepository` (findByNim, findWithFilters, getMapCoordinates, getStats) | `AlumniRepository.php` | ✅ |
+| 2A.6 | Service: `AlumniService` (create, update, delete, import, export, sendInvitation) | `app/Services/AlumniService.php` | ✅ |
+| 2A.7 | Service: `ImportExportService` (parseExcel, validateRows, batchInsert, generateTemplate, exportExcel) | `ImportExportService.php` | ✅ |
+| 2A.8 | Policy: `AlumniPolicy` (view, create, update, delete — role-aware) | `AlumniPolicy.php` | ✅ |
+| 2A.9 | FormRequest: `StoreAlumniRequest`, `UpdateAlumniRequest`, `StoreWorkHistoryRequest` | Request files | ✅ |
+| 2A.10 | Controller: `Admin/AlumniController` (index, show, store, update, destroy, import, export, importTemplate, sendInvitation) | `AlumniController.php` | ✅ |
+| 2A.11 | Controller: `Alumni/ProfileController` (show, update, uploadPhoto) | `ProfileController.php` | ✅ |
+| 2A.12 | Controller: `Alumni/WorkHistoryController` (index, store, update, destroy) | `WorkHistoryController.php` | ✅ |
+| 2A.13 | Routes: `/api/v1/admin/alumni/*` + `/api/v1/alumni/*` | `routes/api.php` | ✅ |
+| 2A.14 | Job: `GenerateReportExport` (queue: default, generate Excel export besar) | `GenerateReportExport.php` | ✅ |
 | 2A.15 | Frontend: Store `stores/alumni.js` (Pinia: list, current, pagination, filters, CRUD actions) | `stores/alumni.js` | ⏳ |
 | 2A.16 | Frontend: Komponen `common/DataTable.vue` (sortable, selectable, pagination, empty state) | `DataTable.vue` | ⏳ |
 | 2A.17 | Frontend: Komponen `common/FilterBar.vue` (multi-filter, reset) | `FilterBar.vue` | ⏳ |
@@ -169,7 +171,7 @@
 | 2A.30 | Feature Test: CRUD alumni (create, read, update, delete — per role) | `tests/Feature/Admin/AlumniTest.php` | ⏳ |
 | 2A.31 | Feature Test: Import alumni (berhasil, validasi error, duplikat NIM) | `tests/Feature/Admin/AlumniImportTest.php` | ⏳ |
 
-**Total Sesi 2A: 31 task**
+**Total Sesi 2A: 31 task — ✅ Backend 14/31 selesai | ⏳ Frontend 0/17 pending**
 
 ---
 
@@ -446,7 +448,7 @@
 | 0 | 0A | 10 (dokumentasi — tidak dihitung development) | ✅ Selesai |
 | 1 | 1A | 19 | ✅ Selesai (2026-06-09) |
 | 1 | 1B | 28 | ✅ Selesai (2026-06-09) |
-| 2 | 2A | 31 | ⏳ |
+| 2 | 2A | 31 | 🔄 Backend 14/31 ✅ (2026-06-09) | Frontend + Test pending |
 | 2 | 2B | 16 | ⏳ |
 | 2 | 2C | 13 | ⏳ |
 | 3 | 3A | 12 | ⏳ |
@@ -509,6 +511,7 @@ Fase 1A (Setup + DB) → Fase 1B (Auth)
 | 1.0.3 | 2026-06-09 | Fix header STATUS RINGKASAN: `Total Task: 167` → `199` yang tertinggal sejak v1.0.1 (INC-03) |
 | 1.0.4 | 2026-06-09 | Update progress Sesi 1A selesai (19/19 task ✅); update STATUS RINGKASAN dan RINGKASAN TASK PER FASE |
 | 1.0.5 | 2026-06-09 | Update progress Sesi 1B selesai (28/28 task ✅); update STATUS RINGKASAN dan RINGKASAN TASK PER FASE; counter task selesai 19→47 |
+| 1.0.6 | 2026-06-09 | Update progress Sesi 2A backend selesai (14/31 task ✅): migrations alumni, models, repository, service, policy, form requests, controllers, jobs, routes; counter task selesai 47→61; status Fase 2 berubah dari Pending → Berjalan |
 
 ---
 
