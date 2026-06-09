@@ -77,7 +77,13 @@ class AppServiceProvider extends ServiceProvider
 
     /**
      * Daftarkan Eloquent Observers.
-     * Body observer diisi di sesi 2A/2B sesuai catatan di 08_PHASE_TRACKER.md.
+     *
+     * Semua observer sudah tersedia sebagai placeholder.
+     * Body method diisi bertahap:
+     *   - AlumniObserver  : sesi 2A
+     *   - UserObserver    : sesi 2A
+     *   - EmployerObserver: sesi 2B
+     *   - SurveyResponseObserver: sesi 3A
      */
     private function registerObservers(): void
     {

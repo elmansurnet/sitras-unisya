@@ -2,20 +2,28 @@
 
 namespace App\Observers;
 
+use App\Models\SurveyResponse;
+
 /**
  * SurveyResponseObserver
- * Diisi lengkap pada sesi 3B (Survey Response).
- * Model SurveyResponse belum dibuat — type-hint akan diupdate saat sesi 3B.
+ *
+ * Placeholder — implementasi diisi pada sesi 3A.
+ * Akan menangani: update alumni employment status, audit log.
  */
 class SurveyResponseObserver
 {
-    public function created(object $surveyResponse): void
+    public function created(SurveyResponse $surveyResponse): void
     {
-        // Implemented in session 3B
+        // TODO sesi 3A
     }
 
-    public function updated(object $surveyResponse): void
+    public function updated(SurveyResponse $surveyResponse): void
     {
-        // Implemented in session 3B
+        // TODO sesi 3A: jika status → 'submitted', update alumni last_survey_at
+    }
+
+    public function deleted(SurveyResponse $surveyResponse): void
+    {
+        // TODO sesi 3A
     }
 }
