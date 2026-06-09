@@ -5,42 +5,54 @@ namespace Database\Seeders;
 use App\Models\Faculty;
 use Illuminate\Database\Seeder;
 
+/**
+ * FacultySeeder
+ *
+ * Data fakultas Universitas Islam Syarifuddin Lumajang.
+ * Kolom sesuai migration 000004: code, name, dean_name, is_active.
+ */
 class FacultySeeder extends Seeder
 {
-    /**
-     * Data fakultas Universitas Islam Syarifuddin (UNISYA)
-     */
     public function run(): void
     {
         $faculties = [
             [
-                'code'      => 'FTIK',
-                'name'      => 'Fakultas Tarbiyah dan Ilmu Keguruan',
+                'code'      => 'FAI',
+                'name'      => 'Fakultas Agama Islam',
                 'dean_name' => null,
                 'is_active' => true,
             ],
             [
-                'code'      => 'FSH',
-                'name'      => 'Fakultas Syariah dan Hukum',
+                'code'      => 'FT',
+                'name'      => 'Fakultas Teknik',
                 'dean_name' => null,
                 'is_active' => true,
             ],
             [
-                'code'      => 'FEBI',
-                'name'      => 'Fakultas Ekonomi dan Bisnis Islam',
+                'code'      => 'FE',
+                'name'      => 'Fakultas Ekonomi',
                 'dean_name' => null,
                 'is_active' => true,
             ],
             [
-                'code'      => 'FDIK',
-                'name'      => 'Fakultas Dakwah dan Ilmu Komunikasi',
+                'code'      => 'FKIP',
+                'name'      => 'Fakultas Keguruan dan Ilmu Pendidikan',
+                'dean_name' => null,
+                'is_active' => true,
+            ],
+            [
+                'code'      => 'FH',
+                'name'      => 'Fakultas Hukum',
                 'dean_name' => null,
                 'is_active' => true,
             ],
         ];
 
-        foreach ($faculties as $data) {
-            Faculty::updateOrCreate(['code' => $data['code']], $data);
+        foreach ($faculties as $faculty) {
+            Faculty::updateOrCreate(
+                ['code' => $faculty['code']],
+                $faculty
+            );
         }
     }
 }

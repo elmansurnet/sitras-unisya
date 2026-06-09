@@ -14,6 +14,11 @@ use Illuminate\Support\Facades\Schema;
  * ke tabel employers BELUM ditambahkan di sini karena tabel employers dibuat di sesi 2B.
  * Constraint FK akan ditambahkan via migration terpisah di sesi 2B:
  *   2026_06_09_200003_add_fk_employer_to_alumni_work_histories.php
+ *
+ * Changelog fix vs versi sebelumnya:
+ * - is_current: tinyInteger()->unsigned() → boolean() agar konsisten TINYINT(1)
+ * - is_relevant_to_study: hapus ->unsigned() — TINYINT(1) tidak pakai unsigned
+ * - Hapus duplikat $table->index('alumni_id') — FK di InnoDB otomatis membuat index
  */
 return new class extends Migration
 {
@@ -23,21 +28,21 @@ return new class extends Migration
             // Primary Key
             $table->bigIncrements('id');
 
-            // Relasi ke alumni (required)
+            // FK ke alumni (required, cascade delete)
             $table->unsignedBigInteger('alumni_id');
             $table->foreign('alumni_id')
                   ->references('id')
                   ->on('alumni')
                   ->cascadeOnDelete();
 
-            // Relasi ke employers (nullable — employer mungkin belum terdaftar di sistem)
-            // FK CONSTRAINT ke employers ditambahkan di sesi 2B setelah tabel employers dibuat
+            // FK ke employers (nullable — employer mungkin belum terdaftar)
+            // FK CONSTRAINT menyusul di sesi 2B via migration terpisah
             $table->unsignedBigInteger('employer_id')->nullable();
 
             // Data pekerjaan — sesuai 02_DATABASE.md §2.3
-            $table->string('company_name', 255);                // VARCHAR(255) sesuai spec
-            $table->string('position', 255);                    // VARCHAR(255) sesuai spec
-            $table->string('industry_sector', 100)->nullable(); // nama kolom sesuai spec
+            $table->string('company_name', 255);
+            $table->string('position', 255);
+            $table->string('industry_sector', 100)->nullable();
             $table->enum('employment_type', [
                 'penuh_waktu',
                 'paruh_waktu',
@@ -49,30 +54,32 @@ return new class extends Migration
 
             // Periode kerja
             $table->date('start_date');
-            $table->date('end_date')->nullable(); // NULL = masih bekerja
-            $table->tinyInteger('is_current')->unsigned()->default(0);
+            $table->date('end_date')->nullable();
+
+            // FIX: boolean() menghasilkan TINYINT(1) — konsisten dengan konvensi boolean 02_DATABASE.md
+            $table->boolean('is_current')->default(false);
 
             // Lokasi
             $table->string('city', 100)->nullable();
             $table->string('province', 100)->nullable();
-            $table->string('country', 100)->nullable();         // kolom sesuai spec
+            $table->string('country', 100)->nullable();
 
-            // Gaji — sesuai spec: VARCHAR(50) kode range, bukan FK
-            $table->string('monthly_salary_range', 50)->nullable(); // contoh: '3_5jt'
+            // Gaji — VARCHAR(50) kode range (misal: '3_5jt'), bukan FK
+            $table->string('monthly_salary_range', 50)->nullable();
 
-            // Relevansi & tunggu kerja
-            $table->tinyInteger('is_relevant_to_study')->unsigned()->nullable(); // 1=ya,0=tidak
-            $table->tinyInteger('waiting_time_months')->unsigned()->nullable();  // bulan tunggu
+            // FIX: hapus ->unsigned() pada TINYINT(1) boolean field
+            $table->tinyInteger('is_relevant_to_study')->nullable()
+                  ->comment('1=ya, 0=tidak, NULL=belum diisi');
 
-            // Deskripsi
+            // Bulan menunggu setelah lulus — TINYINT UNSIGNED sesuai spec
+            $table->tinyInteger('waiting_time_months')->unsigned()->nullable();
+
             $table->text('description')->nullable();
-
-            // Timestamps
             $table->timestamps();
 
             // Index sesuai 02_DATABASE.md §2.3
-            $table->index('alumni_id');
-            $table->index('employer_id'); // index kolom ada, constraint FK menyusul di sesi 2B
+            // alumni_id: TIDAK di-index manual — FK InnoDB otomatis membuat index
+            $table->index('employer_id');  // manual karena FK belum ada (menyusul sesi 2B)
             $table->index('is_current');
         });
     }

@@ -5,24 +5,80 @@ namespace Database\Seeders;
 use App\Models\SalaryRange;
 use Illuminate\Database\Seeder;
 
+/**
+ * SalaryRangeSeeder
+ *
+ * Master rentang gaji untuk dropdown pilihan alumni.
+ * Kolom sesuai migration 000009 & 02_DATABASE.md §2.8:
+ *   label, min_value, max_value, order_number, is_active
+ */
 class SalaryRangeSeeder extends Seeder
 {
     public function run(): void
     {
         $ranges = [
-            ['label' => '< Rp 1.000.000',                   'min_salary' => null,      'max_salary' => 999999,   'sort_order' => 1],
-            ['label' => 'Rp 1.000.000 – Rp 2.000.000',     'min_salary' => 1000000,   'max_salary' => 2000000,  'sort_order' => 2],
-            ['label' => 'Rp 2.000.001 – Rp 3.500.000',     'min_salary' => 2000001,   'max_salary' => 3500000,  'sort_order' => 3],
-            ['label' => 'Rp 3.500.001 – Rp 5.000.000',     'min_salary' => 3500001,   'max_salary' => 5000000,  'sort_order' => 4],
-            ['label' => 'Rp 5.000.001 – Rp 7.500.000',     'min_salary' => 5000001,   'max_salary' => 7500000,  'sort_order' => 5],
-            ['label' => 'Rp 7.500.001 – Rp 10.000.000',    'min_salary' => 7500001,   'max_salary' => 10000000, 'sort_order' => 6],
-            ['label' => '> Rp 10.000.000',                  'min_salary' => 10000001,  'max_salary' => null,     'sort_order' => 7],
+            [
+                'label'        => '< Rp 1 Juta',
+                'min_value'    => 0,
+                'max_value'    => 999999,
+                'order_number' => 1,
+                'is_active'    => true,
+            ],
+            [
+                'label'        => 'Rp 1 - 2 Juta',
+                'min_value'    => 1000000,
+                'max_value'    => 1999999,
+                'order_number' => 2,
+                'is_active'    => true,
+            ],
+            [
+                'label'        => 'Rp 2 - 3 Juta',
+                'min_value'    => 2000000,
+                'max_value'    => 2999999,
+                'order_number' => 3,
+                'is_active'    => true,
+            ],
+            [
+                'label'        => 'Rp 3 - 5 Juta',
+                'min_value'    => 3000000,
+                'max_value'    => 4999999,
+                'order_number' => 4,
+                'is_active'    => true,
+            ],
+            [
+                'label'        => 'Rp 5 - 7 Juta',
+                'min_value'    => 5000000,
+                'max_value'    => 6999999,
+                'order_number' => 5,
+                'is_active'    => true,
+            ],
+            [
+                'label'        => 'Rp 7 - 10 Juta',
+                'min_value'    => 7000000,
+                'max_value'    => 9999999,
+                'order_number' => 6,
+                'is_active'    => true,
+            ],
+            [
+                'label'        => 'Rp 10 - 15 Juta',
+                'min_value'    => 10000000,
+                'max_value'    => 14999999,
+                'order_number' => 7,
+                'is_active'    => true,
+            ],
+            [
+                'label'        => '> Rp 15 Juta',
+                'min_value'    => 15000000,
+                'max_value'    => null,
+                'order_number' => 8,
+                'is_active'    => true,
+            ],
         ];
 
-        foreach ($ranges as $data) {
+        foreach ($ranges as $range) {
             SalaryRange::updateOrCreate(
-                ['label' => $data['label']],
-                array_merge($data, ['is_active' => true])
+                ['label' => $range['label']],
+                $range
             );
         }
     }

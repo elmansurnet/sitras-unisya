@@ -6,6 +6,16 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
+/**
+ * SuperadminSeeder
+ *
+ * Membuat 1 akun superadmin default.
+ * Password di-hash dengan bcrypt cost factor 12 sesuai 07_SECURITY.md.
+ *
+ * Kolom sesuai migration users (0001_01_01_000000):
+ *   name, email, phone, role, password, is_active,
+ *   login_attempts, locked_until, email_verified_at
+ */
 class SuperadminSeeder extends Seeder
 {
     public function run(): void
@@ -17,15 +27,11 @@ class SuperadminSeeder extends Seeder
                 'email'             => 'superadmin@unisya.ac.id',
                 'phone'             => null,
                 'role'              => 'superadmin',
-                // bcrypt dengan cost factor 12 sesuai spesifikasi keamanan
-                'password'          => Hash::make(
-                    env('SUPERADMIN_PASSWORD', 'SitrasSuperAdmin@2026!'),
-                    ['rounds' => 12]
-                ),
-                'email_verified_at' => now(),
+                'password'          => Hash::make('SuperAdmin@UNISYA2026!', ['rounds' => 12]),
                 'is_active'         => true,
                 'login_attempts'    => 0,
                 'locked_until'      => null,
+                'email_verified_at' => now(),
             ]
         );
     }
