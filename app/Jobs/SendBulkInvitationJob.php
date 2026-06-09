@@ -4,118 +4,165 @@ namespace App\Jobs;
 
 use App\Models\Alumni;
 use App\Models\AuditLog;
+use App\Models\SystemSetting;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * SendBulkInvitationJob
+ *
+ * Dikirim ke queue 'high' — kirim undangan survei massal ke alumni.
+ * Setiap job menangani SATU alumni untuk isolasi kegagalan.
+ *
+ * Dispatch dari:
+ *  - AlumniService::sendInvitation() — undangan tunggal
+ *  - SurveyPeriodService::sendBulkInvitations() — undangan massal (sesi 4A)
+ */
 class SendBulkInvitationJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * Jumlah retry jika job gagal.
+     * Maksimal percobaan ulang sebelum job dinyatakan gagal.
      */
     public int $tries = 3;
 
     /**
-     * Backoff dalam detik antar retry: 60s, 300s, 600s.
-     *
-     * @var array<int,int>
+     * Timeout per job dalam detik.
      */
-    public array $backoff = [60, 300, 600];
+    public int $timeout = 30;
 
-    /**
-     * Timeout maksimal eksekusi job (detik).
-     */
-    public int $timeout = 300;
-
-    /**
-     * @param  Collection<int,int> $alumniIds   ID alumni yang akan diundang
-     * @param  int                 $surveyPeriodId
-     * @param  int                 $actorId     user_id yang men-trigger blast
-     * @param  int                 $questionnaireId  ID kuesioner yang akan dikirimkan
-     */
     public function __construct(
-        private readonly Collection $alumniIds,
-        private readonly int        $surveyPeriodId,
-        private readonly int        $actorId,
-        private readonly int        $questionnaireId,
-    ) {}
+        public readonly int    $alumniId,
+        public readonly int    $questionnaireId,
+        public readonly string $channel,         // 'whatsapp' | 'email' | 'both'
+        public readonly int    $actorId,
+    ) {
+        $this->onQueue('high');
+    }
 
-    /**
-     * Eksekusi job: kirim undangan ke setiap alumni.
-     * Notifikasi aktual (WA/email) akan diimplementasikan di sesi 4A
-     * setelah SurveyPeriod, NotificationTemplate, dan WhatsAppService tersedia.
-     */
     public function handle(): void
     {
-        $chunk = 50; // Proses 50 alumni per iterasi untuk menghindari memory leak
+        $alumni = Alumni::with('user')->find($this->alumniId);
 
-        $this->alumniIds->chunk($chunk)->each(function (Collection $chunk) {
-            $alumni = Alumni::whereIn('id', $chunk)
-                ->where('is_active', true)
-                ->with('user:id,name,email')
-                ->get();
+        if (!$alumni) {
+            Log::warning('SendBulkInvitationJob: alumni not found', ['alumni_id' => $this->alumniId]);
+            return;
+        }
 
-            foreach ($alumni as $alum) {
-                try {
-                    // Placeholder: dispatching SendWhatsAppNotification & SendEmailNotification
-                    // akan diisi penuh di sesi 4A setelah NotificationService tersedia
-                    Log::info('SendBulkInvitationJob: alumni queued', [
-                        'alumni_id'        => $alum->id,
-                        'survey_period_id' => $this->surveyPeriodId,
-                        'questionnaire_id' => $this->questionnaireId,
-                    ]);
-                } catch (\Throwable $e) {
-                    Log::error('SendBulkInvitationJob: failed for alumni ' . $alum->id, [
-                        'error' => $e->getMessage(),
-                    ]);
-                    // Lanjutkan ke alumni berikutnya (jangan lempar exception agar loop tidak berhenti)
-                }
-            }
-        });
+        // Buat URL survei alumni
+        $surveyUrl = config('app.frontend_url', config('app.url'))
+            . '/survey?alumni=' . $alumni->id
+            . '&q='            . $this->questionnaireId;
 
-        AuditLog::record(
-            action   : 'bulk_invitation_dispatched',
-            module   : 'survey',
-            modelId  : $this->surveyPeriodId,
-            oldValues: null,
-            newValues: [
-                'alumni_count'     => $this->alumniIds->count(),
-                'questionnaire_id' => $this->questionnaireId,
-                'actor_id'         => $this->actorId,
-            ],
-            modelType: null,
-        );
+        $message = "Assalamu'alaikum, Yth. {$alumni->full_name}\n\n"
+            . "Kami mengundang Anda untuk mengisi Survei Tracer Study UNISYA.\n"
+            . "Survei ini hanya membutuhkan ±10 menit.\n\n"
+            . "Link survei:\n{$surveyUrl}\n\n"
+            . "Terima kasih atas partisipasi Anda. 🙏";
+
+        $sent = false;
+
+        if (in_array($this->channel, ['whatsapp', 'both'], true) && $alumni->phone) {
+            $sent = $this->sendWhatsapp($alumni->phone, $message);
+        }
+
+        if (in_array($this->channel, ['email', 'both'], true) && $alumni->user?->email) {
+            // Email akan diimplementasi penuh di sesi 3A (NotificationService)
+            // Placeholder: log saja dulu
+            Log::info('SendBulkInvitationJob: email queued', [
+                'alumni_id' => $this->alumniId,
+                'email'     => $alumni->user->email,
+            ]);
+            $sent = true;
+        }
+
+        if ($sent) {
+            // Update survey_status → 'terkirim'
+            $alumni->update(['survey_status' => 'terkirim']);
+
+            AuditLog::record(
+                action   : 'send_invitation',
+                module   : 'alumni',
+                modelId  : $alumni->id,
+                oldValues: ['survey_status' => $alumni->getOriginal('survey_status')],
+                newValues: [
+                    'survey_status'    => 'terkirim',
+                    'channel'          => $this->channel,
+                    'questionnaire_id' => $this->questionnaireId,
+                    'actor_id'         => $this->actorId,
+                ],
+                modelType: Alumni::class,
+            );
+        }
     }
 
     /**
-     * Tangani kegagalan job setelah semua retry habis.
+     * Kirim pesan via WA Gateway UNISYA.
+     * Config: wa_gateway_url, wa_api_key, wa_sender di system_settings.
+     *
+     * Response success: { status: true, data: { key: { id: "..." } } }
+     * Status 'delivered' TIDAK diisi otomatis dari gateway ini.
+     */
+    private function sendWhatsapp(string $phone, string $message): bool
+    {
+        try {
+            $url    = SystemSetting::getValue('wa_gateway_url', config('tracer.wa_gateway_url', ''));
+            $apiKey = SystemSetting::getValue('wa_api_key', '');
+            $sender = SystemSetting::getValue('wa_sender', '');
+
+            if (empty($url) || empty($apiKey) || empty($sender)) {
+                Log::warning('SendBulkInvitationJob: WA gateway not configured');
+                return false;
+            }
+
+            $response = Http::timeout(10)->post($url, [
+                'api_key' => $apiKey,
+                'sender'  => $sender,
+                'number'  => $phone,
+                'message' => $message,
+                'full'    => 1,
+            ]);
+
+            $body = $response->json();
+
+            if ($response->successful() && ($body['status'] ?? false) === true) {
+                Log::info('SendBulkInvitationJob: WA sent', [
+                    'alumni_id' => $this->alumniId,
+                    'phone'     => $phone,
+                ]);
+                return true;
+            }
+
+            Log::warning('SendBulkInvitationJob: WA gateway returned failure', [
+                'alumni_id' => $this->alumniId,
+                'response'  => $body,
+            ]);
+            return false;
+
+        } catch (\Throwable $e) {
+            Log::error('SendBulkInvitationJob: WA exception', [
+                'alumni_id' => $this->alumniId,
+                'error'     => $e->getMessage(),
+            ]);
+            // Re-throw agar Laravel Queue retry job ini
+            throw $e;
+        }
+    }
+
+    /**
+     * Tangani job yang sudah gagal setelah semua retry habis.
      */
     public function failed(\Throwable $exception): void
     {
-        Log::error('SendBulkInvitationJob permanently failed', [
-            'survey_period_id' => $this->surveyPeriodId,
-            'alumni_count'     => $this->alumniIds->count(),
-            'actor_id'         => $this->actorId,
-            'error'            => $exception->getMessage(),
+        Log::error('SendBulkInvitationJob: permanently failed', [
+            'alumni_id' => $this->alumniId,
+            'error'     => $exception->getMessage(),
         ]);
-
-        AuditLog::record(
-            action   : 'bulk_invitation_failed',
-            module   : 'survey',
-            modelId  : $this->surveyPeriodId,
-            oldValues: null,
-            newValues: [
-                'error'       => $exception->getMessage(),
-                'actor_id'    => $this->actorId,
-                'alumni_count'=> $this->alumniIds->count(),
-            ],
-            modelType: null,
-        );
     }
 }

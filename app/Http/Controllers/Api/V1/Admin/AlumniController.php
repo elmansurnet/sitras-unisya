@@ -4,81 +4,108 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Alumni\ImportAlumniRequest;
+use App\Http\Requests\Alumni\SendInvitationRequest;
 use App\Http\Requests\Alumni\StoreAlumniRequest;
 use App\Http\Requests\Alumni\UpdateAlumniRequest;
 use App\Models\Alumni;
-use App\Repositories\AlumniRepository;
 use App\Services\AlumniService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AlumniController extends Controller
 {
     public function __construct(
-        private readonly AlumniService    $service,
-        private readonly AlumniRepository $repository,
+        private readonly AlumniService $alumniService,
     ) {}
 
-    // ─── GET /api/v1/admin/alumni ─────────────────────────────────────────────
+    // ─── GET /admin/alumni ────────────────────────────────────────────────────
     public function index(Request $request): JsonResponse
     {
-        $filters = $request->only([
-            'search', 'faculty_id', 'study_program_id', 'graduation_year_id',
-            'employment_status', 'is_active', 'per_page', 'sort_by', 'sort_dir',
-        ]);
+        Gate::authorize('viewAny', Alumni::class);
 
-        $paginator = $this->repository->findWithFilters($filters);
+        $paginator = $this->alumniService->alumniRepo->paginate($request->only([
+            'search', 'study_program_id', 'graduation_year_id',
+            'survey_status', 'gender', 'sort_by', 'sort_dir', 'per_page',
+        ]));
+
+        $items = $paginator->getCollection()->map(fn(Alumni $a) => [
+            'id'              => $a->id,
+            'nim'             => $a->nim,
+            'full_name'       => $a->full_name,
+            'gender'          => $a->gender,
+            'study_program'   => $a->studyProgram ? [
+                'id'           => $a->studyProgram->id,
+                'name'         => $a->studyProgram->name,
+                'degree_level' => $a->studyProgram->degree_level,
+            ] : null,
+            'graduation_year' => $a->graduationYear ? [
+                'id'            => $a->graduationYear->id,
+                'year'          => $a->graduationYear->year,
+                'academic_year' => $a->graduationYear->academic_year,
+            ] : null,
+            'gpa'             => $a->gpa,
+            'phone'           => $a->phone,
+            'email'           => $a->user?->email,
+            'survey_status'   => $a->survey_status,
+            'created_at'      => $a->created_at?->toIso8601String(),
+        ]);
 
         return response()->json([
             'success' => true,
-            'data'    => $paginator->items(),
+            'message' => 'Data alumni berhasil diambil',
+            'data'    => $items,
             'meta'    => [
                 'current_page' => $paginator->currentPage(),
                 'per_page'     => $paginator->perPage(),
                 'total'        => $paginator->total(),
                 'last_page'    => $paginator->lastPage(),
+                'from'         => $paginator->firstItem(),
+                'to'           => $paginator->lastItem(),
+            ],
+            'links'   => [
+                'first' => $paginator->url(1),
+                'last'  => $paginator->url($paginator->lastPage()),
+                'prev'  => $paginator->previousPageUrl(),
+                'next'  => $paginator->nextPageUrl(),
             ],
         ]);
     }
 
-    // ─── GET /api/v1/admin/alumni/{alumni} ────────────────────────────────────
+    // ─── GET /admin/alumni/{alumni} ───────────────────────────────────────────
     public function show(Alumni $alumni): JsonResponse
     {
-        $alumni->load([
-            'user:id,name,email,is_active,last_login_at',
-            'studyProgram:id,name,faculty_id',
-            'studyProgram.faculty:id,name',
-            'graduationYear:id,year',
-            'workHistories',
-        ]);
+        Gate::authorize('view', $alumni);
+
+        $alumni->load(['user', 'studyProgram.faculty', 'graduationYear', 'workHistories', 'surveyResponses']);
 
         return response()->json([
             'success' => true,
-            'data'    => $alumni,
+            'message' => 'Detail alumni berhasil diambil',
+            'data'    => $this->formatDetail($alumni),
         ]);
     }
 
-    // ─── POST /api/v1/admin/alumni ────────────────────────────────────────────
+    // ─── POST /admin/alumni ───────────────────────────────────────────────────
     public function store(StoreAlumniRequest $request): JsonResponse
     {
-        $alumni = $this->service->create(
+        $alumni = $this->alumniService->create(
             $request->validated(),
             $request->user()->id,
         );
 
         return response()->json([
             'success' => true,
-            'message' => 'Alumni berhasil ditambahkan.',
-            'data'    => $alumni,
+            'message' => 'Data alumni berhasil ditambahkan',
+            'data'    => ['id' => $alumni->id, 'nim' => $alumni->nim, 'full_name' => $alumni->full_name],
         ], 201);
     }
 
-    // ─── PUT /api/v1/admin/alumni/{alumni} ────────────────────────────────────
+    // ─── PUT /admin/alumni/{alumni} ───────────────────────────────────────────
     public function update(UpdateAlumniRequest $request, Alumni $alumni): JsonResponse
     {
-        $alumni = $this->service->update(
+        $updated = $this->alumniService->update(
             $alumni,
             $request->validated(),
             $request->user()->id,
@@ -86,107 +113,167 @@ class AlumniController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Data alumni berhasil diperbarui.',
-            'data'    => $alumni,
+            'message' => 'Data alumni berhasil diperbarui',
+            'data'    => $this->formatDetail($updated),
         ]);
     }
 
-    // ─── DELETE /api/v1/admin/alumni/{alumni} ─────────────────────────────────
+    // ─── DELETE /admin/alumni/{alumni} ────────────────────────────────────────
     public function destroy(Request $request, Alumni $alumni): JsonResponse
     {
-        $this->service->delete($alumni, $request->user()->id);
+        Gate::authorize('delete', $alumni);
+
+        $this->alumniService->delete($alumni, $request->user()->id);
 
         return response()->json([
             'success' => true,
-            'message' => 'Alumni berhasil dihapus.',
+            'message' => 'Data alumni berhasil dihapus',
         ]);
     }
 
-    // ─── POST /api/v1/admin/alumni/import ─────────────────────────────────────
+    // ─── POST /admin/alumni/import ────────────────────────────────────────────
     public function import(ImportAlumniRequest $request): JsonResponse
     {
-        $result = $this->service->import(
+        $result = $this->alumniService->import(
             $request->file('file'),
             $request->user()->id,
         );
 
-        $statusCode = $result['failed'] > 0 && $result['success'] === 0 ? 422 : 200;
-
-        return response()->json([
-            'success' => $result['success'] > 0 || $result['failed'] === 0,
-            'message' => "Berhasil: {$result['success']}, Gagal: {$result['failed']}",
-            'data'    => $result,
-        ], $statusCode);
-    }
-
-    // ─── GET /api/v1/admin/alumni/export ──────────────────────────────────────
-    public function export(Request $request): JsonResponse
-    {
-        $filters  = $request->only(['search', 'faculty_id', 'study_program_id', 'graduation_year_id', 'employment_status']);
-        $filename = $this->service->export($filters, $request->user()->id);
-
-        return response()->json([
-            'success'  => true,
-            'message'  => 'Export sedang diproses. File akan tersedia setelah selesai.',
-            'data'     => ['filename' => $filename],
-        ]);
-    }
-
-    // ─── GET /api/v1/admin/alumni/import-template ─────────────────────────────
-    public function importTemplate(): JsonResponse
-    {
-        $path = $this->service->generateImportTemplate();
-
-        // Return signed URL agar client bisa download dari storage/private
-        $url = Storage::temporaryUrl($path, now()->addMinutes(15));
-
         return response()->json([
             'success' => true,
-            'data'    => ['url' => $url, 'expires_in' => 900],
+            'message' => 'Import selesai',
+            'data'    => [
+                'total_rows' => $result['success'] + $result['failed'],
+                'imported'   => $result['success'],
+                'skipped'    => 0,
+                'failed'     => $result['failed'],
+                'errors'     => $result['errors'],
+            ],
         ]);
     }
 
-    // ─── POST /api/v1/admin/alumni/{alumni}/send-invitation ───────────────────
-    public function sendInvitation(Request $request, Alumni $alumni): JsonResponse
+    // ─── GET /admin/alumni/export ─────────────────────────────────────────────
+    public function export(Request $request): JsonResponse
     {
-        $request->validate([
-            'survey_period_id' => ['required', 'integer', 'min:1'],
-        ]);
+        Gate::authorize('export', Alumni::class);
 
-        $this->service->sendInvitation(
-            $alumni,
-            (int) $request->input('survey_period_id'),
+        $filename = $this->alumniService->export(
+            $request->only(['study_program_id', 'graduation_year_id', 'survey_status', 'gender']),
             $request->user()->id,
         );
 
         return response()->json([
             'success' => true,
-            'message' => 'Undangan survei berhasil dikirim.',
+            'message' => 'Export sedang diproses. File akan tersedia dalam beberapa saat.',
+            'data'    => ['filename' => $filename],
         ]);
     }
 
-    // ─── GET /api/v1/admin/alumni/stats ───────────────────────────────────────
-    public function stats(): JsonResponse
+    // ─── GET /admin/alumni/template ───────────────────────────────────────────
+    public function importTemplate(Request $request): JsonResponse
     {
-        $stats = $this->repository->getStats();
+        Gate::authorize('import', Alumni::class);
+
+        $filename = $this->alumniService->generateImportTemplate();
 
         return response()->json([
             'success' => true,
+            'message' => 'Template berhasil digenerate',
+            'data'    => ['filename' => $filename],
+        ]);
+    }
+
+    // ─── GET /admin/alumni/stats ──────────────────────────────────────────────
+    public function stats(Request $request): JsonResponse
+    {
+        Gate::authorize('viewAny', Alumni::class);
+
+        $stats = $this->alumniService->alumniRepo->stats();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Statistik alumni berhasil diambil',
             'data'    => $stats,
         ]);
     }
 
-    // ─── GET /api/v1/admin/alumni/map ─────────────────────────────────────────
-    public function map(Request $request): JsonResponse
+    // ─── POST /admin/alumni/{alumni}/invite ───────────────────────────────────
+    public function sendInvitation(SendInvitationRequest $request, Alumni $alumni): JsonResponse
     {
-        $coords = $this->repository->getMapCoordinates(
-            $request->integer('study_program_id') ?: null,
-            $request->integer('graduation_year_id') ?: null,
+        $this->alumniService->sendInvitation(
+            $alumni,
+            $request->validated('questionnaire_id'),
+            $request->user()->id,
         );
 
         return response()->json([
             'success' => true,
-            'data'    => $coords,
+            'message' => 'Undangan survei berhasil dikirim ke alumni',
         ]);
+    }
+
+    // ─── PRIVATE HELPER ───────────────────────────────────────────────────────
+
+    /**
+     * Format alumni detail sesuai response spec 05_API.md §3.2
+     *
+     * @return array<string,mixed>
+     */
+    private function formatDetail(Alumni $alumni): array
+    {
+        return [
+            'id'                   => $alumni->id,
+            'nim'                  => $alumni->nim,
+            'nik'                  => $alumni->nik,
+            'full_name'            => $alumni->full_name,
+            'gender'               => $alumni->gender,
+            'birth_place'          => $alumni->birth_place,
+            'birth_date'           => $alumni->birth_date?->toDateString(),
+            'study_program'        => $alumni->studyProgram ? [
+                'id'           => $alumni->studyProgram->id,
+                'name'         => $alumni->studyProgram->name,
+                'code'         => $alumni->studyProgram->code,
+                'degree_level' => $alumni->studyProgram->degree_level,
+            ] : null,
+            'graduation_year'      => $alumni->graduationYear ? [
+                'id'            => $alumni->graduationYear->id,
+                'year'          => $alumni->graduationYear->year,
+                'academic_year' => $alumni->graduationYear->academic_year,
+                'semester'      => $alumni->graduationYear->semester,
+            ] : null,
+            'thesis_title'         => $alumni->thesis_title,
+            'gpa'                  => $alumni->gpa,
+            'graduation_predicate' => $alumni->graduation_predicate,
+            'address'              => [
+                'street'      => $alumni->address_street,
+                'village'     => $alumni->address_village,
+                'district'    => $alumni->address_district,
+                'city'        => $alumni->address_city,
+                'province'    => $alumni->address_province,
+                'postal_code' => $alumni->address_postal_code,
+                'latitude'    => $alumni->latitude,
+                'longitude'   => $alumni->longitude,
+            ],
+            'phone'                => $alumni->phone,
+            'email'                => $alumni->user?->email,
+            'linkedin_url'         => $alumni->linkedin_url,
+            'photo_url'            => $alumni->photo_path
+                ? \Illuminate\Support\Facades\Storage::temporaryUrl($alumni->photo_path, now()->addHour())
+                : null,
+            'survey_status'        => $alumni->survey_status,
+            'work_histories'       => $alumni->workHistories?->map(fn($wh) => [
+                'id'           => $wh->id,
+                'company_name' => $wh->company_name,
+                'position'     => $wh->position,
+                'is_current'   => (bool) $wh->is_current,
+            ])->values()->toArray(),
+            'survey_responses'     => $alumni->surveyResponses?->map(fn($sr) => [
+                'id'           => $sr->id,
+                'status'       => $sr->status,
+                'submitted_at' => $sr->submitted_at?->toIso8601String(),
+            ])->values()->toArray(),
+            'created_at'           => $alumni->created_at?->toIso8601String(),
+            'updated_at'           => $alumni->updated_at?->toIso8601String(),
+        ];
     }
 }

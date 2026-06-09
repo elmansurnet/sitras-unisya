@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Models\Alumni;
 use App\Models\AuditLog;
-use App\Repositories\AlumniRepository;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -15,110 +15,95 @@ use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * GenerateReportExport
- * Generate file Excel untuk export alumni/report dan simpan ke storage/app/private/exports/
- * Dispatch dari AlumniService::export()
  *
- * Dispatch contoh:
- *   GenerateReportExport::dispatch('alumni', $filters, 'exports/file.xlsx', $userId)
- *       ->onQueue('default');
+ * Job untuk generate file Excel export di background queue.
+ * Dikirim ke queue 'default'.
+ *
+ * Supported types: 'alumni', 'employer', 'survey_response' (lebih lanjut di sesi berikutnya).
  */
 class GenerateReportExport implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries   = 2;
-    public int $timeout = 300; // 5 menit untuk dataset besar
+    public int $timeout = 120;
 
-    /**
-     * @param  string              $type    Tipe export: alumni | employer | survey
-     * @param  array<string,mixed> $filters Filter data
-     * @param  string              $path    Path output relatif ke storage/app/private/
-     * @param  int                 $userId  user_id yang request export
-     */
     public function __construct(
-        private readonly string $type,
-        private readonly array  $filters,
-        private readonly string $path,
-        private readonly int    $userId,
+        public readonly string $type,
+        public readonly array  $filters,
+        public readonly string $path,
+        public readonly int    $userId,
     ) {
         $this->onQueue('default');
     }
 
-    /**
-     * Eksekusi job.
-     */
-    public function handle(AlumniRepository $alumniRepo): void
+    public function handle(): void
     {
-        try {
-            match ($this->type) {
-                'alumni' => $this->exportAlumni($alumniRepo),
-                default  => throw new \InvalidArgumentException("Unknown export type: {$this->type}"),
-            };
+        match ($this->type) {
+            'alumni'   => $this->exportAlumni(),
+            default    => Log::warning('GenerateReportExport: unknown type', ['type' => $this->type]),
+        };
+    }
 
-            AuditLog::record(
-                action   : 'export',
-                module   : $this->type,
-                modelId  : null,
-                oldValues: null,
-                newValues: [
-                    'path'    => $this->path,
-                    'filters' => $this->filters,
-                    'user_id' => $this->userId,
-                ],
-            );
-        } catch (\Throwable $e) {
-            Log::error('GenerateReportExport failed', [
-                'type'  => $this->type,
-                'path'  => $this->path,
-                'error' => $e->getMessage(),
-            ]);
-            throw $e;
+    private function exportAlumni(): void
+    {
+        $query = Alumni::query()->with(['studyProgram.faculty', 'graduationYear', 'user']);
+
+        if (!empty($this->filters['study_program_id'])) {
+            $query->where('study_program_id', $this->filters['study_program_id']);
         }
-    }
+        if (!empty($this->filters['graduation_year_id'])) {
+            $query->where('graduation_year_id', $this->filters['graduation_year_id']);
+        }
+        if (!empty($this->filters['survey_status'])) {
+            $query->where('survey_status', $this->filters['survey_status']);
+        }
+        if (!empty($this->filters['gender'])) {
+            $query->where('gender', $this->filters['gender']);
+        }
 
-    /**
-     * Export alumni ke Excel menggunakan Laravel Excel.
-     */
-    private function exportAlumni(AlumniRepository $alumniRepo): void
-    {
-        $data = $alumniRepo->allWithFilters($this->filters);
+        $rows = $query->get()->map(fn(Alumni $a) => [
+            'NIM'                  => $a->nim,
+            'Nama Lengkap'         => $a->full_name,
+            'Jenis Kelamin'        => $a->gender === 'L' ? 'Laki-laki' : 'Perempuan',
+            'Program Studi'        => $a->studyProgram?->name,
+            'Angkatan'             => $a->graduationYear?->year,
+            'IPK'                  => $a->gpa,
+            'Predikat'             => $a->graduation_predicate,
+            'Email'                => $a->user?->email,
+            'Telepon'              => $a->phone,
+            'Kota'                 => $a->address_city,
+            'Provinsi'             => $a->address_province,
+            'Status Survei'        => $a->survey_status,
+            'Tanggal Daftar'       => $a->created_at?->format('Y-m-d'),
+        ]);
 
-        // Konversi ke array rows untuk export
-        $rows = $data->map(fn ($alumni) => [
-            $alumni->nim,
-            $alumni->full_name,
-            $alumni->gender,
-            $alumni->studyProgram?->name,
-            $alumni->graduationYear?->year,
-            $alumni->gpa,
-            $alumni->graduation_predicate,
-            $alumni->user?->email,
-            $alumni->user?->phone,
-            $alumni->address_city,
-            $alumni->address_province,
-            $alumni->survey_status,
-        ])->toArray();
-
-        $headers = [
-            'NIM', 'Nama Lengkap', 'Jenis Kelamin', 'Program Studi',
-            'Angkatan', 'IPK', 'Predikat', 'Email', 'Telepon',
-            'Kota', 'Provinsi', 'Status Survei',
-        ];
-
-        // Simpan ke private storage
+        // Tulis ke disk private menggunakan Laravel Excel (maatwebsite/excel)
+        // Disk private sesuai aturan file upload: storage/app/private/
         Excel::store(
-            new \App\Exports\AlumniExport($headers, $rows),
+            new \App\Exports\AlumniExport($rows),
             $this->path,
-            'private'
+            'private',
         );
+
+        AuditLog::record(
+            action   : 'export',
+            module   : 'alumni',
+            modelId  : null,
+            oldValues: null,
+            newValues: ['path' => $this->path, 'filters' => $this->filters, 'count' => $rows->count()],
+            modelType: Alumni::class,
+        );
+
+        Log::info('GenerateReportExport: alumni export done', [
+            'path'  => $this->path,
+            'count' => $rows->count(),
+        ]);
     }
 
-    /**
-     * Handle job failure.
-     */
     public function failed(\Throwable $exception): void
     {
-        Log::error('GenerateReportExport FAILED', [
+        Log::error('GenerateReportExport: permanently failed', [
             'type'  => $this->type,
             'path'  => $this->path,
             'error' => $exception->getMessage(),

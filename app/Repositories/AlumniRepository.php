@@ -4,45 +4,29 @@ namespace App\Repositories;
 
 use App\Models\Alumni;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Builder;
 
 class AlumniRepository
 {
     /**
-     * Cari alumni berdasarkan NIM.
-     */
-    public function findByNim(string $nim): ?Alumni
-    {
-        return Alumni::where('nim', $nim)->first();
-    }
-
-    /**
-     * Cari alumni dengan filter lengkap + pagination.
+     * Ambil daftar alumni dengan filter, search, sort, dan paginasi.
      *
      * @param  array<string,mixed> $filters
-     *         Keys: search, faculty_id, study_program_id, graduation_year_id,
-     *               employment_status, is_active, per_page, sort_by, sort_dir
      */
-    public function findWithFilters(array $filters): LengthAwarePaginator
+    public function paginate(array $filters = []): LengthAwarePaginator
     {
         $query = Alumni::query()
-            ->with(['user:id,name,email', 'studyProgram:id,name,faculty_id', 'studyProgram.faculty:id,name', 'graduationYear:id,year'])
-            ->withTrashed(isset($filters['with_trashed']) && $filters['with_trashed']);
+            ->with(['user', 'studyProgram.faculty', 'graduationYear'])
+            ->withTrashed(false);
 
-        // Full-text search: nim, full_name, email, nik
+        // Search: nama, NIM, email
         if (!empty($filters['search'])) {
-            $term = '%' . $filters['search'] . '%';
-            $query->where(function ($q) use ($term) {
-                $q->where('nim', 'like', $term)
-                  ->orWhere('full_name', 'like', $term)
-                  ->orWhere('nik', 'like', $term)
-                  ->orWhereHas('user', fn ($u) => $u->where('email', 'like', $term));
+            $search = $filters['search'];
+            $query->where(function (Builder $q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                  ->orWhere('nim', 'like', "%{$search}%")
+                  ->orWhereHas('user', fn(Builder $u) => $u->where('email', 'like', "%{$search}%"));
             });
-        }
-
-        if (!empty($filters['faculty_id'])) {
-            $query->whereHas('studyProgram', fn ($q) => $q->where('faculty_id', $filters['faculty_id']));
         }
 
         if (!empty($filters['study_program_id'])) {
@@ -53,16 +37,16 @@ class AlumniRepository
             $query->where('graduation_year_id', $filters['graduation_year_id']);
         }
 
-        if (isset($filters['employment_status']) && $filters['employment_status'] !== '') {
-            $query->where('employment_status', $filters['employment_status']);
+        if (!empty($filters['survey_status'])) {
+            $query->where('survey_status', $filters['survey_status']);
         }
 
-        if (isset($filters['is_active']) && $filters['is_active'] !== '') {
-            $query->where('is_active', (bool) $filters['is_active']);
+        if (!empty($filters['gender'])) {
+            $query->where('gender', $filters['gender']);
         }
 
         // Sorting
-        $sortBy  = in_array($filters['sort_by'] ?? '', ['full_name', 'nim', 'gpa', 'created_at'])
+        $sortBy  = in_array($filters['sort_by']  ?? '', ['nim', 'full_name', 'gpa', 'created_at'], true)
             ? $filters['sort_by']
             : 'created_at';
         $sortDir = ($filters['sort_dir'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
@@ -74,56 +58,65 @@ class AlumniRepository
     }
 
     /**
-     * Ambil koordinat alumni untuk peta distribusi.
-     * Hanya alumni yang memiliki latitude & longitude.
-     *
-     * @return Collection<int, Alumni>
+     * Temukan alumni by ID dengan relasi lengkap.
      */
-    public function getMapCoordinates(?int $studyProgramId = null, ?int $graduationYearId = null): Collection
+    public function findWithRelations(int $id): Alumni
     {
-        return Alumni::query()
-            ->select(['id', 'full_name', 'latitude', 'longitude', 'city', 'employment_status', 'study_program_id'])
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->where('is_active', true)
-            ->when($studyProgramId, fn ($q) => $q->where('study_program_id', $studyProgramId))
-            ->when($graduationYearId, fn ($q) => $q->where('graduation_year_id', $graduationYearId))
-            ->get();
+        return Alumni::with([
+            'user',
+            'studyProgram.faculty',
+            'graduationYear',
+            'workHistories',
+            'surveyResponses',
+        ])->findOrFail($id);
     }
 
     /**
-     * Statistik ringkasan alumni untuk dashboard.
-     *
-     * @return array<string,mixed>
+     * Temukan alumni by user_id (untuk self-profile).
      */
-    public function getStats(): array
+    public function findByUserId(int $userId): ?Alumni
     {
-        $total   = Alumni::count();
-        $active  = Alumni::where('is_active', true)->count();
-        $byStatus = Alumni::where('is_active', true)
-            ->select('employment_status', DB::raw('COUNT(*) as total'))
-            ->groupBy('employment_status')
-            ->pluck('total', 'employment_status')
-            ->toArray();
+        return Alumni::with(['user', 'studyProgram.faculty', 'graduationYear', 'workHistories'])
+            ->where('user_id', $userId)
+            ->first();
+    }
 
-        $avgGpa = Alumni::where('is_active', true)
-            ->whereNotNull('gpa')
-            ->avg('gpa');
+    /**
+     * Ambil semua alumni (tanpa paginasi) sesuai filter — untuk export.
+     *
+     * @param  array<string,mixed> $filters
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function all(array $filters = [])
+    {
+        $query = Alumni::query()->with(['studyProgram.faculty', 'graduationYear']);
 
-        $byFaculty = Alumni::query()
-            ->join('study_programs', 'alumni.study_program_id', '=', 'study_programs.id')
-            ->join('faculties', 'study_programs.faculty_id', '=', 'faculties.id')
-            ->select('faculties.name as faculty_name', DB::raw('COUNT(alumni.id) as total'))
-            ->groupBy('faculties.id', 'faculties.name')
-            ->pluck('total', 'faculty_name')
-            ->toArray();
+        if (!empty($filters['study_program_id'])) {
+            $query->where('study_program_id', $filters['study_program_id']);
+        }
+        if (!empty($filters['graduation_year_id'])) {
+            $query->where('graduation_year_id', $filters['graduation_year_id']);
+        }
+        if (!empty($filters['survey_status'])) {
+            $query->where('survey_status', $filters['survey_status']);
+        }
 
+        return $query->get();
+    }
+
+    /**
+     * Statistik ringkas alumni untuk dashboard.
+     *
+     * @return array<string,int>
+     */
+    public function stats(): array
+    {
         return [
-            'total'               => $total,
-            'active'              => $active,
-            'by_employment_status' => $byStatus,
-            'avg_gpa'             => $avgGpa !== null ? round((float) $avgGpa, 2) : null,
-            'by_faculty'          => $byFaculty,
+            'total'            => Alumni::count(),
+            'belum_disurvei'   => Alumni::where('survey_status', 'belum_disurvei')->count(),
+            'terkirim'         => Alumni::where('survey_status', 'terkirim')->count(),
+            'sedang_mengisi'   => Alumni::where('survey_status', 'sedang_mengisi')->count(),
+            'selesai'          => Alumni::where('survey_status', 'selesai')->count(),
         ];
     }
 }

@@ -4,70 +4,84 @@ namespace App\Policies;
 
 use App\Models\Alumni;
 use App\Models\User;
-use Illuminate\Auth\Access\HandlesAuthorization;
 
+/**
+ * AlumniPolicy
+ *
+ * Matriks izin sesuai 07_SECURITY.md §3.3:
+ * ---------------------------------------------------
+ * | Aksi          | superadmin | admin | alumni      |
+ * |---------------|------------|-------|-------------|
+ * | viewAny       | ✅         | ✅    | ❌          |
+ * | view          | ✅         | ✅    | self only   |
+ * | create        | ✅         | ✅    | ❌          |
+ * | update        | ✅         | ✅    | self only   |
+ * | delete        | ✅         | ❌    | ❌          |
+ * | import/export | ✅         | ✅    | ❌          |
+ * ---------------------------------------------------
+ */
 class AlumniPolicy
 {
-    use HandlesAuthorization;
-
     /**
-     * Superadmin & admin selalu bisa melakukan semua aksi.
-     * Alumni hanya bisa akses data diri sendiri.
-     */
-    public function before(User $user, string $ability): ?bool
-    {
-        if ($user->isSuperadmin() || $user->isAdmin()) {
-            return true;
-        }
-
-        return null; // lanjutkan ke method spesifik
-    }
-
-    /**
-     * Lihat daftar alumni (admin only — sudah di-handle `before`).
+     * Superadmin & admin bisa melihat daftar alumni.
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return in_array($user->role, ['superadmin', 'admin'], true);
     }
 
     /**
-     * Alumni dapat melihat profil diri sendiri.
+     * Superadmin & admin bisa lihat semua.
+     * Alumni hanya bisa lihat data dirinya sendiri.
      */
     public function view(User $user, Alumni $alumni): bool
     {
-        return $user->id === $alumni->user_id;
+        if (in_array($user->role, ['superadmin', 'admin'], true)) {
+            return true;
+        }
+
+        return $user->role === 'alumni' && $alumni->user_id === $user->id;
     }
 
     /**
-     * Hanya admin yang bisa membuat alumni baru.
+     * Superadmin & admin bisa membuat alumni.
      */
     public function create(User $user): bool
     {
-        return false;
+        return in_array($user->role, ['superadmin', 'admin'], true);
     }
 
     /**
-     * Alumni hanya bisa update profil diri sendiri.
+     * Superadmin & admin bisa update semua.
+     * Alumni hanya bisa update data dirinya sendiri.
      */
     public function update(User $user, Alumni $alumni): bool
     {
-        return $user->id === $alumni->user_id;
+        if (in_array($user->role, ['superadmin', 'admin'], true)) {
+            return true;
+        }
+
+        return $user->role === 'alumni' && $alumni->user_id === $user->id;
     }
 
     /**
-     * Hanya admin yang bisa delete alumni (handled by before()).
+     * Hanya superadmin yang bisa hapus (soft delete).
      */
     public function delete(User $user, Alumni $alumni): bool
     {
-        return false;
+        return $user->role === 'superadmin';
     }
 
     /**
-     * Upload foto: alumni hanya bisa upload foto diri sendiri.
+     * Import & export: superadmin & admin.
      */
-    public function uploadPhoto(User $user, Alumni $alumni): bool
+    public function import(User $user): bool
     {
-        return $user->id === $alumni->user_id;
+        return in_array($user->role, ['superadmin', 'admin'], true);
+    }
+
+    public function export(User $user): bool
+    {
+        return in_array($user->role, ['superadmin', 'admin'], true);
     }
 }
