@@ -1,56 +1,42 @@
-/**
- * composables/useToast.js — Singleton toast state
- * Task 2A.21 | Sesuai 06_UI_UX.md Design System
- *
- * Usage:
- *   const { toast } = useToast()
- *   toast.success('Berhasil disimpan.')
- *   toast.error('Terjadi kesalahan.')
- *   toast.warning('Periksa kembali data Anda.')
- *   toast.info('Memproses permintaan...')
- */
-import { reactive } from 'vue'
+import { ref } from 'vue'
 
-const DEFAULT_DURATION = 4000 // ms
-
-const state = reactive({
-  toasts: [],
-})
-
-let idCounter = 0
-
-function add(message, type = 'info', duration = DEFAULT_DURATION) {
-  const id = ++idCounter
-  state.toasts.push({ id, message, type })
-
-  if (duration > 0) {
-    setTimeout(() => remove(id), duration)
-  }
-
-  return id
-}
-
-function remove(id) {
-  const idx = state.toasts.findIndex((t) => t.id === id)
-  if (idx !== -1) state.toasts.splice(idx, 1)
-}
-
-function clear() {
-  state.toasts = []
-}
-
-const toast = {
-  success: (msg, dur) => add(msg, 'success', dur),
-  error:   (msg, dur) => add(msg, 'error',   dur ?? 6000),
-  warning: (msg, dur) => add(msg, 'warning', dur),
-  info:    (msg, dur) => add(msg, 'info',    dur),
-}
+const toasts = ref([])
+let _nextId = 0
 
 export function useToast() {
-  return {
-    toasts: state.toasts,
-    toast,
-    remove,
-    clear,
+  function show({ message, type = 'info', duration = 4000 }) {
+    const id = ++_nextId
+    toasts.value.push({ id, message, type })
+    if (duration > 0) {
+      setTimeout(() => dismiss(id), duration)
+    }
+    return id
   }
+
+  function success(message, duration = 4000) {
+    return show({ message, type: 'success', duration })
+  }
+
+  function error(message, duration = 6000) {
+    return show({ message, type: 'error', duration })
+  }
+
+  function warning(message, duration = 5000) {
+    return show({ message, type: 'warning', duration })
+  }
+
+  function info(message, duration = 4000) {
+    return show({ message, type: 'info', duration })
+  }
+
+  function dismiss(id) {
+    const idx = toasts.value.findIndex((t) => t.id === id)
+    if (idx !== -1) toasts.value.splice(idx, 1)
+  }
+
+  function clearAll() {
+    toasts.value = []
+  }
+
+  return { toasts, show, success, error, warning, info, dismiss, clearAll }
 }
