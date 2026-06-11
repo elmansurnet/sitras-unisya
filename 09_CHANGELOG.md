@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.6 | Tanggal: 2026-06-09
+# Versi: 1.0.7 | Tanggal: 2026-06-11
 
 ---
 
@@ -21,6 +21,44 @@ Setiap entri changelog mengikuti format:
 - `Removed` — Konten yang dihapus
 - `Security` — Perbaikan keamanan
 - `Deprecated` — Fitur yang akan dihapus di versi mendatang
+
+---
+
+## [1.0.7] — 2026-06-11
+
+> **Sumber:** Patch Sesi 2A — Refactor `WorkHistoryController` + tambah `UpdateWorkHistoryRequest`.
+> Engineer: Claude (Lead Engineer SITRAS UNISYA).
+> **Perubahan berisi perbaikan konsistensi kode produksi — tidak ada perubahan skema database atau API endpoint.**
+
+***
+
+### Changed — WorkHistoryController (Refactor Form Request)
+
+#### Changed — Controllers (1 file)
+- `app/Http/Controllers/Api/V1/Alumni/WorkHistoryController.php` — Refactor method `store()` dan `update()`:
+  - `store()`: inject `StoreWorkHistoryRequest` (sebelumnya: `Illuminate\Http\Request` dengan inline `$request->validate()`)
+  - `update()`: inject `UpdateWorkHistoryRequest` baru (sebelumnya: `Illuminate\Http\Request` dengan inline `$request->validate()`)
+  - Hapus private method `rules()` yang duplikat logika validasi
+  - Hapus private helper `authorizeSelf()` & `authorizeOwnership()` (sudah ditangani di method `authorize()` Form Request)
+  - Perbaiki `$oldValues` di `update()`: capture field `position`, `company_name`, `employment_type`, `is_current`, `start_date`, `end_date` sebelum update (sebelumnya hanya capture seluruh `toArray()` tanpa seleksi field relevan)
+
+#### Added — Form Requests (1 file)
+- `app/Http/Requests/Alumni/UpdateWorkHistoryRequest.php` — Baru:
+  - `authorize()`: cek ownership `alumni_id` milik authenticated user (role alumni) atau superadmin/admin
+  - Rules: `position`, `company_name` required; `employment_type` ENUM; `start_date` date; `end_date` nullable setelah `start_date`; `is_current` boolean; semua field konsisten dengan `02_DATABASE.md §2.2 alumni_work_histories`
+  - Route model binding: inject `AlumniWorkHistory $workHistory` untuk otorisasi di `authorize()`
+
+### Ringkasan File Terdampak v1.0.7
+
+| File | Aksi | Keterangan |
+|---|---|---|
+| `app/Http/Controllers/Api/V1/Alumni/WorkHistoryController.php` | Changed | Inject Form Request (store + update), hapus inline validate & helper private, perbaiki $oldValues capture |
+| `app/Http/Requests/Alumni/UpdateWorkHistoryRequest.php` | Added | Form Request baru untuk update riwayat kerja |
+| `08_PHASE_TRACKER.md` | Changed | 2A.9 tambah `UpdateWorkHistoryRequest`; 2A.12 keterangan refactor; counter 2A backend 14→15, total selesai 61→62 |
+| `09_CHANGELOG.md` | Added | Entri ini |
+
+**Total: 4 file ditambah/diubah | Patch 2A.12 refactor WorkHistoryController ✅**
+**Task selesai keseluruhan: 62/199**
 
 ---
 
@@ -894,6 +932,9 @@ Baris "Hapus Employer (soft delete)" tidak ada di matriks izin sebelumnya, padah
 | 1.0.3 | 2026-06-09 | Tambah entri audit v1.0.3 — 8 inkonsistensi ditemukan dan diperbaiki (6 file direvisi); update tabel inkonsistensi global (22 total) |
 | 1.0.4 | 2026-06-09 | Tambah entri penyelesaian Sesi 1A — 37 file produksi ditambah/diubah; 19/199 task development selesai |
 | 1.0.5 | 2026-06-09 | Tambah entri penyelesaian Sesi 1B — ~35 file produksi (middleware, service, controller, job, frontend Vue); 28/28 task ✅ |
+SESUDAH (tambah baris baru di bawahnya):
+| 1.0.6 | 2026-06-09 | Tambah entri penyelesaian Sesi 2A backend — 17 file produksi (migration, model, repository, service, policy, request, controller, job, export, routes); 14/31 task ✅ |
+| 1.0.7 | 2026-06-11 | Tambah entri patch WorkHistoryController refactor — inject Form Request, hapus inline validate, tambah UpdateWorkHistoryRequest; 1 task diperbarui |
 
 ---
 
