@@ -1,42 +1,45 @@
-import { ref } from 'vue'
+import { reactive } from 'vue'
 
-const toasts = ref([])
-let _nextId = 0
+/** Shared reactive state — singleton per app instance */
+const toasts = reactive([])
 
+let _idCounter = 0
+
+/**
+ * useToast — composable for displaying toast notifications
+ *
+ * Usage:
+ *   const { toast } = useToast()
+ *   toast.success('Alumni berhasil disimpan')
+ *   toast.error('Gagal menghapus data', { title: 'Error' })
+ *   toast.show({ type: 'warning', message: 'Perhatikan...', duration: 6000 })
+ */
 export function useToast() {
-  function show({ message, type = 'info', duration = 4000 }) {
-    const id = ++_nextId
-    toasts.value.push({ id, message, type })
+  /**
+   * Show a toast
+   * @param {{ type: 'success'|'error'|'warning'|'info', message: string, title?: string, duration?: number }} options
+   */
+  function show({ type = 'info', message, title, duration = 4000 }) {
+    const id = ++_idCounter
+    toasts.push({ id, type, message, title })
     if (duration > 0) {
-      setTimeout(() => dismiss(id), duration)
+      setTimeout(() => remove(id), duration)
     }
     return id
   }
 
-  function success(message, duration = 4000) {
-    return show({ message, type: 'success', duration })
+  function remove(id) {
+    const idx = toasts.findIndex((t) => t.id === id)
+    if (idx !== -1) toasts.splice(idx, 1)
   }
 
-  function error(message, duration = 6000) {
-    return show({ message, type: 'error', duration })
+  const toast = {
+    success: (message, opts = {}) => show({ type: 'success', message, ...opts }),
+    error: (message, opts = {}) => show({ type: 'error', message, ...opts }),
+    warning: (message, opts = {}) => show({ type: 'warning', message, ...opts }),
+    info: (message, opts = {}) => show({ type: 'info', message, ...opts }),
+    show,
   }
 
-  function warning(message, duration = 5000) {
-    return show({ message, type: 'warning', duration })
-  }
-
-  function info(message, duration = 4000) {
-    return show({ message, type: 'info', duration })
-  }
-
-  function dismiss(id) {
-    const idx = toasts.value.findIndex((t) => t.id === id)
-    if (idx !== -1) toasts.value.splice(idx, 1)
-  }
-
-  function clearAll() {
-    toasts.value = []
-  }
-
-  return { toasts, show, success, error, warning, info, dismiss, clearAll }
+  return { toasts, toast, remove }
 }

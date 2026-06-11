@@ -1,79 +1,109 @@
 <script setup>
 const props = defineProps({
-  currentPage: { type: Number, required: true },
-  lastPage: { type: Number, required: true },
-  total: { type: Number, default: 0 },
-  perPage: { type: Number, default: 15 },
-  loading: { type: Boolean, default: false },
+  /** API pagination meta: { current_page, last_page, per_page, total, from, to } */
+  meta: {
+    type: Object,
+    required: true,
+  },
+  maxVisible: {
+    type: Number,
+    default: 5,
+  },
 })
 
-const emit = defineEmits(['change'])
+const emit = defineEmits(['page-change'])
 
-function pages() {
-  const range = []
-  const delta = 2
-  const left = Math.max(1, props.currentPage - delta)
-  const right = Math.min(props.lastPage, props.currentPage + delta)
-
-  for (let i = left; i <= right; i++) range.push(i)
-
-  if (left > 2) range.unshift('...')
-  if (left > 1) range.unshift(1)
-  if (right < props.lastPage - 1) range.push('...')
-  if (right < props.lastPage) range.push(props.lastPage)
-
-  return range
+function go(page) {
+  if (page < 1 || page > props.meta.last_page || page === props.meta.current_page) return
+  emit('page-change', page)
 }
 
-const from = () => (props.currentPage - 1) * props.perPage + 1
-const to = () => Math.min(props.currentPage * props.perPage, props.total)
+/** Build visible page range with ellipsis markers */
+function pages() {
+  const { current_page: cur, last_page: last } = props.meta
+  if (last <= props.maxVisible) {
+    return Array.from({ length: last }, (_, i) => i + 1)
+  }
+
+  const half = Math.floor(props.maxVisible / 2)
+  let start = Math.max(2, cur - half)
+  let end = Math.min(last - 1, cur + half)
+
+  if (cur - half < 2) end = Math.min(last - 1, props.maxVisible - 1)
+  if (cur + half > last - 1) start = Math.max(2, last - props.maxVisible + 2)
+
+  const range = []
+  range.push(1)
+  if (start > 2) range.push('...')
+  for (let i = start; i <= end; i++) range.push(i)
+  if (end < last - 1) range.push('...')
+  range.push(last)
+  return range
+}
 </script>
 
 <template>
-  <div v-if="lastPage > 0" class="flex items-center justify-between flex-wrap gap-3 py-3 px-1 text-sm text-[var(--color-text-muted)]">
-    <span>
-      Menampilkan <strong class="text-[var(--color-text)]">{{ from() }}–{{ to() }}</strong> dari
-      <strong class="text-[var(--color-text)]">{{ total }}</strong> data
-    </span>
+  <div class="flex items-center justify-between gap-4 text-sm">
+    <!-- Info -->
+    <p class="text-gray-500 dark:text-gray-400 whitespace-nowrap">
+      <template v-if="meta.total">
+        Menampilkan
+        <span class="font-medium text-gray-700 dark:text-gray-300">{{ meta.from }}</span>–<span class="font-medium text-gray-700 dark:text-gray-300">{{ meta.to }}</span>
+        dari
+        <span class="font-medium text-gray-700 dark:text-gray-300">{{ meta.total }}</span>
+      </template>
+      <template v-else>Tidak ada data</template>
+    </p>
 
-    <nav class="flex items-center gap-1" aria-label="Pagination">
+    <!-- Page buttons -->
+    <nav aria-label="Pagination" class="flex items-center gap-1">
+      <!-- Prev -->
       <button
-        class="w-8 h-8 flex items-center justify-center rounded-md border border-[var(--color-border)] hover:bg-[var(--color-surface-offset)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        :disabled="currentPage <= 1 || loading"
-        @click="emit('change', currentPage - 1)"
+        type="button"
+        :disabled="meta.current_page === 1"
+        class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         aria-label="Halaman sebelumnya"
+        @click="go(meta.current_page - 1)"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
 
-      <template v-for="p in pages()" :key="p">
-        <span v-if="p === '...'" class="w-8 h-8 flex items-center justify-center text-[var(--color-text-faint)]">…</span>
+      <template v-for="page in pages()" :key="page">
+        <!-- Ellipsis -->
+        <span
+          v-if="page === '...'"
+          class="inline-flex h-8 w-8 items-center justify-center text-gray-400"
+        >…</span>
+
+        <!-- Page number -->
         <button
           v-else
-          class="w-8 h-8 flex items-center justify-center rounded-md border text-sm font-medium transition-colors"
-          :class="
-            p === currentPage
-              ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
-              : 'border-[var(--color-border)] hover:bg-[var(--color-surface-offset)]'
-          "
-          :disabled="loading"
-          @click="emit('change', p)"
-          :aria-current="p === currentPage ? 'page' : undefined"
+          type="button"
+          :aria-current="page === meta.current_page ? 'page' : undefined"
+          :class="[
+            'inline-flex h-8 w-8 items-center justify-center rounded-md border text-sm font-medium transition-colors',
+            page === meta.current_page
+              ? 'border-teal-600 bg-teal-600 text-white cursor-default'
+              : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700',
+          ]"
+          @click="go(page)"
         >
-          {{ p }}
+          {{ page }}
         </button>
       </template>
 
+      <!-- Next -->
       <button
-        class="w-8 h-8 flex items-center justify-center rounded-md border border-[var(--color-border)] hover:bg-[var(--color-surface-offset)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        :disabled="currentPage >= lastPage || loading"
-        @click="emit('change', currentPage + 1)"
+        type="button"
+        :disabled="meta.current_page === meta.last_page"
+        class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         aria-label="Halaman berikutnya"
+        @click="go(meta.current_page + 1)"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
         </svg>
       </button>
     </nav>
