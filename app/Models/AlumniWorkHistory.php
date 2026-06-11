@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -9,55 +10,70 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Model AlumniWorkHistory
  *
  * Riwayat pekerjaan seorang alumni.
- * Relasi ke employers nullable — employer bisa belum terdaftar di sistem.
+ * Skema sesuai 02_DATABASE.md §2.4 dan migration _000011.
+ *
  * Tidak ada SoftDeletes — hapus riwayat kerja adalah operasi hard-delete.
  *
- * @property int         $id
- * @property int         $alumni_id
- * @property int|null    $employer_id
- * @property int|null    $salary_range_id
- * @property string      $company_name
- * @property string      $position
- * @property string|null $industry
- * @property string|null $city
- * @property string|null $province
- * @property \Carbon\Carbon $start_date
+ * @property int              $id
+ * @property int              $alumni_id
+ * @property int|null         $employer_id
+ * @property string           $company_name
+ * @property string           $position
+ * @property string|null      $industry_sector
+ * @property string|null      $employment_type   penuh_waktu|paruh_waktu|kontrak|freelance|wirausaha|magang
+ * @property \Carbon\Carbon   $start_date
  * @property \Carbon\Carbon|null $end_date
- * @property bool        $is_current
- * @property string      $source
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
+ * @property bool             $is_current
+ * @property string|null      $city
+ * @property string|null      $province
+ * @property string|null      $country
+ * @property string|null      $monthly_salary_range  kode range VARCHAR(50)
+ * @property int|null         $is_relevant_to_study  1=ya, 0=tidak, NULL=belum diisi
+ * @property int|null         $waiting_time_months
+ * @property string|null      $description
+ * @property \Carbon\Carbon   $created_at
+ * @property \Carbon\Carbon   $updated_at
  */
 class AlumniWorkHistory extends Model
 {
+    use HasFactory;
+
     protected $table = 'alumni_work_histories';
 
     /**
-     * Mass assignable attributes.
-     * Semua kolom kecuali id, created_at, updated_at.
+     * Mass assignable — semua kolom kecuali id, created_at, updated_at.
+     * Sesuai migration 2026_06_09_000011 dan 02_DATABASE.md §2.4.
      */
     protected $fillable = [
         'alumni_id',
         'employer_id',
-        'salary_range_id',
         'company_name',
         'position',
-        'industry',
-        'city',
-        'province',
+        'industry_sector',
+        'employment_type',
         'start_date',
         'end_date',
         'is_current',
-        'source',
+        'city',
+        'province',
+        'country',
+        'monthly_salary_range',
+        'is_relevant_to_study',
+        'waiting_time_months',
+        'description',
     ];
 
     /**
      * Attribute casts.
+     * gpa-equivalent tidak ada di sini; tapi boolean & date wajib di-cast.
      */
     protected $casts = [
-        'start_date'  => 'date',
-        'end_date'    => 'date',
-        'is_current'  => 'boolean',
+        'start_date'           => 'date',
+        'end_date'             => 'date',
+        'is_current'           => 'boolean',
+        'waiting_time_months'  => 'integer',
+        // is_relevant_to_study sengaja tidak di-cast boolean karena nilai
+        // valid-nya adalah 1, 0, NULL — NULL punya makna semantik "belum diisi".
     ];
 
     // =========================================================================
@@ -74,47 +90,27 @@ class AlumniWorkHistory extends Model
 
     /**
      * Perusahaan terdaftar di sistem (nullable).
-     * Model Employer dibuat di sesi 2B.
+     * FK constraint ke employers ditambahkan di sesi 2B.
      */
     public function employer(): BelongsTo
     {
         return $this->belongsTo(Employer::class);
     }
 
-    /**
-     * Rentang gaji.
-     */
-    public function salaryRange(): BelongsTo
-    {
-        return $this->belongsTo(SalaryRange::class);
-    }
-
     // =========================================================================
     // SCOPES
     // =========================================================================
 
-    /**
-     * Scope: hanya pekerjaan yang masih aktif.
-     */
+    /** Hanya pekerjaan yang masih aktif. */
     public function scopeCurrent($query)
     {
         return $query->where('is_current', true);
     }
 
-    /**
-     * Scope: pekerjaan yang sudah berakhir.
-     */
+    /** Pekerjaan yang sudah berakhir. */
     public function scopePast($query)
     {
         return $query->where('is_current', false);
-    }
-
-    /**
-     * Scope: filter berdasarkan sumber data.
-     */
-    public function scopeBySource($query, string $source)
-    {
-        return $query->where('source', $source);
     }
 
     // =========================================================================
