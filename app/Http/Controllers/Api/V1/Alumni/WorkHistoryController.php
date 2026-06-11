@@ -3,18 +3,20 @@
 namespace App\Http\Controllers\Api\V1\Alumni;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Alumni\StoreWorkHistoryRequest;
+use App\Http\Requests\Alumni\UpdateWorkHistoryRequest;
 use App\Models\Alumni;
 use App\Models\AlumniWorkHistory;
 use App\Models\AuditLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class WorkHistoryController extends Controller
 {
     // ─── GET /alumni/work-histories (self) ────────────────────────────────────
     /**
      * Daftar riwayat pekerjaan milik alumni yang sedang login.
+     * 05_API.md §11.4
      */
     public function index(Request $request): JsonResponse
     {
@@ -36,31 +38,32 @@ class WorkHistoryController extends Controller
     // ─── POST /alumni/work-histories/{alumni} ─────────────────────────────────
     /**
      * Tambah riwayat pekerjaan.
-     * Alumni hanya boleh tambah untuk dirinya sendiri.
+     * Otorisasi ditangani sepenuhnya oleh StoreWorkHistoryRequest::authorize().
+     * 05_API.md §11.5
      */
-    public function store(Request $request, Alumni $alumni): JsonResponse
+    public function store(StoreWorkHistoryRequest $request, Alumni $alumni): JsonResponse
     {
-        $this->authorizeSelf($request, $alumni);
+        $validated = $request->validated();
 
-        $validated = $request->validate($this->rules());
-
-        // Jika is_current = true, reset semua pekerjaan lain
+        // Jika is_current = true, reset flag pada pekerjaan lain milik alumni ini
         if (!empty($validated['is_current'])) {
             AlumniWorkHistory::where('alumni_id', $alumni->id)
                 ->update(['is_current' => false]);
         }
 
-        $workHistory = AlumniWorkHistory::create(array_merge(
-            $validated,
-            ['alumni_id' => $alumni->id]
-        ));
+        $workHistory = AlumniWorkHistory::create(
+            array_merge($validated, ['alumni_id' => $alumni->id])
+        );
 
         AuditLog::record(
             action   : 'create_work_history',
             module   : 'alumni',
             modelId  : $alumni->id,
             oldValues: null,
-            newValues: ['work_history_id' => $workHistory->id, 'company' => $workHistory->company_name],
+            newValues: [
+                'work_history_id' => $workHistory->id,
+                'company'         => $workHistory->company_name,
+            ],
             modelType: Alumni::class,
         );
 
@@ -72,12 +75,17 @@ class WorkHistoryController extends Controller
     }
 
     // ─── PUT /alumni/work-histories/{alumni}/{workHistory} ────────────────────
-    public function update(Request $request, Alumni $alumni, AlumniWorkHistory $workHistory): JsonResponse
-    {
-        $this->authorizeSelf($request, $alumni);
-        $this->authorizeOwnership($alumni, $workHistory);
-
-        $validated = $request->validate($this->rules(update: true));
+    /**
+     * Update riwayat pekerjaan.
+     * Otorisasi & ownership check ditangani oleh UpdateWorkHistoryRequest::authorize().
+     * 05_API.md §11.6
+     */
+    public function update(
+        UpdateWorkHistoryRequest $request,
+        Alumni $alumni,
+        AlumniWorkHistory $workHistory,
+    ): JsonResponse {
+        $validated = $request->validated();
 
         if (!empty($validated['is_current'])) {
             AlumniWorkHistory::where('alumni_id', $alumni->id)
@@ -85,13 +93,18 @@ class WorkHistoryController extends Controller
                 ->update(['is_current' => false]);
         }
 
+        $oldValues = $workHistory->only([
+            'company_name', 'position', 'employment_type',
+            'start_date', 'end_date', 'is_current',
+        ]);
+
         $workHistory->update($validated);
 
         AuditLog::record(
             action   : 'update_work_history',
             module   : 'alumni',
             modelId  : $alumni->id,
-            oldValues: ['work_history_id' => $workHistory->id],
+            oldValues: array_merge(['work_history_id' => $workHistory->id], $oldValues),
             newValues: array_merge(['work_history_id' => $workHistory->id], $validated),
             modelType: Alumni::class,
         );
@@ -104,16 +117,32 @@ class WorkHistoryController extends Controller
     }
 
     // ─── DELETE /alumni/work-histories/{alumni}/{workHistory} ─────────────────
-    public function destroy(Request $request, Alumni $alumni, AlumniWorkHistory $workHistory): JsonResponse
-    {
-        $this->authorizeSelf($request, $alumni);
-        $this->authorizeOwnership($alumni, $workHistory);
+    /**
+     * Hapus riwayat pekerjaan.
+     * 05_API.md §11.7
+     */
+    public function destroy(
+        Request $request,
+        Alumni $alumni,
+        AlumniWorkHistory $workHistory,
+    ): JsonResponse {
+        // Ownership: alumni hanya bisa hapus miliknya sendiri; admin bebas
+        if (!$request->user()->isAdmin() && $alumni->user_id !== $request->user()->id) {
+            abort(403, 'Anda tidak memiliki izin untuk mengakses data ini.');
+        }
+
+        if ((int) $workHistory->alumni_id !== (int) $alumni->id) {
+            abort(403, 'Riwayat pekerjaan ini tidak milik alumni yang dimaksud.');
+        }
 
         AuditLog::record(
             action   : 'delete_work_history',
             module   : 'alumni',
             modelId  : $alumni->id,
-            oldValues: ['work_history_id' => $workHistory->id, 'company' => $workHistory->company_name],
+            oldValues: [
+                'work_history_id' => $workHistory->id,
+                'company'         => $workHistory->company_name,
+            ],
             newValues: null,
             modelType: Alumni::class,
         );
@@ -130,6 +159,7 @@ class WorkHistoryController extends Controller
     /**
      * Daftar riwayat pekerjaan untuk view admin.
      * Dipanggil dari route admin di routes/api.php.
+     * 05_API.md §3.x (work-histories sub-resource)
      */
     public function indexForAdmin(Request $request, Alumni $alumni): JsonResponse
     {
@@ -147,52 +177,6 @@ class WorkHistoryController extends Controller
     }
 
     // ─── PRIVATE HELPERS ──────────────────────────────────────────────────────
-
-    /**
-     * Pastikan alumni yang diakses adalah milik user yang login.
-     */
-    private function authorizeSelf(Request $request, Alumni $alumni): void
-    {
-        if ($alumni->user_id !== $request->user()->id) {
-            abort(403, 'Anda tidak memiliki izin untuk mengakses data ini.');
-        }
-    }
-
-    /**
-     * Pastikan work history milik alumni yang dimaksud.
-     */
-    private function authorizeOwnership(Alumni $alumni, AlumniWorkHistory $workHistory): void
-    {
-        if ($workHistory->alumni_id !== $alumni->id) {
-            abort(403, 'Riwayat pekerjaan ini tidak milik alumni yang dimaksud.');
-        }
-    }
-
-    /**
-     * Validation rules untuk store/update work history.
-     *
-     * @return array<string, mixed>
-     */
-    private function rules(bool $update = false): array
-    {
-        $required = $update ? 'sometimes' : 'required';
-
-        return [
-            'company_name'      => [$required, 'string', 'max:200'],
-            'position'          => [$required, 'string', 'max:200'],
-            'employment_type'   => [$required, Rule::in(['penuh_waktu', 'paruh_waktu', 'kontrak', 'magang', 'wirausaha'])],
-            'industry_sector'   => ['nullable', 'string', 'max:100'],
-            'city'              => ['nullable', 'string', 'max:100'],
-            'province'          => ['nullable', 'string', 'max:100'],
-            'start_date'        => [$required, 'date'],
-            'end_date'          => ['nullable', 'date', 'after_or_equal:start_date'],
-            'is_current'        => ['boolean'],
-            'salary_range_id'   => ['nullable', 'integer', 'exists:salary_ranges,id'],
-            'job_relevance'     => ['nullable', Rule::in(['sangat_relevan', 'relevan', 'kurang_relevan', 'tidak_relevan'])],
-            'waiting_time_months' => ['nullable', 'integer', 'min:0', 'max:120'],
-            'description'       => ['nullable', 'string', 'max:1000'],
-        ];
-    }
 
     /**
      * Format work history sesuai response spec.
