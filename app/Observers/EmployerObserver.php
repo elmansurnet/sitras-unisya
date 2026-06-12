@@ -2,38 +2,81 @@
 
 namespace App\Observers;
 
+use App\Models\AuditLog;
 use App\Models\Employer;
 
-/**
- * EmployerObserver
- *
- * Placeholder — implementasi diisi pada sesi 2B.
- * Akan menangani: token generation, audit log create/update/delete.
- */
 class EmployerObserver
 {
     public function created(Employer $employer): void
     {
-        // TODO sesi 2B: generate survey_token, AuditLog::record('create', 'employer', ...)
+        AuditLog::record(
+            action: 'create',
+            module: 'Employer',
+            modelId: $employer->id,
+            oldValues: null,
+            newValues: $employer->only([
+                'company_name', 'contact_name', 'contact_email',
+                'industry_sector_id', 'company_size',
+            ]),
+            modelType: Employer::class,
+        );
     }
 
     public function updated(Employer $employer): void
     {
-        // TODO sesi 2B: AuditLog::record('update', 'employer', ...)
+        if ($employer->isDirty()) {
+            // Jangan log perubahan survey_token (sensitif)
+            $dirty   = collect($employer->getDirty())->except(['survey_token'])->all();
+            $original = collect($employer->getOriginal())->except(['survey_token'])->all();
+
+            if (empty($dirty)) {
+                return;
+            }
+
+            AuditLog::record(
+                action: 'update',
+                module: 'Employer',
+                modelId: $employer->id,
+                oldValues: $original,
+                newValues: $dirty,
+                modelType: Employer::class,
+            );
+        }
     }
 
     public function deleted(Employer $employer): void
     {
-        // TODO sesi 2B: AuditLog::record('delete', 'employer', ...)
+        AuditLog::record(
+            action: 'delete',
+            module: 'Employer',
+            modelId: $employer->id,
+            oldValues: $employer->only(['company_name', 'contact_email']),
+            newValues: null,
+            modelType: Employer::class,
+        );
     }
 
     public function restored(Employer $employer): void
     {
-        // TODO sesi 2B
+        AuditLog::record(
+            action: 'restore',
+            module: 'Employer',
+            modelId: $employer->id,
+            oldValues: null,
+            newValues: $employer->only(['company_name', 'contact_email']),
+            modelType: Employer::class,
+        );
     }
 
     public function forceDeleted(Employer $employer): void
     {
-        // TODO sesi 2B
+        AuditLog::record(
+            action: 'force_delete',
+            module: 'Employer',
+            modelId: $employer->id,
+            oldValues: $employer->only(['company_name', 'contact_email']),
+            newValues: null,
+            modelType: Employer::class,
+        );
     }
 }

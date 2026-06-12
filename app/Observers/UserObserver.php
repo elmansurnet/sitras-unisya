@@ -2,38 +2,80 @@
 
 namespace App\Observers;
 
+use App\Models\AuditLog;
 use App\Models\User;
 
-/**
- * UserObserver
- *
- * Placeholder — implementasi diisi pada sesi 2A.
- * Akan menangani: audit log untuk create/update/delete user.
- */
 class UserObserver
 {
     public function created(User $user): void
     {
-        // TODO sesi 2A: AuditLog::record('create', 'user', $user->id, null, $user->toArray())
+        AuditLog::record(
+            action: 'create',
+            module: 'User',
+            modelId: $user->id,
+            oldValues: null,
+            newValues: $user->only(['name', 'email', 'role', 'is_active']),
+            modelType: User::class,
+        );
     }
 
     public function updated(User $user): void
     {
-        // TODO sesi 2A: AuditLog::record('update', 'user', $user->id, $user->getOriginal(), $user->getDirty())
+        if (! $user->isDirty()) {
+            return;
+        }
+
+        // Jangan log perubahan password/remember_token (sensitif)
+        $dirty    = collect($user->getDirty())->except(['password', 'remember_token', 'login_attempts', 'locked_until', 'last_login_at'])->all();
+        $original = collect($user->getOriginal())->except(['password', 'remember_token', 'login_attempts', 'locked_until', 'last_login_at'])->all();
+
+        if (empty($dirty)) {
+            return;
+        }
+
+        AuditLog::record(
+            action: 'update',
+            module: 'User',
+            modelId: $user->id,
+            oldValues: $original,
+            newValues: $dirty,
+            modelType: User::class,
+        );
     }
 
     public function deleted(User $user): void
     {
-        // TODO sesi 2A: AuditLog::record('delete', 'user', $user->id, $user->toArray(), null)
+        AuditLog::record(
+            action: 'delete',
+            module: 'User',
+            modelId: $user->id,
+            oldValues: $user->only(['name', 'email', 'role']),
+            newValues: null,
+            modelType: User::class,
+        );
     }
 
     public function restored(User $user): void
     {
-        // TODO sesi 2A
+        AuditLog::record(
+            action: 'restore',
+            module: 'User',
+            modelId: $user->id,
+            oldValues: null,
+            newValues: $user->only(['name', 'email', 'role', 'is_active']),
+            modelType: User::class,
+        );
     }
 
     public function forceDeleted(User $user): void
     {
-        // TODO sesi 2A
+        AuditLog::record(
+            action: 'force_delete',
+            module: 'User',
+            modelId: $user->id,
+            oldValues: $user->only(['name', 'email', 'role']),
+            newValues: null,
+            modelType: User::class,
+        );
     }
 }

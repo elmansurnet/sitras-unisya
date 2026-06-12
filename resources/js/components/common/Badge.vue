@@ -1,118 +1,105 @@
 <script setup>
 /**
- * Badge component — covers all status variants used in SITRAS:
- * survey_status: belum_disurvei | terkirim | sedang_mengisi | selesai
- * generic: active | inactive | warning | error | info | default
+ * Badge.vue — Status badge dengan semua variant
+ *
+ * Props:
+ *   variant : 'success'|'warning'|'danger'|'info'|'neutral'|'purple'
+ *   size    : 'sm'|'md'
+ *   dot     : Boolean — tampilkan dot indikator
+ *
+ * Shortcut props (auto-map variant dari value survei/employment):
+ *   status  : nilai status dari API (survey_status, is_current, dll)
  */
+import { computed } from 'vue'
+
 const props = defineProps({
   variant: {
     type: String,
-    default: 'default',
-    validator: (v) =>
-      [
-        // Survey status
-        'belum_disurvei',
-        'terkirim',
-        'sedang_mengisi',
-        'selesai',
-        // Generic
-        'active',
-        'inactive',
-        'warning',
-        'error',
-        'info',
-        'default',
-        // Survey period status
-        'draft',
-        'aktif',
-        'arsip',
-        'closed',
-      ].includes(v),
+    default: 'neutral',
+    validator: (v) => ['success', 'warning', 'danger', 'info', 'neutral', 'purple'].includes(v),
   },
-  size: {
-    type: String,
-    default: 'sm',
-    validator: (v) => ['xs', 'sm', 'md'].includes(v),
-  },
-  dot: {
-    type: Boolean,
-    default: false,
-  },
+  size:    { type: String, default: 'md', validator: (v) => ['sm', 'md'].includes(v) },
+  dot:     { type: Boolean, default: false },
+  status:  { type: String, default: null },
 })
 
-const variantMap = {
-  // Survey status
-  belum_disurvei: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
-  terkirim: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  sedang_mengisi: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  selesai: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
-  // Generic
-  active: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
-  inactive: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500',
-  warning: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  error: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-  info: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
-  default: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-  // Questionnaire / period status
-  draft: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-  aktif: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
-  arsip: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500',
-  closed: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500',
+// Auto-map status → variant
+const STATUS_MAP = {
+  completed:   'success',
+  submitted:   'success',
+  active:      'success',
+  invited:     'info',
+  pending:     'warning',
+  in_progress: 'warning',
+  not_invited: 'neutral',
+  inactive:    'neutral',
+  expired:     'danger',
+  rejected:    'danger',
+  superadmin:  'purple',
+  admin:       'info',
+  alumni:      'success',
+  employer:    'warning',
 }
 
-const dotMap = {
-  belum_disurvei: 'bg-gray-400',
-  terkirim: 'bg-blue-500',
-  sedang_mengisi: 'bg-amber-500',
-  selesai: 'bg-green-500',
-  active: 'bg-green-500',
-  inactive: 'bg-gray-400',
+const resolvedVariant = computed(() =>
+  props.status ? (STATUS_MAP[props.status] ?? 'neutral') : props.variant
+)
+
+const VARIANT_CLASSES = {
+  success: 'bg-green-50  text-green-700  ring-green-600/20',
+  warning: 'bg-amber-50  text-amber-700  ring-amber-600/20',
+  danger:  'bg-red-50    text-red-700    ring-red-600/20',
+  info:    'bg-blue-50   text-blue-700   ring-blue-600/20',
+  neutral: 'bg-gray-100  text-gray-600   ring-gray-500/20',
+  purple:  'bg-purple-50 text-purple-700 ring-purple-600/20',
+}
+
+const DOT_CLASSES = {
+  success: 'bg-green-500',
   warning: 'bg-amber-500',
-  error: 'bg-red-500',
-  info: 'bg-sky-500',
-  default: 'bg-gray-400',
-  draft: 'bg-gray-400',
-  aktif: 'bg-teal-500',
-  arsip: 'bg-gray-400',
-  closed: 'bg-gray-400',
+  danger:  'bg-red-500',
+  info:    'bg-blue-500',
+  neutral: 'bg-gray-400',
+  purple:  'bg-purple-500',
 }
 
-const sizeMap = {
-  xs: 'px-1.5 py-0.5 text-[10px]',
-  sm: 'px-2 py-0.5 text-xs',
-  md: 'px-2.5 py-1 text-sm',
+const badgeClass = computed(() => [
+  'inline-flex items-center gap-1.5 rounded-full font-medium ring-1 ring-inset',
+  VARIANT_CLASSES[resolvedVariant.value],
+  props.size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-xs',
+])
+
+const dotClass = computed(() => [
+  'h-1.5 w-1.5 rounded-full',
+  DOT_CLASSES[resolvedVariant.value],
+])
+
+// Label otomatis dari status
+const STATUS_LABELS = {
+  completed:   'Selesai',
+  submitted:   'Terkirim',
+  active:      'Aktif',
+  invited:     'Diundang',
+  pending:     'Menunggu',
+  in_progress: 'Berjalan',
+  not_invited: 'Belum Diundang',
+  inactive:    'Tidak Aktif',
+  expired:     'Kedaluwarsa',
+  rejected:    'Ditolak',
+  superadmin:  'Super Admin',
+  admin:       'Admin',
+  alumni:      'Alumni',
+  employer:    'Employer',
 }
 
-const labelMap = {
-  belum_disurvei: 'Belum Disurvei',
-  terkirim: 'Terkirim',
-  sedang_mengisi: 'Sedang Mengisi',
-  selesai: 'Selesai',
-  active: 'Aktif',
-  inactive: 'Tidak Aktif',
-  warning: 'Peringatan',
-  error: 'Error',
-  info: 'Info',
-  default: 'Default',
-  draft: 'Draft',
-  aktif: 'Aktif',
-  arsip: 'Arsip',
-  closed: 'Ditutup',
-}
+const autoLabel = computed(() =>
+  props.status ? (STATUS_LABELS[props.status] ?? props.status) : null
+)
 </script>
 
 <template>
-  <span
-    :class="[
-      'inline-flex items-center gap-1 rounded-full font-medium',
-      variantMap[variant],
-      sizeMap[size],
-    ]"
-  >
-    <span
-      v-if="dot"
-      :class="['inline-block rounded-full flex-shrink-0', dotMap[variant], size === 'xs' ? 'w-1.5 h-1.5' : 'w-2 h-2']"
-    />
-    <slot>{{ labelMap[variant] }}</slot>
+  <span :class="badgeClass">
+    <span v-if="dot" :class="dotClass" aria-hidden="true" />
+    <slot>{{ autoLabel }}</slot>
   </span>
 </template>
