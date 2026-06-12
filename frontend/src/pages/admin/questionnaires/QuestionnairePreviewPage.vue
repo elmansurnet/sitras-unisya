@@ -1,9 +1,11 @@
 <template>
   <div class="min-h-screen bg-gray-50">
 
-    <!-- ═══ TOP BAR ══════════════════════════════════════════════════════════════ -->
-    <header class="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 shadow-sm print:hidden">
-      <!-- Kiri: breadcrumb -->
+    <!-- ═══ TOP BAR ════════════════════════════════════════════════════════════ -->
+    <header
+      class="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 shadow-sm print:hidden"
+    >
+      <!-- Kiri: back + judul -->
       <div class="flex min-w-0 items-center gap-2">
         <button
           @click="goBack"
@@ -23,8 +25,12 @@
         </div>
       </div>
 
-      <!-- Tengah: step navigator (desktop) -->
-      <nav v-if="visibleSections.length > 1" class="hidden items-center gap-1 md:flex">
+      <!-- Tengah: dot navigator (multi-seksi, hanya step mode desktop) -->
+      <nav
+        v-if="visibleSections.length > 1 && viewMode === 'step'"
+        aria-label="Navigasi seksi"
+        class="hidden items-center gap-1 md:flex"
+      >
         <button
           v-for="(sec, i) in visibleSections"
           :key="sec.id"
@@ -35,16 +41,45 @@
               ? 'w-6 bg-teal-600'
               : 'w-2 bg-gray-300 hover:bg-gray-400',
           ]"
-          :title="sec.title"
+          :aria-label="`Seksi ${i + 1}: ${sec.title}`"
+          :aria-current="currentStep === i ? 'step' : undefined"
         />
       </nav>
 
-      <!-- Kanan: aksi -->
+      <!-- Kanan: kontrol -->
       <div class="flex shrink-0 items-center gap-2">
         <!-- Badge preview -->
         <span class="hidden rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700 sm:inline-flex">
           Preview Admin
         </span>
+
+        <!-- Toggle view mode -->
+        <div
+          v-if="visibleSections.length > 1"
+          class="hidden items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5 sm:flex"
+          title="Mode tampilan"
+          role="group"
+          aria-label="Pilih mode tampilan"
+        >
+          <button
+            @click="setViewMode('all')"
+            :class="[
+              'rounded px-2.5 py-1 text-xs font-medium transition-all',
+              viewMode === 'all'
+                ? 'bg-white text-gray-800 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700',
+            ]"
+          >Semua</button>
+          <button
+            @click="setViewMode('step')"
+            :class="[
+              'rounded px-2.5 py-1 text-xs font-medium transition-all',
+              viewMode === 'step'
+                ? 'bg-white text-gray-800 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700',
+            ]"
+          >Per Seksi</button>
+        </div>
 
         <!-- Reset jawaban -->
         <button
@@ -94,16 +129,20 @@
     </div>
 
     <!-- ═══ KONTEN PREVIEW ════════════════════════════════════════════════════════ -->
-    <main v-else-if="store.current" class="mx-auto max-w-2xl px-4 py-8 print:px-0 print:py-4">
+    <main
+      v-else-if="store.current"
+      class="mx-auto max-w-2xl px-4 py-8 print:px-0 print:py-4"
+      id="preview-main"
+    >
 
       <!-- Header kuesioner -->
       <div class="mb-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm print:rounded-none print:border-x-0 print:border-t-0 print:shadow-none">
-        <div class="mb-2 flex items-center gap-2">
+        <div class="mb-2 flex flex-wrap items-center gap-2">
           <span
             :class="{
               'bg-amber-100 text-amber-700': store.isDraft,
               'bg-teal-100  text-teal-700':  store.isPublished,
-              'bg-gray-100  text-gray-500':   store.isArchived,
+              'bg-gray-100  text-gray-500':  store.isArchived,
             }"
             class="rounded-full px-2 py-0.5 text-xs font-medium print:hidden"
           >{{ statusLabel }}</span>
@@ -116,24 +155,55 @@
           {{ store.current.description }}
         </p>
 
-        <!-- Progress bar (multi-seksi) -->
-        <div v-if="visibleSections.length > 1" class="mt-5 print:hidden">
-          <div class="mb-1.5 flex items-center justify-between text-xs text-gray-500">
-            <span>Seksi {{ currentStep + 1 }} dari {{ visibleSections.length }}</span>
-            <span>{{ Math.round(progressPercent) }}% selesai</span>
+        <!-- Stats bar: answer counter + progress -->
+        <div class="mt-4 space-y-3">
+          <!-- Answer counter -->
+          <div class="flex items-center justify-between text-xs text-gray-500 print:hidden">
+            <span class="flex items-center gap-1.5">
+              <span
+                :class="[
+                  'inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold',
+                  answeredCount === totalQuestionCount
+                    ? 'bg-teal-100 text-teal-700'
+                    : 'bg-gray-100 text-gray-600',
+                ]"
+              >{{ answeredCount }}</span>
+              dari {{ totalQuestionCount }} pertanyaan dijawab
+            </span>
+            <span
+              v-if="requiredUnansweredCount > 0"
+              class="text-amber-600"
+            >{{ requiredUnansweredCount }} wajib belum diisi</span>
+            <span v-else-if="answeredCount === totalQuestionCount && totalQuestionCount > 0" class="text-teal-600 font-medium">
+              Semua terjawab ✓
+            </span>
           </div>
-          <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-            <div
-              class="h-full rounded-full bg-teal-500 transition-all duration-300"
-              :style="{ width: progressPercent + '%' }"
-            />
+
+          <!-- Progress bar (multi-seksi) -->
+          <div v-if="visibleSections.length > 1" class="print:hidden">
+            <div class="mb-1.5 flex items-center justify-between text-xs text-gray-500">
+              <span v-if="viewMode === 'step'">
+                Seksi {{ currentStep + 1 }} dari {{ visibleSections.length }}
+              </span>
+              <span v-else>{{ visibleSections.length }} seksi</span>
+              <span>{{ Math.round(completionPercent) }}% selesai</span>
+            </div>
+            <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+              <div
+                class="h-full rounded-full bg-teal-500 transition-all duration-300"
+                :style="{ width: completionPercent + '%' }"
+                role="progressbar"
+                :aria-valuenow="Math.round(completionPercent)"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- ── SEKSI (single step atau multi-step) ────────────────────────────── -->
+      <!-- ── MODE: SEMUA SEKSI (all) ──────────────────────────────────────────── -->
       <template v-if="viewMode === 'all'">
-        <!-- Tampilkan semua seksi sekaligus (admin preview) -->
         <div
           v-for="(sec, si) in visibleSections"
           :key="sec.id"
@@ -148,7 +218,7 @@
             <p v-if="sec.description" class="mt-0.5 text-sm text-gray-500">{{ sec.description }}</p>
           </div>
 
-          <!-- Pertanyaan dalam seksi -->
+          <!-- Pertanyaan -->
           <div class="space-y-4">
             <template v-for="q in visibleQuestions(sec)" :key="q.id">
               <QuestionRenderer
@@ -158,7 +228,6 @@
                 @update:model-value="answers[q.id] = $event"
               />
             </template>
-
             <div
               v-if="!visibleQuestions(sec).length"
               class="rounded-xl border border-dashed border-gray-200 py-6 text-center text-xs text-gray-400"
@@ -169,8 +238,102 @@
         </div>
       </template>
 
-      <!-- ── Dummy submit area (hanya preview, no API) ──────────────────────── -->
-      <div class="mt-8 rounded-xl border border-gray-200 bg-white p-5 text-center print:hidden">
+      <!-- ── MODE: PER SEKSI (step) ──────────────────────────────────────────── -->
+      <template v-else>
+        <div
+          v-if="activeSection"
+          :key="activeSection.id"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <!-- Header seksi aktif -->
+          <div class="mb-3 border-b border-gray-200 pb-2">
+            <div class="flex items-center justify-between">
+              <p class="text-xs font-semibold uppercase tracking-wide text-teal-600">
+                Seksi {{ currentStep + 1 }} dari {{ visibleSections.length }}
+              </p>
+              <!-- Mini dot navigator mobile -->
+              <div class="flex items-center gap-1 md:hidden">
+                <span
+                  v-for="(_, i) in visibleSections"
+                  :key="i"
+                  :class="[
+                    'h-1.5 rounded-full transition-all',
+                    i === currentStep ? 'w-4 bg-teal-600' : 'w-1.5 bg-gray-300',
+                  ]"
+                />
+              </div>
+            </div>
+            <h3 class="text-base font-semibold text-gray-800">{{ activeSection.title }}</h3>
+            <p v-if="activeSection.description" class="mt-0.5 text-sm text-gray-500">
+              {{ activeSection.description }}
+            </p>
+          </div>
+
+          <!-- Pertanyaan seksi aktif -->
+          <div class="space-y-4">
+            <template v-for="q in visibleQuestions(activeSection)" :key="q.id">
+              <QuestionRenderer
+                :question="q"
+                mode="preview"
+                :model-value="answers[q.id]"
+                @update:model-value="answers[q.id] = $event"
+              />
+            </template>
+            <div
+              v-if="!visibleQuestions(activeSection).length"
+              class="rounded-xl border border-dashed border-gray-200 py-6 text-center text-xs text-gray-400"
+            >
+              Seksi ini belum memiliki pertanyaan
+            </div>
+          </div>
+
+          <!-- Navigasi prev / next -->
+          <div class="mt-6 flex items-center justify-between gap-3">
+            <button
+              @click="prevSection"
+              :disabled="currentStep === 0"
+              class="flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+              </svg>
+              Sebelumnya
+            </button>
+
+            <!-- Step counter -->
+            <span class="text-xs text-gray-400 tabular-nums">
+              {{ currentStep + 1 }} / {{ visibleSections.length }}
+            </span>
+
+            <!-- Tombol Lanjut / Selesai (disabled — mode preview) -->
+            <button
+              v-if="currentStep < visibleSections.length - 1"
+              @click="nextSection"
+              class="flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 transition-all"
+            >
+              Lanjut
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+            <button
+              v-else
+              disabled
+              class="flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-teal-300 px-4 py-2 text-sm font-medium text-white"
+              title="Mode preview — jawaban tidak dikirim"
+            >
+              Selesai (Preview)
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <!-- ── Dummy submit area (mode all) ──────────────────────────────────── -->
+      <div
+        v-if="viewMode === 'all'"
+        class="mt-8 rounded-xl border border-gray-200 bg-white p-5 text-center print:hidden"
+      >
         <div class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-teal-100">
           <svg class="h-5 w-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.641 0-8.573-3.007-9.964-7.178Z" />
@@ -235,10 +398,15 @@ const store  = useQuestionnaireStore()
 const qId    = computed(() => Number(route.params.id))
 
 // ─── View mode ────────────────────────────────────────────────────────────────
-// Admin preview: selalu tampilkan semua seksi sekaligus (viewMode = 'all')
-// Dapat dikembangkan ke 'step' untuk simulasi pengisian responden
+// 'all'  → tampilkan semua seksi sekaligus (default admin preview)
+// 'step' → tampilkan satu seksi per langkah (simulasi alur responden)
 const viewMode    = ref('all')
 const currentStep = ref(0)
+
+function setViewMode(mode) {
+  viewMode.value    = mode
+  currentStep.value = 0
+}
 
 // ─── Answers (preview-only, tidak dikirim ke API) ─────────────────────────────
 const answers = reactive({})
@@ -254,35 +422,26 @@ const statusLabel = computed(() => {
 })
 
 // ─── Conditional logic: evaluasi visibilitas pertanyaan ──────────────────────
-/**
- * Evaluasi apakah satu kondisi terpenuhi berdasarkan jawaban saat ini.
- * Format conditional_logic: { operator: 'and'|'or', conditions: [{ question_id, operator, value }] }
- */
 function evaluateCondition(condition) {
   const answer = answers[condition.question_id]
   const val    = condition.value
 
   switch (condition.operator) {
-    case 'equals':
-      return String(answer) === String(val)
-    case 'not_equals':
-      return String(answer) !== String(val)
+    case 'equals':       return String(answer) === String(val)
+    case 'not_equals':   return String(answer) !== String(val)
     case 'contains':
-      if (Array.isArray(answer)) return answer.includes(val)
-      return String(answer ?? '').includes(String(val))
+      return Array.isArray(answer)
+        ? answer.includes(val)
+        : String(answer ?? '').includes(String(val))
     case 'not_contains':
-      if (Array.isArray(answer)) return !answer.includes(val)
-      return !String(answer ?? '').includes(String(val))
-    case 'greater_than':
-      return Number(answer) > Number(val)
-    case 'less_than':
-      return Number(answer) < Number(val)
-    case 'is_empty':
-      return !answer || (Array.isArray(answer) && answer.length === 0)
-    case 'is_not_empty':
-      return !!answer && !(Array.isArray(answer) && answer.length === 0)
-    default:
-      return true
+      return Array.isArray(answer)
+        ? !answer.includes(val)
+        : !String(answer ?? '').includes(String(val))
+    case 'greater_than': return Number(answer) > Number(val)
+    case 'less_than':    return Number(answer) < Number(val)
+    case 'is_empty':     return !answer || (Array.isArray(answer) && answer.length === 0)
+    case 'is_not_empty': return !!answer && !(Array.isArray(answer) && answer.length === 0)
+    default:             return true
   }
 }
 
@@ -290,23 +449,18 @@ function isQuestionVisible(q) {
   const cl = q.conditional_logic
   if (!cl) return true
 
-  // Support dua format: array langsung atau { operator, conditions }
   const conditions = Array.isArray(cl) ? cl : (cl.conditions ?? [])
   if (!conditions.length) return true
 
   const logicOp = Array.isArray(cl) ? 'and' : (cl.operator ?? 'and')
-
-  if (logicOp === 'or') {
-    return conditions.some(evaluateCondition)
-  }
-  return conditions.every(evaluateCondition)
+  return logicOp === 'or'
+    ? conditions.some(evaluateCondition)
+    : conditions.every(evaluateCondition)
 }
 
-// ─── Sections & questions yang terlihat ──────────────────────────────────────
+// ─── Sections & questions ─────────────────────────────────────────────────────
 const visibleSections = computed(() =>
-  (store.sections ?? []).filter(sec =>
-    (sec.questions ?? []).length > 0
-  )
+  (store.sections ?? []).filter(sec => (sec.questions ?? []).length > 0)
 )
 
 function visibleQuestions(sec) {
@@ -316,14 +470,64 @@ function visibleQuestions(sec) {
     .filter(isQuestionVisible)
 }
 
-// ─── Progress (untuk multi-seksi step mode) ───────────────────────────────────
-const progressPercent = computed(() => {
-  if (!visibleSections.value.length) return 0
-  return ((currentStep.value + 1) / visibleSections.value.length) * 100
+// Seksi yang aktif di step mode
+const activeSection = computed(() => visibleSections.value[currentStep.value] ?? null)
+
+// ─── Answer counter ──────────────────────────────────────────────────────────
+const allVisibleQuestions = computed(() =>
+  visibleSections.value.flatMap(sec => visibleQuestions(sec))
+)
+
+const totalQuestionCount = computed(() => allVisibleQuestions.value.length)
+
+const answeredCount = computed(() =>
+  allVisibleQuestions.value.filter(q => {
+    const a = answers[q.id]
+    if (a === null || a === undefined || a === '') return false
+    if (Array.isArray(a)) return a.length > 0
+    return true
+  }).length
+)
+
+const requiredUnansweredCount = computed(() =>
+  allVisibleQuestions.value.filter(q => {
+    if (!q.is_required) return false
+    const a = answers[q.id]
+    if (a === null || a === undefined || a === '') return true
+    if (Array.isArray(a)) return a.length === 0
+    return false
+  }).length
+)
+
+// ─── Progress ─────────────────────────────────────────────────────────────────
+const completionPercent = computed(() => {
+  if (!totalQuestionCount.value) return 0
+  return (answeredCount.value / totalQuestionCount.value) * 100
 })
 
+// ─── Step navigation ──────────────────────────────────────────────────────────
 function goToSection(idx) {
-  currentStep.value = idx
+  currentStep.value = Math.max(0, Math.min(idx, visibleSections.value.length - 1))
+  scrollToMain()
+}
+
+function nextSection() {
+  if (currentStep.value < visibleSections.value.length - 1) {
+    currentStep.value++
+    scrollToMain()
+  }
+}
+
+function prevSection() {
+  if (currentStep.value > 0) {
+    currentStep.value--
+    scrollToMain()
+  }
+}
+
+function scrollToMain() {
+  const el = document.getElementById('preview-main')
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 // ─── Navigasi kembali ─────────────────────────────────────────────────────────
@@ -342,7 +546,6 @@ function printPage() {
 
 // ─── Load data ────────────────────────────────────────────────────────────────
 async function loadData() {
-  // Jika sudah di-load oleh builder sebelumnya, tidak perlu fetch ulang
   if (store.current?.id === qId.value && store.sections.length) return
   try {
     await store.fetchById(qId.value)
