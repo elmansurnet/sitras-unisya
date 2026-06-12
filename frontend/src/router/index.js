@@ -2,13 +2,11 @@
  * router/index.js — Vue Router 4
  * Sesuai 04_ARCHITECTURE.md (struktur direktori) + 06_UI_UX.md §8 (routing URL)
  *
- * Konvensi nama file: {NamaKonsep}Page.vue (eksplisit, sesuai 04_ARCHITECTURE.md)
- *
  * Route Groups:
  *  - /login/*          → AuthLayout   (guest only)
  *  - /admin/*          → AdminLayout  (role: superadmin, admin)
  *  - /alumni/*         → AlumniLayout (role: alumni)
- *  - /employer/*       → EmployerLayout (role: employer, token-based)
+ *  - /employer/*       → EmployerLayout (token-based)
  *  - /                 → redirect ke dashboard berdasarkan role
  *  - /unauthorized     → halaman 403
  *  - /:pathMatch(.*)* → halaman 404
@@ -21,65 +19,66 @@ import { useAuthStore } from '@/stores/auth'
 // Lazy-loaded pages (code splitting per route)
 // ---------------------------------------------------------------------------
 
-// Auth
-const LoginPage            = () => import('@/pages/auth/LoginPage.vue')
-const OtpRequestPage       = () => import('@/pages/auth/OtpRequestPage.vue')
-const OtpVerifyPage        = () => import('@/pages/auth/OtpVerifyPage.vue')
-const EmployerTokenPage    = () => import('@/pages/auth/EmployerTokenPage.vue')
+// Auth — sesuai 04_ARCHITECTURE.md: pages/auth/
+const LoginPage          = () => import('@/pages/auth/LoginPage.vue')
+const OtpRequestPage     = () => import('@/pages/auth/OtpRequestPage.vue')
+const OtpVerifyPage      = () => import('@/pages/auth/OtpVerifyPage.vue')
+const EmployerAccessPage = () => import('@/pages/auth/EmployerAccessPage.vue')
 
-// Admin — Dashboard
-const AdminDashboardPage   = () => import('@/pages/admin/DashboardPage.vue')
+// Admin — sesuai 04_ARCHITECTURE.md: pages/admin/
+const AdminDashboardPage         = () => import('@/pages/admin/DashboardPage.vue')
+const AdminStatisticsPage        = () => import('@/pages/admin/dashboard/StatisticsPage.vue')
 
-// Admin — Alumni
-const AlumniIndexPage      = () => import('@/pages/admin/alumni/AlumniIndexPage.vue')
-const AlumniDetailPage     = () => import('@/pages/admin/alumni/AlumniDetailPage.vue')
-const AlumniFormPage       = () => import('@/pages/admin/alumni/AlumniFormPage.vue')
-const AlumniImportPage     = () => import('@/pages/admin/alumni/AlumniImportPage.vue')
+// Admin — Alumni: pages/admin/alumni/
+const AlumniIndexPage            = () => import('@/pages/admin/alumni/AlumniIndexPage.vue')
+const AlumniDetailPage           = () => import('@/pages/admin/alumni/AlumniDetailPage.vue')
+const AlumniFormPage             = () => import('@/pages/admin/alumni/AlumniFormPage.vue')
+const AlumniImportPage           = () => import('@/pages/admin/alumni/AlumniImportPage.vue')
 
-// Admin — Employers
-const EmployerIndexPage    = () => import('@/pages/admin/employers/EmployerIndexPage.vue')
-const EmployerDetailPage   = () => import('@/pages/admin/employers/EmployerDetailPage.vue')
-const EmployerFormPage     = () => import('@/pages/admin/employers/EmployerFormPage.vue')
+// Admin — Employers: pages/admin/employers/
+const EmployerIndexPage          = () => import('@/pages/admin/employers/EmployerIndexPage.vue')
+const EmployerDetailPage         = () => import('@/pages/admin/employers/EmployerDetailPage.vue')
+const EmployerFormPage           = () => import('@/pages/admin/employers/EmployerFormPage.vue')
 
-// Admin — Questionnaires
-const QuestionnaireIndexPage   = () => import('@/pages/admin/questionnaires/QuestionnaireIndexPage.vue')
-const QuestionnaireBuilderPage = () => import('@/pages/admin/questionnaires/QuestionnaireBuilderPage.vue')
-const QuestionnairePreviewPage = () => import('@/pages/admin/questionnaires/QuestionnairePreviewPage.vue')
+// Admin — Questionnaires: pages/admin/questionnaires/
+const QuestionnaireIndexPage     = () => import('@/pages/admin/questionnaires/QuestionnaireIndexPage.vue')
+const QuestionnaireBuilderPage   = () => import('@/pages/admin/questionnaires/QuestionnaireBuilderPage.vue')
+const QuestionnairePreviewPage   = () => import('@/pages/admin/questionnaires/QuestionnairePreviewPage.vue')
 
-// Admin — Survey Periods
-const SurveyPeriodIndexPage  = () => import('@/pages/admin/survey-periods/SurveyPeriodIndexPage.vue')
-const SurveyPeriodDetailPage = () => import('@/pages/admin/survey-periods/SurveyPeriodDetailPage.vue')
+// Admin — Survey Periods: pages/admin/survey-periods/
+const SurveyPeriodIndexPage      = () => import('@/pages/admin/survey-periods/SurveyPeriodIndexPage.vue')
+const SurveyPeriodDetailPage     = () => import('@/pages/admin/survey-periods/SurveyPeriodDetailPage.vue')
 
-// Admin — Reports
-const ReportPage = () => import('@/pages/admin/reports/ReportPage.vue')
+// Admin — Reports: pages/admin/reports/
+const ReportPage                 = () => import('@/pages/admin/reports/ReportPage.vue')
 
-// Admin — Notifications
-const NotificationTemplatePage = () => import('@/pages/admin/notifications/NotificationTemplatePage.vue')
-const NotificationLogPage      = () => import('@/pages/admin/notifications/NotificationLogPage.vue')
+// Admin — Notifications: pages/admin/notifications/
+const NotificationTemplatePage   = () => import('@/pages/admin/notifications/NotificationTemplatePage.vue')
+const NotificationLogPage        = () => import('@/pages/admin/notifications/NotificationLogPage.vue')
 
-// Admin — Settings (superadmin only)
-const SystemSettingPage    = () => import('@/pages/admin/settings/SystemSettingPage.vue')
-const FacultyPage          = () => import('@/pages/admin/settings/FacultyPage.vue')
-const StudyProgramPage     = () => import('@/pages/admin/settings/StudyProgramPage.vue')
-const GraduationYearPage   = () => import('@/pages/admin/settings/GraduationYearPage.vue')
-const UserManagementPage   = () => import('@/pages/admin/settings/UserManagementPage.vue')
-const AuditLogPage         = () => import('@/pages/admin/settings/AuditLogPage.vue')
+// Admin — Settings: pages/admin/settings/
+const SystemSettingPage          = () => import('@/pages/admin/settings/SystemSettingPage.vue')
+const FacultyPage                = () => import('@/pages/admin/settings/FacultyPage.vue')
+const StudyProgramPage           = () => import('@/pages/admin/settings/StudyProgramPage.vue')
+const GraduationYearPage         = () => import('@/pages/admin/settings/GraduationYearPage.vue')
+const UserManagementPage         = () => import('@/pages/admin/settings/UserManagementPage.vue')
+const AuditLogPage               = () => import('@/pages/admin/settings/AuditLogPage.vue')
 
-// Alumni
-const AlumniDashboardPage  = () => import('@/pages/alumni/DashboardPage.vue')
-const AlumniProfilePage    = () => import('@/pages/alumni/ProfilePage.vue')
-const ProfileEditPage      = () => import('@/pages/alumni/ProfileEditPage.vue')
-const WorkHistoryPage      = () => import('@/pages/alumni/WorkHistoryPage.vue')
-const AlumniSurveyPage     = () => import('@/pages/alumni/SurveyPage.vue')
-const AlumniSurveyDonePage = () => import('@/pages/alumni/SurveyDonePage.vue')
+// Alumni — sesuai 04_ARCHITECTURE.md: pages/alumni/
+const AlumniDashboardPage        = () => import('@/pages/alumni/DashboardPage.vue')
+const AlumniProfilePage          = () => import('@/pages/alumni/ProfilePage.vue')
+const AlumniProfileEditPage      = () => import('@/pages/alumni/ProfileEditPage.vue')
+const AlumniWorkHistoryPage      = () => import('@/pages/alumni/WorkHistoryPage.vue')
+const AlumniSurveyPage           = () => import('@/pages/alumni/SurveyPage.vue')
+const AlumniSurveyDonePage       = () => import('@/pages/alumni/SurveyDonePage.vue')
 
-// Employer
-const EmployerSurveyPage   = () => import('@/pages/employer/SurveyPage.vue')
-const EmployerDonePage     = () => import('@/pages/employer/DonePage.vue')
+// Employer — sesuai 04_ARCHITECTURE.md: pages/employer/
+const EmployerSurveyPage         = () => import('@/pages/employer/SurveyPage.vue')
+const EmployerDonePage           = () => import('@/pages/employer/DonePage.vue')
 
-// Misc
-const UnauthorizedPage = () => import('@/pages/errors/UnauthorizedPage.vue')
-const NotFoundPage     = () => import('@/pages/errors/NotFoundPage.vue')
+// Error pages
+const UnauthorizedPage           = () => import('@/pages/errors/UnauthorizedPage.vue')
+const NotFoundPage               = () => import('@/pages/errors/NotFoundPage.vue')
 
 // ---------------------------------------------------------------------------
 // Layouts
@@ -127,11 +126,11 @@ const routes = [
     ],
   },
 
-  // Employer token — akses langsung via URL token (tidak pakai AuthLayout)
+  // Employer token — akses form survei langsung via URL token
   {
     path: '/login/employer/:token',
-    name: 'employer.token',
-    component: EmployerTokenPage,
+    name: 'employer.access',
+    component: EmployerAccessPage,
     meta: { title: 'Akses Survei Employer' },
   },
 
@@ -151,6 +150,18 @@ const routes = [
         meta: {
           title: 'Dashboard',
           breadcrumbs: [{ label: 'Dashboard' }],
+        },
+      },
+      {
+        path: 'dashboard/stats',
+        name: 'admin.dashboard.stats',
+        component: AdminStatisticsPage,
+        meta: {
+          title: 'Statistik Ketenagakerjaan',
+          breadcrumbs: [
+            { label: 'Dashboard', to: { name: 'admin.dashboard' } },
+            { label: 'Statistik' },
+          ],
         },
       },
 
@@ -216,7 +227,7 @@ const routes = [
       // ── Employers ──
       {
         path: 'employers',
-        name: 'admin.employers.index',
+        name: 'admin.employer.index',
         component: EmployerIndexPage,
         meta: {
           title: 'Daftar Employer',
@@ -225,36 +236,36 @@ const routes = [
       },
       {
         path: 'employers/create',
-        name: 'admin.employers.create',
+        name: 'admin.employer.create',
         component: EmployerFormPage,
         meta: {
           title: 'Tambah Employer',
           breadcrumbs: [
-            { label: 'Employer', to: { name: 'admin.employers.index' } },
+            { label: 'Employer', to: { name: 'admin.employer.index' } },
             { label: 'Tambah' },
           ],
         },
       },
       {
         path: 'employers/:id',
-        name: 'admin.employers.detail',
+        name: 'admin.employer.detail',
         component: EmployerDetailPage,
         meta: {
           title: 'Detail Employer',
           breadcrumbs: [
-            { label: 'Employer', to: { name: 'admin.employers.index' } },
+            { label: 'Employer', to: { name: 'admin.employer.index' } },
             { label: 'Detail' },
           ],
         },
       },
       {
         path: 'employers/:id/edit',
-        name: 'admin.employers.edit',
+        name: 'admin.employer.edit',
         component: EmployerFormPage,
         meta: {
           title: 'Edit Employer',
           breadcrumbs: [
-            { label: 'Employer', to: { name: 'admin.employers.index' } },
+            { label: 'Employer', to: { name: 'admin.employer.index' } },
             { label: 'Edit' },
           ],
         },
@@ -273,7 +284,7 @@ const routes = [
       {
         path: 'questionnaires/create',
         name: 'admin.questionnaires.create',
-        component: QuestionnaireIndexPage,
+        component: QuestionnaireBuilderPage,
         meta: {
           title: 'Buat Kuesioner',
           breadcrumbs: [
@@ -320,7 +331,7 @@ const routes = [
       {
         path: 'survey-periods/create',
         name: 'admin.survey-periods.create',
-        component: SurveyPeriodIndexPage,
+        component: SurveyPeriodDetailPage,
         meta: {
           title: 'Buat Periode Survei',
           breadcrumbs: [
@@ -385,13 +396,16 @@ const routes = [
         },
       },
       {
-        path: 'settings/faculty',
-        name: 'admin.settings.faculty',
+        path: 'settings/faculties',
+        name: 'admin.settings.faculties',
         component: FacultyPage,
         meta: {
           title: 'Kelola Fakultas',
           roles: ['superadmin'],
-          breadcrumbs: [{ label: 'Pengaturan' }, { label: 'Fakultas' }],
+          breadcrumbs: [
+            { label: 'Pengaturan', to: { name: 'admin.settings' } },
+            { label: 'Fakultas' },
+          ],
         },
       },
       {
@@ -401,7 +415,10 @@ const routes = [
         meta: {
           title: 'Kelola Program Studi',
           roles: ['superadmin'],
-          breadcrumbs: [{ label: 'Pengaturan' }, { label: 'Program Studi' }],
+          breadcrumbs: [
+            { label: 'Pengaturan', to: { name: 'admin.settings' } },
+            { label: 'Program Studi' },
+          ],
         },
       },
       {
@@ -411,7 +428,10 @@ const routes = [
         meta: {
           title: 'Kelola Tahun Lulus',
           roles: ['superadmin'],
-          breadcrumbs: [{ label: 'Pengaturan' }, { label: 'Tahun Lulus' }],
+          breadcrumbs: [
+            { label: 'Pengaturan', to: { name: 'admin.settings' } },
+            { label: 'Tahun Lulus' },
+          ],
         },
       },
       {
@@ -419,9 +439,9 @@ const routes = [
         name: 'admin.users',
         component: UserManagementPage,
         meta: {
-          title: 'Kelola Admin',
+          title: 'Manajemen Admin',
           roles: ['superadmin'],
-          breadcrumbs: [{ label: 'Sistem' }, { label: 'Admin' }],
+          breadcrumbs: [{ label: 'Manajemen Admin' }],
         },
       },
       {
@@ -431,7 +451,7 @@ const routes = [
         meta: {
           title: 'Audit Log',
           roles: ['superadmin'],
-          breadcrumbs: [{ label: 'Sistem' }, { label: 'Audit Log' }],
+          breadcrumbs: [{ label: 'Audit Log' }],
         },
       },
     ],
@@ -459,13 +479,13 @@ const routes = [
       {
         path: 'profile/edit',
         name: 'alumni.profile.edit',
-        component: ProfileEditPage,
+        component: AlumniProfileEditPage,
         meta: { title: 'Edit Profil' },
       },
       {
         path: 'work-histories',
         name: 'alumni.work-histories',
-        component: WorkHistoryPage,
+        component: AlumniWorkHistoryPage,
         meta: { title: 'Riwayat Pekerjaan' },
       },
       {
@@ -493,13 +513,13 @@ const routes = [
         path: 'survey',
         name: 'employer.survey',
         component: EmployerSurveyPage,
-        meta: { title: 'Form Survei Employer' },
+        meta: { title: 'Survei Employer' },
       },
       {
         path: 'done',
         name: 'employer.done',
         component: EmployerDonePage,
-        meta: { title: 'Survei Employer Selesai' },
+        meta: { title: 'Survei Selesai' },
       },
     ],
   },
