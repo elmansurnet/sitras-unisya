@@ -1,4 +1,1 @@
-import axios from 'axios';
-window.axios = axios;
-
-window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+// DEPRECATED: Moved to frontend/ — This file is kept only for Laravel's asset pipeline compatibility. Do not edit.

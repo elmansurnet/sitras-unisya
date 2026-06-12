@@ -1,8 +1,1 @@
-<template>
-  <router-view />
-</template>
-
-<script setup>
-// App.vue adalah root shell.
-// Layout (AuthLayout, AdminLayout, dll) di-inject via nested routes.
-</script>
+<!-- DEPRECATED: Moved to frontend/src/App.vue — This file is kept only for Laravel's asset pipeline compatibility. Do not edit. -->
