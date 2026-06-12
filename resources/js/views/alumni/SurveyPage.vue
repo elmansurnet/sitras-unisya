@@ -1,118 +1,163 @@
 <script setup>
 /**
- * SurveyPage.vue — Daftar Survei Tersedia untuk Alumni
- * Route: /alumni/survey (name: alumni.survey)
- * Sesuai 06_UI_UX.md §2.2 & §8
- * API: GET /api/v1/alumni/surveys (05_API.md §7)
+ * views/alumni/SurveyPage.vue
+ * Halaman daftar survei tersedia untuk alumni yang sudah login.
+ * Route: alumni.survey — /alumni/survey
+ * Layout: AlumniLayout (sudah wrap di router)
+ * Sesuai 06_UI_UX.md §8 & 05_API.md GET /alumni/survey
  */
-import { computed, onMounted } from 'vue'
+import { onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAlumniSurveyStore } from '@/stores/alumniSurvey'
-import Badge from '@/components/common/Badge.vue'
+import { useSurveyStore } from '@/stores/survey'
 
 const router = useRouter()
-const surveyStore = useAlumniSurveyStore()
+const surveyStore = useSurveyStore()
 
-const surveys = computed(() => surveyStore.list)
+onMounted(() => {
+  surveyStore.fetchAvailableSurveys()
+})
+
+const surveys = computed(() => surveyStore.availableSurveys)
 const loading = computed(() => surveyStore.loading)
+const error   = computed(() => surveyStore.error)
 
-const statusConfig = {
-  belum_disurvei: { variant: 'muted', label: 'Belum Dimulai',    cta: 'Mulai Isi' },
-  terkirim:       { variant: 'info',    label: 'Undangan Dikirim', cta: 'Mulai Isi' },
-  sedang_mengisi: { variant: 'warning', label: 'Sedang Diisi',    cta: 'Lanjutkan' },
-  selesai:        { variant: 'success', label: 'Selesai',         cta: null },
+function statusLabel(status) {
+  const map = {
+    not_started: 'Belum Dikerjakan',
+    in_progress:  'Sedang Diisi',
+    submitted:    'Sudah Dikirim',
+  }
+  return map[status] ?? status
 }
 
-function goFill(survey) {
-  router.push({ name: 'alumni.survey.fill', params: { id: survey.id } })
+function statusClass(status) {
+  const map = {
+    not_started: 'bg-amber-100 text-amber-800',
+    in_progress:  'bg-blue-100 text-blue-800',
+    submitted:    'bg-green-100 text-green-800',
+  }
+  return map[status] ?? 'bg-gray-100 text-gray-700'
 }
 
-onMounted(() => surveyStore.fetchList())
+function goFill(id) {
+  router.push({ name: 'alumni.survey.fill', params: { id } })
+}
 </script>
 
 <template>
-  <div class="space-y-5">
+  <div class="max-w-3xl mx-auto px-4 py-8">
     <!-- Header -->
-    <div>
-      <h1 class="text-xl font-semibold text-[var(--color-text)]">Survei Tersedia</h1>
-      <p class="text-sm text-[var(--color-text-muted)]">Survei yang dikirimkan kepada Anda oleh institusi.</p>
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">Survei Tersedia</h1>
+      <p class="mt-1 text-sm text-gray-500">
+        Daftar survei tracer study yang perlu Anda isi.
+      </p>
     </div>
 
-    <!-- Skeleton -->
-    <div v-if="loading" class="space-y-3">
-      <div class="skeleton h-28 rounded-xl" />
-      <div class="skeleton h-28 rounded-xl" />
+    <!-- Loading skeleton -->
+    <div v-if="loading" class="space-y-4">
+      <div
+        v-for="i in 3"
+        :key="i"
+        class="animate-pulse rounded-xl border border-gray-200 bg-white p-6"
+      >
+        <div class="h-4 w-1/3 rounded bg-gray-200 mb-3" />
+        <div class="h-3 w-2/3 rounded bg-gray-100 mb-2" />
+        <div class="h-3 w-1/2 rounded bg-gray-100" />
+      </div>
     </div>
 
-    <!-- Empty -->
-    <div v-else-if="!surveys.length" class="text-center py-16 space-y-2">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mx-auto text-[var(--color-text-faint)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+    <!-- Error state -->
+    <div
+      v-else-if="error"
+      class="rounded-xl border border-red-200 bg-red-50 p-6 text-center"
+    >
+      <p class="text-sm font-medium text-red-700">{{ error }}</p>
+      <button
+        class="mt-3 text-sm text-red-600 underline"
+        @click="surveyStore.fetchAvailableSurveys()"
+      >
+        Coba lagi
+      </button>
+    </div>
+
+    <!-- Empty state -->
+    <div
+      v-else-if="surveys.length === 0"
+      class="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center"
+    >
+      <svg
+        class="mx-auto mb-4 h-12 w-12 text-gray-300"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="1.5"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M9 12h6m-3-3v6M3 12a9 9 0 1118 0 9 9 0 01-18 0z"
+        />
       </svg>
-      <p class="text-sm font-medium text-[var(--color-text-muted)]">Belum ada survei yang tersedia.</p>
-      <p class="text-xs text-[var(--color-text-faint)]">Survei akan muncul di sini saat institusi mengirimkan undangan.</p>
+      <p class="text-sm font-medium text-gray-500">Tidak ada survei aktif saat ini.</p>
+      <p class="mt-1 text-xs text-gray-400">Silakan kembali lagi nanti.</p>
     </div>
 
-    <!-- Survey cards -->
-    <div v-else class="space-y-3">
+    <!-- Survey list -->
+    <div v-else class="space-y-4">
       <div
         v-for="survey in surveys"
         :key="survey.id"
-        class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-5"
+        class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition hover:shadow-md"
       >
-        <div class="flex items-start justify-between gap-4 flex-wrap">
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 flex-wrap mb-1">
-              <h2 class="text-sm font-semibold text-[var(--color-text)] truncate">{{ survey.title }}</h2>
-              <Badge :variant="statusConfig[survey.my_status]?.variant ?? 'muted'" dot>
-                {{ statusConfig[survey.my_status]?.label ?? survey.my_status }}
-              </Badge>
-            </div>
-            <p v-if="survey.description" class="text-xs text-[var(--color-text-muted)] line-clamp-2">{{ survey.description }}</p>
-            <div class="flex items-center gap-4 mt-2 flex-wrap">
-              <span v-if="survey.estimated_minutes" class="text-xs text-[var(--color-text-faint)]">
-                ⏱ ±{{ survey.estimated_minutes }} menit
-              </span>
-              <span v-if="survey.end_date" class="text-xs text-[var(--color-text-faint)]">
-                Batas: {{ new Date(survey.end_date).toLocaleDateString('id-ID') }}
-              </span>
-            </div>
-
-            <!-- Progress bar untuk sedang_mengisi -->
-            <div v-if="survey.my_status === 'sedang_mengisi' && survey.my_progress" class="mt-3">
-              <div class="flex justify-between text-xs text-[var(--color-text-muted)] mb-1">
-                <span>Progress</span>
-                <span>{{ survey.my_progress }}%</span>
-              </div>
-              <div class="h-1.5 rounded-full bg-[var(--color-surface-offset)] overflow-hidden">
-                <div
-                  class="h-full bg-[var(--color-warning)] rounded-full transition-all duration-500"
-                  :style="{ width: survey.my_progress + '%' }"
-                />
-              </div>
-            </div>
+        <!-- Top: judul + status badge -->
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <h2 class="truncate text-base font-semibold text-gray-900">
+              {{ survey.title }}
+            </h2>
+            <p v-if="survey.description" class="mt-1 text-sm text-gray-500 line-clamp-2">
+              {{ survey.description }}
+            </p>
           </div>
-
-          <!-- CTA button -->
-          <button
-            v-if="statusConfig[survey.my_status]?.cta"
-            class="flex-shrink-0 h-9 px-4 rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors"
-            @click="goFill(survey)"
+          <span
+            :class="statusClass(survey.alumni_status)"
+            class="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium"
           >
-            {{ statusConfig[survey.my_status].cta }}
+            {{ statusLabel(survey.alumni_status) }}
+          </span>
+        </div>
+
+        <!-- Meta info -->
+        <div class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
+          <span v-if="survey.end_date">
+            ⏰ Batas: {{ new Date(survey.end_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) }}
+          </span>
+          <span v-if="survey.total_questions">
+            📋 {{ survey.total_questions }} pertanyaan
+          </span>
+          <span v-if="survey.completion_percentage != null">
+            ✅ {{ survey.completion_percentage }}% selesai
+          </span>
+        </div>
+
+        <!-- Action button -->
+        <div class="mt-5 flex justify-end">
+          <button
+            v-if="survey.alumni_status !== 'submitted'"
+            class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 active:bg-teal-800 disabled:opacity-50"
+            @click="goFill(survey.id)"
+          >
+            {{ survey.alumni_status === 'in_progress' ? 'Lanjutkan Isi' : 'Isi Survei' }}
           </button>
-          <span v-else class="text-xs text-[var(--color-success)] font-medium flex-shrink-0">✓ Selesai</span>
+          <span
+            v-else
+            class="rounded-lg bg-green-50 px-4 py-2 text-sm font-medium text-green-700"
+          >
+            Survei telah dikirim
+          </span>
         </div>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-@keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
-.skeleton {
-  background: linear-gradient(90deg, var(--color-surface-offset) 25%, var(--color-surface-dynamic) 50%, var(--color-surface-offset) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-}
-</style>
