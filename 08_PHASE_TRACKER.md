@@ -1,6 +1,6 @@
 # 08_PHASE_TRACKER.md
 # PHASE TRACKER — SISTEM TRACER STUDY UNISYA
-# Versi: 1.1.0 | Tanggal: 2026-06-12 
+# Versi: 1.2.0 | Tanggal: 2026-06-12
 
 > File ini hanya bisa edit untuk update progress project dan task tidak boleh dikurangi untuk konsistensi project!
 
@@ -12,7 +12,7 @@
 |---|---|---|---|
 | 0 | Dokumentasi & Desain | 0A | ✅ Selesai |
 | 1 | Fondasi & Autentikasi | 1A, 1B | ✅ Selesai (1A ✅, 1B ✅) |
-| 2 | Manajemen Data Inti | 2A, 2B, 2C | 🔄 Berjalan (2A ✅, 2B ✅, 2C ⏳) |
+| 2 | Manajemen Data Inti | 2A, 2B, 2C | ✅ Selesai (2A ✅, 2B ✅, 2C ✅) |
 | 3 | Kuesioner Dinamis | 3A, 3B | ⏳ Pending |
 | 4 | Survei & Notifikasi | 4A, 4B | ⏳ Pending |
 | 5 | Analitik & Pelaporan | 5A, 5B | ⏳ Pending |
@@ -20,7 +20,7 @@
 | 7 | Deployment & Optimasi | 7A | ⏳ Pending |
 
 **Total Task: 199 task**
-**Selesai: 108 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
+**Selesai: 121 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
 
 ---
 
@@ -203,26 +203,27 @@
 ---
 
 ### Sesi 2C — Konfigurasi Akademik & Sistem (Backend + Frontend)
+**Status: ✅ Selesai | Tanggal Selesai: 2026-06-12**
 **Dependensi:** 2A selesai
 **Estimasi:** 2–3 hari
 
 | No | Task | File/Artefak | Status |
 |---|---|---|---|
-| 2C.1 | Controller: `Admin/FacultyController` (CRUD) | `FacultyController.php` | ⏳ |
-| 2C.2 | Controller: `Admin/StudyProgramController` (CRUD) | `StudyProgramController.php` | ⏳ |
-| 2C.3 | Controller: `Admin/GraduationYearController` (CRUD) | `GraduationYearController.php` | ⏳ |
-| 2C.4 | Controller: `Admin/UserController` (CRUD admin, toggleActive — superadmin only) | `UserController.php` | ⏳ |
-| 2C.5 | Controller: `Admin/SettingController` (index, update — superadmin only) | `SettingController.php` | ⏳ |
-| 2C.6 | Controller: `Admin/AuditLogController` (index dengan filter — superadmin only) | `AuditLogController.php` | ⏳ |
-| 2C.7 | Routes: `/api/v1/admin/faculties`, `/study-programs`, `/graduation-years`, `/users`, `/settings`, `/audit-logs` | `routes/api.php` | ⏳ |
-| 2C.8 | Frontend: `pages/admin/settings/FacultyPage.vue` (CRUD inline) | `FacultyPage.vue` | ⏳ |
-| 2C.9 | Frontend: `pages/admin/settings/StudyProgramPage.vue` (CRUD, filter per fakultas) | `StudyProgramPage.vue` | ⏳ |
-| 2C.10 | Frontend: `pages/admin/settings/GraduationYearPage.vue` (CRUD) | `GraduationYearPage.vue` | ⏳ |
-| 2C.11 | Frontend: `pages/admin/settings/UserManagementPage.vue` (CRUD admin, toggle aktif — superadmin) | `UserManagementPage.vue` | ⏳ |
-| 2C.12 | Frontend: `pages/admin/settings/SystemSettingPage.vue` (tab: umum, smtp, wa, keamanan, notif) | `SystemSettingPage.vue` | ⏳ |
-| 2C.13 | Frontend: `pages/admin/settings/AuditLogPage.vue` (tabel, filter, detail — superadmin) | `AuditLogPage.vue` | ⏳ |
+| 2C.1 | Controller: `Admin/FacultyController` (CRUD) | `FacultyController.php` | ✅ |
+| 2C.2 | Controller: `Admin/StudyProgramController` (CRUD) | `StudyProgramController.php` | ✅ |
+| 2C.3 | Controller: `Admin/GraduationYearController` (CRUD) | `GraduationYearController.php` | ✅ |
+| 2C.4 | Controller: `Admin/UserController` (CRUD admin, toggleActive — superadmin only) | `UserController.php` | ✅ |
+| 2C.5 | Controller: `Admin/SettingController` (index, update — superadmin only) | `SettingController.php` | ✅ |
+| 2C.6 | Controller: `Admin/AuditLogController` (index dengan filter — superadmin only) | `AuditLogController.php` | ✅ |
+| 2C.7 | Routes: `/api/v1/admin/faculties`, `/study-programs`, `/graduation-years`, `/users`, `/settings`, `/audit-logs` | `routes/api.php` | ✅ |
+| 2C.8 | Frontend: `pages/admin/settings/FacultyPage.vue` (CRUD inline) | `FacultyPage.vue` | ✅ |
+| 2C.9 | Frontend: `pages/admin/settings/StudyProgramPage.vue` (CRUD, filter per fakultas) | `StudyProgramPage.vue` | ✅ |
+| 2C.10 | Frontend: `pages/admin/settings/GraduationYearPage.vue` (CRUD) | `GraduationYearPage.vue` | ✅ |
+| 2C.11 | Frontend: `pages/admin/settings/UserManagementPage.vue` (CRUD admin, toggle aktif — superadmin) | `UserManagementPage.vue` | ✅ |
+| 2C.12 | Frontend: `pages/admin/settings/SystemSettingPage.vue` (tab: umum, smtp, wa, keamanan, notif) | `SystemSettingPage.vue` | ✅ |
+| 2C.13 | Frontend: `pages/admin/settings/AuditLogPage.vue` (tabel, filter, detail — superadmin) | `AuditLogPage.vue` | ✅ |
 
-**Total Sesi 2C: 13 task**
+**Total Sesi 2C: 13 task — ✅ Selesai 13/13 (diverifikasi 2026-06-12)**
 
 ---
 
@@ -450,7 +451,7 @@
 | 1 | 1B | 28 | ✅ Selesai (2026-06-09) |
 | 2 | 2A | 31 | ✅ Selesai (2026-06-12) |
 | 2 | 2B | 16 | ✅ Selesai (2026-06-12) |
-| 2 | 2C | 13 | ⏳ |
+| 2 | 2C | 13 | ✅ Selesai (2026-06-12) |
 | 3 | 3A | 12 | ⏳ |
 | 3 | 3B | 9 | ⏳ |
 | 4 | 4A | 28 | ⏳ |
@@ -517,6 +518,7 @@ Fase 1A (Setup + DB) → Fase 1B (Auth)
 | 1.0.8 | 2026-06-12 | Audit & cleanup Sesi 2A: verifikasi tidak ada file duplikat di repo; AlumniObserver placeholder diidentifikasi; WorkHistoryController refactor dikonfirmasi selesai; semua Form Request 2A konsisten dengan spec |
 | 1.0.9 | 2026-06-12 | Sesi 2A dinyatakan ✅ Selesai penuh (31/31 task diverifikasi ada di repository); 2A.4 AlumniObserver diupdate ✅; counter task selesai 61→92; status Fase 2 diupdate: 2A ✅ |
 | 1.1.0 | 2026-06-12 | Sesi 2B dinyatakan ✅ Selesai penuh (16/16 task diverifikasi ada di repository): migrations employers+pivot, Model Employer, EmployerObserver, EmployerRepository, EmployerService, EmployerPolicy, 2 FormRequest, Admin/EmployerController, Employer/ProfileController, routes, store employer.js, 3 halaman frontend (Index/Detail/Form), 2 feature tests (EmployerTest + EmployerTokenTest); counter task selesai 92→108; status Fase 2 diupdate: 2A ✅, 2B ✅ |
+| 1.2.0 | 2026-06-12 | Sesi 2C dinyatakan ✅ Selesai penuh (13/13 task diverifikasi ada di repository): 6 controller (Faculty, StudyProgram, GraduationYear, User, Setting, AuditLog), 6 folder FormRequest (Faculty, StudyProgram, GraduationYear, User, Setting), routes api.php update, 6 halaman frontend settings (Faculty, StudyProgram, GraduationYear, UserManagement, SystemSetting, AuditLog); Fase 2 dinyatakan ✅ selesai penuh (2A+2B+2C); counter task selesai 108→121 |
 
 ---
 

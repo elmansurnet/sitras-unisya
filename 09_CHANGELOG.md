@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.1.0 | Tanggal: 2026-06-12 
+# Versi: 1.2.0 | Tanggal: 2026-06-12
 
 ---
 
@@ -21,6 +21,103 @@ Setiap entri changelog mengikuti format:
 - `Removed` — Konten yang dihapus
 - `Security` — Perbaikan keamanan
 - `Deprecated` — Fitur yang akan dihapus di versi mendatang
+
+---
+
+## [1.2.0] — 2026-06-12
+
+> **Sumber:** Penyelesaian Sesi 2C — Konfigurasi Akademik & Sistem (Backend + Frontend).
+> Engineer: Claude (Lead Engineer SITRAS UNISYA).
+> **Batch pelaksanaan:**
+> - Batch 1 (2C.1–2C.3): FacultyController, StudyProgramController, GraduationYearController + FormRequests
+> - Batch 2 (2C.4): UserController + UserObserver + FormRequests + AppServiceProvider update
+> - Batch 3 (2C.5–2C.6): SettingController + AuditLogController + FormRequests
+> - Batch 4 (2C.7): Routes api.php update
+> - Batch 5 (2C.8–2C.10): FacultyPage.vue, StudyProgramPage.vue, GraduationYearPage.vue
+> - Batch 6 (2C.11–2C.13): UserManagementPage.vue, SystemSettingPage.vue, AuditLogPage.vue
+
+---
+
+### Added — File Kode Produksi Sesi 2C
+
+#### Added — Controllers (6 file)
+- `app/Http/Controllers/Api/V1/Admin/FacultyController.php` — CRUD fakultas (index, show, store, update, destroy); middleware `auth:sanctum` + role admin/superadmin; AuditLog::record() di store/update/destroy; response sesuai `05_API.md §5.1`
+- `app/Http/Controllers/Api/V1/Admin/StudyProgramController.php` — CRUD program studi dengan filter `faculty_id`; validasi FK ke tabel faculties; load relasi faculty di show/index; AuditLog setiap mutasi
+- `app/Http/Controllers/Api/V1/Admin/GraduationYearController.php` — CRUD tahun kelulusan (year INTEGER unik); guard duplikat tahun di StoreRequest; AuditLog di setiap mutasi
+- `app/Http/Controllers/Api/V1/Admin/UserController.php` — CRUD user admin + action `toggleActive` (superadmin only via Gate::authorize); tidak bisa hapus/nonaktif diri sendiri; load role di setiap response; AuditLog level warning untuk toggleActive
+- `app/Http/Controllers/Api/V1/Admin/SettingController.php` — `index` (semua setting dikelompokkan per group), `update` (bulk update array settings, superadmin only); cache invalidation setelah update; AuditLog dengan diff nilai lama→baru
+- `app/Http/Controllers/Api/V1/Admin/AuditLogController.php` — `index` read-only (superadmin only); filter: `module`, `action`, `user_id`, `date_from`, `date_to`, `level`; paginate 50/page; response ringkas (tanpa payload besar)
+
+#### Added — Form Requests (8 file)
+- `app/Http/Requests/Faculty/StoreFacultyRequest.php` — `name` required unique, `code` required unique 2–10 char uppercase
+- `app/Http/Requests/Faculty/UpdateFacultyRequest.php` — sama, unique ignore current id
+- `app/Http/Requests/StudyProgram/StoreStudyProgramRequest.php` — `name`, `code`, `faculty_id` (exists:faculties,id), `degree_level` ENUM
+- `app/Http/Requests/StudyProgram/UpdateStudyProgramRequest.php` — unique code ignore current, `faculty_id` nullable (tidak ganti kalau tidak diisi)
+- `app/Http/Requests/GraduationYear/StoreGraduationYearRequest.php` — `year` integer antara 1990–2050, unique graduation_years
+- `app/Http/Requests/GraduationYear/UpdateGraduationYearRequest.php` — unique year ignore current
+- `app/Http/Requests/User/StoreUserRequest.php` — `name`, `email` unique users, `password` min 8, `role` in:admin/superadmin, `is_active` boolean
+- `app/Http/Requests/User/UpdateUserRequest.php` — semua optional; `email` unique ignore current; `password` nullable min 8
+- `app/Http/Requests/Setting/UpdateSettingRequest.php` — `settings` array required, setiap item: `key` string exists di system_settings, `value` nullable string
+
+#### Added — Observer (1 file)
+- `app/Observers/UserObserver.php` — Event `created`, `updated`, `deleted` → `AuditLog::record()`; `updated`: capture `$oldValues` sebelum save; `deleted`: log `deleted_by` + level `warning` jika yang dihapus adalah admin aktif
+
+#### Changed — Provider & Routes (2 file)
+- `app/Providers/AppServiceProvider.php` — Registrasi `UserObserver` untuk `User::class`; pastikan tidak duplikasi dengan observer sebelumnya
+- `routes/api.php` — Tambah route group `admin/faculties` (apiResource), `admin/study-programs` (apiResource + filter), `admin/graduation-years` (apiResource), `admin/users` (apiResource + POST `{user}/toggle-active`), `admin/settings` (GET index + PUT update), `admin/audit-logs` (GET index only, superadmin middleware)
+
+#### Added — Frontend Pages (6 file)
+- `frontend/src/pages/admin/settings/FacultyPage.vue` — Tabel inline-edit fakultas; modal tambah/edit; konfirmasi hapus dengan cek apakah fakultas punya program studi aktif; search by nama/kode; 14 KB
+- `frontend/src/pages/admin/settings/StudyProgramPage.vue` — Tabel program studi; filter dropdown per fakultas; badge degree_level; modal form (select fakultas via dropdown); 19 KB
+- `frontend/src/pages/admin/settings/GraduationYearPage.vue` — Tabel tahun kelulusan dengan badge jumlah alumni; CRUD modal sederhana; sort descending default; 14 KB
+- `frontend/src/pages/admin/settings/UserManagementPage.vue` — Tabel user admin; toggle aktif/nonaktif dengan konfirmasi (hanya superadmin, dikunci untuk diri sendiri); badge role; modal tambah/edit user + reset password; 22 KB
+- `frontend/src/pages/admin/settings/SystemSettingPage.vue` — Tab SMTP, WhatsApp Gateway, Umum, Keamanan, Notifikasi; tombol "Test Koneksi" per channel; auto-save per group; masked field untuk api_key/password; 16 KB
+- `frontend/src/pages/admin/settings/AuditLogPage.vue` — Tabel audit log read-only; filter module/action/user/level/date range; expandable row untuk lihat detail payload; export CSV; 19 KB
+
+---
+
+### Security
+- `UserController::toggleActive()` dan `destroy()` hanya bisa dieksekusi superadmin (Gate::authorize) sesuai `07_SECURITY.md §3.3`
+- `AuditLogController` hanya GET, tidak ada mutasi — sesuai prinsip audit trail immutable
+- `SettingController::update()` superadmin only; nilai setting tidak di-expose ke role lebih rendah
+- Semua controller menggunakan Form Request (bukan manual `$request->validate()`); mass assignment via `$fillable` di semua model terkait
+- UserObserver mencatat level `warning` saat admin aktif dihapus untuk deteksi anomali
+
+---
+
+### Ringkasan File Terdampak v1.2.0
+
+| File | Aksi | Keterangan |
+|---|---|---|
+| `app/Http/Controllers/Api/V1/Admin/FacultyController.php` | Added | CRUD fakultas + AuditLog |
+| `app/Http/Controllers/Api/V1/Admin/StudyProgramController.php` | Added | CRUD prodi + filter faculty_id |
+| `app/Http/Controllers/Api/V1/Admin/GraduationYearController.php` | Added | CRUD tahun kelulusan |
+| `app/Http/Controllers/Api/V1/Admin/UserController.php` | Added | CRUD user admin + toggleActive (superadmin) |
+| `app/Http/Controllers/Api/V1/Admin/SettingController.php` | Added | index + bulk update (superadmin) |
+| `app/Http/Controllers/Api/V1/Admin/AuditLogController.php` | Added | index read-only + filter (superadmin) |
+| `app/Http/Requests/Faculty/StoreFacultyRequest.php` | Added | Validasi store fakultas |
+| `app/Http/Requests/Faculty/UpdateFacultyRequest.php` | Added | Validasi update fakultas |
+| `app/Http/Requests/StudyProgram/StoreStudyProgramRequest.php` | Added | Validasi store prodi |
+| `app/Http/Requests/StudyProgram/UpdateStudyProgramRequest.php` | Added | Validasi update prodi |
+| `app/Http/Requests/GraduationYear/StoreGraduationYearRequest.php` | Added | Validasi store tahun kelulusan |
+| `app/Http/Requests/GraduationYear/UpdateGraduationYearRequest.php` | Added | Validasi update tahun kelulusan |
+| `app/Http/Requests/User/StoreUserRequest.php` | Added | Validasi store user admin |
+| `app/Http/Requests/User/UpdateUserRequest.php` | Added | Validasi update user admin |
+| `app/Http/Requests/Setting/UpdateSettingRequest.php` | Added | Validasi bulk update settings |
+| `app/Observers/UserObserver.php` | Added | created/updated/deleted → AuditLog |
+| `app/Providers/AppServiceProvider.php` | Changed | Registrasi UserObserver |
+| `routes/api.php` | Changed | 6 route group baru (faculties, study-programs, graduation-years, users, settings, audit-logs) |
+| `frontend/src/pages/admin/settings/FacultyPage.vue` | Added | CRUD inline fakultas (14 KB) |
+| `frontend/src/pages/admin/settings/StudyProgramPage.vue` | Added | CRUD prodi + filter (19 KB) |
+| `frontend/src/pages/admin/settings/GraduationYearPage.vue` | Added | CRUD tahun kelulusan (14 KB) |
+| `frontend/src/pages/admin/settings/UserManagementPage.vue` | Added | CRUD user + toggleActive (22 KB) |
+| `frontend/src/pages/admin/settings/SystemSettingPage.vue` | Added | Setting sistem multi-tab (16 KB) |
+| `frontend/src/pages/admin/settings/AuditLogPage.vue` | Added | Audit log read-only + filter (19 KB) |
+| `08_PHASE_TRACKER.md` | Changed | Sesi 2C 13/13 ✅; Fase 2 ✅ selesai penuh; counter 108→121 |
+| `09_CHANGELOG.md` | Added | Entri ini |
+
+**Total: 26 file ditambah/diubah | Sesi 2C complete: 13/13 task ✅ | Fase 2 complete: 60/60 task ✅**
+**Task selesai keseluruhan: 121/199**
 
 ---
 
@@ -1073,6 +1170,7 @@ SESUDAH (tambah baris baru di bawahnya):
 | 1.0.8 | 2026-06-12 | Changed `app/Http/Controllers/Api/V1/Alumni/WorkHistoryController.php`, fixed Konsistensi Form Request di seluruh controller Sesi 2A, dan added `app/Http/Requests/Alumni/UpdateWorkHistoryRequest.php` — Form Request baru |
 | 1.0.9 | 2026-06-12 | Sesi 2A dinyatakan ✅ Selesai penuh (31/31 task diverifikasi ada di repository) |
 | 1.1.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 2B — 20 file produksi (migrations, model, observer, repository, service, policy, 2 form request, 2 controller, routes, app provider, 4 frontend Vue, 2 feature tests); 16/16 task ✅; counter 92→108 |
+| 1.2.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 2C — 26 file produksi (6 controller, 9 form request, 1 observer, routes+provider update, 6 halaman frontend settings); 13/13 task ✅; Fase 2 selesai penuh (2A+2B+2C); counter 108→121 |
 
 ---
 
