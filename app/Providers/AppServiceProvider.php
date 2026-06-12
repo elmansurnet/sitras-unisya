@@ -4,9 +4,11 @@ namespace App\Providers;
 
 use App\Models\Alumni;
 use App\Models\Employer;
+use App\Models\SurveyResponse;
 use App\Models\User;
 use App\Observers\AlumniObserver;
 use App\Observers\EmployerObserver;
+use App\Observers\SurveyResponseObserver;
 use App\Observers\UserObserver;
 use App\Policies\AlumniPolicy;
 use App\Policies\EmployerPolicy;
@@ -38,6 +40,7 @@ class AppServiceProvider extends ServiceProvider
         // Observer registrations
         Alumni::observe(AlumniObserver::class);
         Employer::observe(EmployerObserver::class);
+        SurveyResponse::observe(SurveyResponseObserver::class);
         User::observe(UserObserver::class);
 
         // Policy registrations
