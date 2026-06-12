@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.2.0 | Tanggal: 2026-06-12
+# Versi: 1.3.0 | Tanggal: 2026-06-12
 
 ---
 
@@ -21,6 +21,122 @@ Setiap entri changelog mengikuti format:
 - `Removed` — Konten yang dihapus
 - `Security` — Perbaikan keamanan
 - `Deprecated` — Fitur yang akan dihapus di versi mendatang
+
+---
+
+## [1.3.0] — 2026-06-12
+
+> **Sumber:** Penyelesaian Sesi 3A — Kuesioner Dinamis Backend.
+> Engineer: Claude (Lead Engineer SITRAS UNISYA).
+> **Batch pelaksanaan:**
+> - Batch 1 (3A.1–3A.5): Migrations + 4 Models (Questionnaire, QuestionnaireSection, Question, QuestionOption)
+> - Batch 2 (3A.6–3A.7): QuestionnaireService + QuestionnairePolicy
+> - Batch 3 (3A.8–3A.9): FormRequests + QuestionnaireController (13 actions)
+> - Batch 4 (3A.10): Routes api.php update
+> - Batch 5 (3A.11–3A.12): Unit Test + Feature Test
+
+---
+
+### Added — File Kode Produksi Sesi 3A
+
+#### Added — Migrations (4 file)
+- `database/migrations/2026_06_12_000012_create_questionnaires_table.php` — Tabel `questionnaires` (title, description, type ENUM: tracer_study/kepuasan/umum, status ENUM: draft/published/archived, `created_by` FK ke users, `published_at` TIMESTAMP NULL, SoftDeletes, index status+type)
+- `database/migrations/2026_06_12_000013_create_questionnaire_sections_table.php` — Tabel `questionnaire_sections` (FK ke questionnaires, title, description, `order_position` TINYINT UNSIGNED, index questionnaire_id+order_position)
+- `database/migrations/2026_06_12_000014_create_questions_table.php` — Tabel `questions` (FK ke questionnaire_sections+questionnaires, question_text, `question_type` ENUM: text/textarea/radio/checkbox/select/likert/rating/date/file/number, `is_required` BOOLEAN, `order_position` SMALLINT UNSIGNED, `validation_rules` JSON NULL, `conditional_logic` JSON NULL, SoftDeletes)
+- `database/migrations/2026_06_12_000015_create_question_options_table.php` — Tabel `question_options` (FK ke questions, option_text, option_value, `order_position` TINYINT UNSIGNED; digunakan untuk radio/checkbox/select/likert)
+
+#### Added — Models (4 file)
+- `app/Models/Questionnaire.php` — `$fillable`, `$casts` (`published_at`→datetime), SoftDeletes; relasi: `sections()` (HasMany, ordered by order_position), `questions()` (HasManyThrough via sections), `responses()` (HasMany SurveyResponse); scope `published()`, `draft()`, `archived()`; helper `isPublished()`, `isDraft()`, `canBeEdited()` (hanya draft yang bisa diedit)
+- `app/Models/QuestionnaireSection.php` — `$fillable`; relasi: `questionnaire()` (BelongsTo), `questions()` (HasMany ordered by order_position); method `reorderQuestions(array $orderedIds)`
+- `app/Models/Question.php` — `$fillable`, `$casts` (`validation_rules`→array, `conditional_logic`→array, `is_required`→boolean); relasi: `section()` (BelongsTo), `questionnaire()` (BelongsTo), `options()` (HasMany QuestionOption ordered by order_position), `answers()` (HasMany SurveyAnswer); helper `hasOptions()` (true untuk radio/checkbox/select/likert), `requiresOptions()`, `isConditional()` (cek conditional_logic tidak null)
+- `app/Models/QuestionOption.php` — `$fillable`; relasi: `question()` (BelongsTo)
+
+#### Added — Service (1 file)
+- `app/Services/QuestionnaireService.php` — Method lengkap dalam DB transaction:
+  - `create(array $data, User $createdBy)` → Questionnaire berstatus draft + AuditLog
+  - `update(Questionnaire $q, array $data)` → guard: tolak update jika status bukan draft; AuditLog dengan $oldValues
+  - `publish(Questionnaire $q)` → validasi min 1 seksi + min 1 pertanyaan per seksi; set `published_at`; AuditLog level info
+  - `archive(Questionnaire $q)` → guard: hanya published yang bisa diarsipkan; AuditLog level warning (tidak bisa di-unarchive)
+  - `addSection(Questionnaire $q, array $data)` → auto-set `order_position` = max+1; AuditLog
+  - `updateSection(QuestionnaireSection $s, array $data)` → AuditLog
+  - `deleteSection(QuestionnaireSection $s)` → guard: questionnaire harus draft; hapus semua question+option dalam seksi (cascade manual karena SoftDeletes); re-order seksi tersisa; AuditLog
+  - `addQuestion(QuestionnaireSection $s, array $data)` → auto-set order_position; sync options jika tipe memerlukan options; AuditLog
+  - `updateQuestion(Question $q, array $data)` → sync options; AuditLog dengan $oldValues
+  - `deleteQuestion(Question $q)` → guard: questionnaire harus draft; hapus options; re-order pertanyaan tersisa; AuditLog
+  - `reorderSections(Questionnaire $q, array $orderedIds)` → update order_position batch; AuditLog
+  - `reorderQuestions(QuestionnaireSection $s, array $orderedIds)` → update order_position batch; AuditLog
+
+#### Added — Policy (1 file)
+- `app/Policies/QuestionnairePolicy.php` — `viewAny`/`view` (superadmin+admin), `create` (superadmin+admin), `update`/`addSection`/`addQuestion` (superadmin+admin; guard: hanya status draft), `publish` (superadmin+admin; guard: hanya dari draft), `archive` (superadmin only), `delete` (superadmin only; hanya draft)
+
+#### Added — Form Requests (3 file)
+- `app/Http/Requests/Questionnaire/StoreQuestionnaireRequest.php` — `title` required max:255, `description` nullable, `type` required in:tracer_study,kepuasan,umum; `authorize()` cek role admin/superadmin
+- `app/Http/Requests/Questionnaire/StoreSectionRequest.php` — `title` required max:255, `description` nullable; `authorize()` cek role + questionnaire status draft via route model binding
+- `app/Http/Requests/Questionnaire/StoreQuestionRequest.php` — `question_text` required, `question_type` required in:10 tipe valid, `is_required` boolean, `order_position` nullable integer, `validation_rules` nullable array, `conditional_logic` nullable array (struktur: `{show_if: {question_id, operator, value}}`), `options` array required_if:question_type,in:radio,checkbox,select,likert (setiap item: `option_text` required, `option_value` required, `order_position` integer)
+
+#### Added — Controller (1 file)
+- `app/Http/Controllers/Api/V1/Admin/QuestionnaireController.php` — 13 action methods, semua dengan `Gate::authorize()`:
+  - `index` — list paginate (filter: type, status, search); load count sections+questions
+  - `show` — load relasi penuh: sections → questions → options (nested eager loading)
+  - `store` → `StoreQuestionnaireRequest` + `QuestionnaireService::create()`
+  - `update` → `StoreQuestionnaireRequest` + `QuestionnaireService::update()` (guard draft)
+  - `publish` → `QuestionnaireService::publish()` (validasi min section+question)
+  - `archive` → `QuestionnaireService::archive()` (superadmin only, AuditLog warning)
+  - `addSection` → `StoreSectionRequest` + `QuestionnaireService::addSection()`
+  - `updateSection` → `StoreSectionRequest` + `QuestionnaireService::updateSection()`
+  - `deleteSection` → `QuestionnaireService::deleteSection()` (cascade + reorder)
+  - `addQuestion` → `StoreQuestionRequest` + `QuestionnaireService::addQuestion()`
+  - `updateQuestion` → `StoreQuestionRequest` + `QuestionnaireService::updateQuestion()`
+  - `deleteQuestion` → `QuestionnaireService::deleteQuestion()` (cascade options + reorder)
+  - `reorder` → body `{sections: [...ids]}` atau `{section_id, questions: [...ids]}`; `QuestionnaireService::reorderSections/reorderQuestions()`; route didaftarkan SEBELUM `{questionnaire}` sesuai INC-04
+
+#### Changed — Routes & Provider (2 file)
+- `routes/api.php` — Tambah routes admin questionnaire: static routes (`reorder`, `stats`) didaftarkan SEBELUM `apiResource` sesuai INC-04; nested routes untuk sections (`{questionnaire}/sections`, `{questionnaire}/sections/{section}/questions`); route `publish` dan `archive` sebagai POST method
+- `app/Providers/AppServiceProvider.php` — Registrasi `QuestionnairePolicy` untuk `Questionnaire::class`
+
+#### Added — Tests (2 file)
+- `tests/Unit/QuestionnaireServiceTest.php` — 18 unit test cases: `publish()` berhasil (ada seksi+pertanyaan), gagal tanpa seksi (QuestionnairePublishException), gagal tanpa pertanyaan, gagal dari status bukan draft; `archive()` berhasil dari published, gagal dari draft (tidak bisa arsip draft); `reorderSections()` urutan baru tersimpan; `addQuestion()` dengan options sync (radio 3 pilihan → 3 QuestionOption tersimpan); `deleteSection()` cascade hapus questions+options; `conditional_logic` tersimpan sebagai array; `update()` tolak jika status bukan draft
+- `tests/Feature/Admin/QuestionnaireTest.php` — 24 feature test cases: `index` (filter type/status, search, pagination), `show` (nested eager load sections→questions→options), `store` (berhasil, validasi type invalid, forbidden alumni), `update` (berhasil draft, forbidden jika published), `publish` (berhasil, gagal tanpa seksi, gagal tanpa pertanyaan, forbidden employer), `archive` (superadmin berhasil, admin forbidden), `addSection`, `updateSection`, `deleteSection` (cascade check), `addQuestion` (dengan options), `updateQuestion` (sync options), `deleteQuestion`, `reorder` (sections + questions)
+
+---
+
+### Security
+- `QuestionnairePolicy::archive()` dan `delete()` hanya superadmin sesuai `07_SECURITY.md §3.3`
+- `update()` dan semua mutasi konten hanya diizinkan saat status `draft` — mencegah modifikasi kuesioner yang sudah disebarkan ke alumni
+- `publish()` memvalidasi kelengkapan struktur sebelum diizinkan — tidak ada kuesioner kosong yang bisa dipublish
+- Route `reorder` didaftarkan SEBELUM `{questionnaire}` di `routes/api.php` sesuai `05_API.md §INC-04` untuk mencegah konflik routing Laravel
+- Semua query via Eloquent dengan parameter binding; `conditional_logic` disimpan sebagai JSON terenkode (bukan eval/exec)
+- Gate::authorize() di seluruh 13 action QuestionnaireController — tidak ada endpoint yang lolos tanpa otorisasi
+
+---
+
+### Ringkasan File Terdampak v1.3.0
+
+| File | Aksi | Keterangan |
+|---|---|---|
+| `database/migrations/2026_06_12_000012_create_questionnaires_table.php` | Added | Tabel questionnaires (type ENUM, status ENUM, SoftDeletes) |
+| `database/migrations/2026_06_12_000013_create_questionnaire_sections_table.php` | Added | Tabel sections (order_position, FK questionnaires) |
+| `database/migrations/2026_06_12_000014_create_questions_table.php` | Added | Tabel questions (10 type ENUM, validation_rules+conditional_logic JSON) |
+| `database/migrations/2026_06_12_000015_create_question_options_table.php` | Added | Tabel options untuk radio/checkbox/select/likert |
+| `app/Models/Questionnaire.php` | Added | Model + scopes published/draft/archived + helper canBeEdited() |
+| `app/Models/QuestionnaireSection.php` | Added | Model + relasi + reorderQuestions() |
+| `app/Models/Question.php` | Added | Model + casts JSON + helpers hasOptions()/isConditional() |
+| `app/Models/QuestionOption.php` | Added | Model dasar options |
+| `app/Services/QuestionnaireService.php` | Added | 12 methods (CRUD + publish + archive + reorder + cascade) |
+| `app/Policies/QuestionnairePolicy.php` | Added | Role-aware + guard status draft |
+| `app/Http/Requests/Questionnaire/StoreQuestionnaireRequest.php` | Added | Validasi store questionnaire |
+| `app/Http/Requests/Questionnaire/StoreSectionRequest.php` | Added | Validasi store/update section |
+| `app/Http/Requests/Questionnaire/StoreQuestionRequest.php` | Added | Validasi store/update question + options array |
+| `app/Http/Controllers/Api/V1/Admin/QuestionnaireController.php` | Added | 13 action methods (CRUD + publish + archive + reorder) |
+| `routes/api.php` | Changed | Routes admin questionnaire (static sebelum param, nested sections/questions) |
+| `app/Providers/AppServiceProvider.php` | Changed | QuestionnairePolicy registration |
+| `tests/Unit/QuestionnaireServiceTest.php` | Added | 18 unit test cases (publish/archive/reorder/conditional logic) |
+| `tests/Feature/Admin/QuestionnaireTest.php` | Added | 24 feature test cases (CRUD + publish + archive + reorder per role) |
+| `08_PHASE_TRACKER.md` | Changed | Sesi 3A 12/12 ✅; Fase 3: 3A ✅, 3B ⏳; counter 121→133 |
+| `09_CHANGELOG.md` | Added | Entri ini |
+
+**Total: 20 file ditambah/diubah | Sesi 3A complete: 12/12 task ✅**
+**Task selesai keseluruhan: 133/199**
 
 ---
 
@@ -1171,6 +1287,7 @@ SESUDAH (tambah baris baru di bawahnya):
 | 1.0.9 | 2026-06-12 | Sesi 2A dinyatakan ✅ Selesai penuh (31/31 task diverifikasi ada di repository) |
 | 1.1.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 2B — 20 file produksi (migrations, model, observer, repository, service, policy, 2 form request, 2 controller, routes, app provider, 4 frontend Vue, 2 feature tests); 16/16 task ✅; counter 92→108 |
 | 1.2.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 2C — 26 file produksi (6 controller, 9 form request, 1 observer, routes+provider update, 6 halaman frontend settings); 13/13 task ✅; Fase 2 selesai penuh (2A+2B+2C); counter 108→121 |
+| 1.3.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 3A — 18 file produksi (4 migrations, 4 models, QuestionnaireService 12 methods, QuestionnairePolicy, 3 FormRequest, QuestionnaireController 13 actions, routes+provider, unit test 18 cases + feature test 24 cases); 12/12 task ✅; counter 121→133; Fase 3: 3A ✅, 3B ⏳ |
 
 ---
 
