@@ -1,26 +1,355 @@
-<script setup>
-/**
- * QuestionnairePreviewPage.vue — Preview Kuesioner (Admin)
- * Route: /admin/questionnaires/:id/preview
- * Sesuai 04_ARCHITECTURE.md + 06_UI_UX.md §8
- * Stub production-ready: akan diimplementasikan penuh pada Sesi 3B
- */
-import { useRoute, RouterLink } from 'vue-router'
-const route = useRoute()
-</script>
-
 <template>
-  <div class="p-6">
-    <div class="flex items-center gap-3 mb-6">
-      <RouterLink :to="{ name: 'admin.questionnaires.index' }" class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
-        Kembali
+  <div class="min-h-screen bg-gray-50">
+
+    <!-- ═══ TOP BAR ══════════════════════════════════════════════════════════════ -->
+    <header class="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 shadow-sm print:hidden">
+      <!-- Kiri: breadcrumb -->
+      <div class="flex min-w-0 items-center gap-2">
+        <button
+          @click="goBack"
+          class="flex shrink-0 items-center gap-1 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          title="Kembali ke builder"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+          </svg>
+        </button>
+
+        <div class="hidden min-w-0 sm:block">
+          <p class="truncate text-xs text-gray-400">Mode Preview — tidak ada data yang dikirim</p>
+          <h1 class="truncate text-sm font-semibold text-gray-800">
+            {{ store.current?.title ?? 'Preview Kuesioner' }}
+          </h1>
+        </div>
+      </div>
+
+      <!-- Tengah: step navigator (desktop) -->
+      <nav v-if="visibleSections.length > 1" class="hidden items-center gap-1 md:flex">
+        <button
+          v-for="(sec, i) in visibleSections"
+          :key="sec.id"
+          @click="goToSection(i)"
+          :class="[
+            'h-2 rounded-full transition-all',
+            currentStep === i
+              ? 'w-6 bg-teal-600'
+              : 'w-2 bg-gray-300 hover:bg-gray-400',
+          ]"
+          :title="sec.title"
+        />
+      </nav>
+
+      <!-- Kanan: aksi -->
+      <div class="flex shrink-0 items-center gap-2">
+        <!-- Badge preview -->
+        <span class="hidden rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700 sm:inline-flex">
+          Preview Admin
+        </span>
+
+        <!-- Reset jawaban -->
+        <button
+          @click="resetAnswers"
+          class="rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+          title="Reset semua jawaban"
+        >
+          Reset
+        </button>
+
+        <!-- Print / PDF -->
+        <button
+          @click="printPage"
+          class="hidden items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-50 sm:inline-flex"
+          title="Cetak / simpan PDF"
+        >
+          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.056 48.056 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" />
+          </svg>
+          Cetak
+        </button>
+
+        <!-- Buka builder -->
+        <RouterLink
+          :to="{ name: 'admin.questionnaires.builder', params: { id: qId } }"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-700"
+        >
+          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
+          </svg>
+          Edit
+        </RouterLink>
+      </div>
+    </header>
+
+    <!-- ═══ LOADING ══════════════════════════════════════════════════════════════ -->
+    <div v-if="store.loadingDetail" class="flex min-h-[60vh] items-center justify-center">
+      <svg class="h-8 w-8 animate-spin text-teal-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" d="M12 3a9 9 0 1 0 9 9" />
+      </svg>
+    </div>
+
+    <!-- ═══ ERROR ═════════════════════════════════════════════════════════════════ -->
+    <div v-else-if="store.error && !store.current" class="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8">
+      <p class="text-sm text-red-600">{{ store.error }}</p>
+      <button @click="loadData" class="rounded-lg bg-teal-600 px-4 py-2 text-sm text-white hover:bg-teal-700">Coba lagi</button>
+    </div>
+
+    <!-- ═══ KONTEN PREVIEW ════════════════════════════════════════════════════════ -->
+    <main v-else-if="store.current" class="mx-auto max-w-2xl px-4 py-8 print:px-0 print:py-4">
+
+      <!-- Header kuesioner -->
+      <div class="mb-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm print:rounded-none print:border-x-0 print:border-t-0 print:shadow-none">
+        <div class="mb-2 flex items-center gap-2">
+          <span
+            :class="{
+              'bg-amber-100 text-amber-700': store.isDraft,
+              'bg-teal-100  text-teal-700':  store.isPublished,
+              'bg-gray-100  text-gray-500':   store.isArchived,
+            }"
+            class="rounded-full px-2 py-0.5 text-xs font-medium print:hidden"
+          >{{ statusLabel }}</span>
+          <span class="text-xs text-gray-400 print:hidden">
+            {{ store.current.type === 'alumni' ? 'Kuesioner Alumni' : 'Kuesioner Employer' }}
+          </span>
+        </div>
+        <h2 class="text-xl font-bold text-gray-900">{{ store.current.title }}</h2>
+        <p v-if="store.current.description" class="mt-2 text-sm text-gray-600">
+          {{ store.current.description }}
+        </p>
+
+        <!-- Progress bar (multi-seksi) -->
+        <div v-if="visibleSections.length > 1" class="mt-5 print:hidden">
+          <div class="mb-1.5 flex items-center justify-between text-xs text-gray-500">
+            <span>Seksi {{ currentStep + 1 }} dari {{ visibleSections.length }}</span>
+            <span>{{ Math.round(progressPercent) }}% selesai</span>
+          </div>
+          <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+            <div
+              class="h-full rounded-full bg-teal-500 transition-all duration-300"
+              :style="{ width: progressPercent + '%' }"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SEKSI (single step atau multi-step) ────────────────────────────── -->
+      <template v-if="viewMode === 'all'">
+        <!-- Tampilkan semua seksi sekaligus (admin preview) -->
+        <div
+          v-for="(sec, si) in visibleSections"
+          :key="sec.id"
+          class="mb-6"
+        >
+          <!-- Header seksi -->
+          <div class="mb-3 border-b border-gray-200 pb-2 print:border-gray-400">
+            <p class="text-xs font-semibold uppercase tracking-wide text-teal-600 print:text-gray-600">
+              Seksi {{ si + 1 }}
+            </p>
+            <h3 class="text-base font-semibold text-gray-800">{{ sec.title }}</h3>
+            <p v-if="sec.description" class="mt-0.5 text-sm text-gray-500">{{ sec.description }}</p>
+          </div>
+
+          <!-- Pertanyaan dalam seksi -->
+          <div class="space-y-4">
+            <template v-for="q in visibleQuestions(sec)" :key="q.id">
+              <QuestionRenderer
+                :question="q"
+                mode="preview"
+                :model-value="answers[q.id]"
+                @update:model-value="answers[q.id] = $event"
+              />
+            </template>
+
+            <div
+              v-if="!visibleQuestions(sec).length"
+              class="rounded-xl border border-dashed border-gray-200 py-6 text-center text-xs text-gray-400"
+            >
+              Seksi ini belum memiliki pertanyaan
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- ── Dummy submit area (hanya preview, no API) ──────────────────────── -->
+      <div class="mt-8 rounded-xl border border-gray-200 bg-white p-5 text-center print:hidden">
+        <div class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-teal-100">
+          <svg class="h-5 w-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.641 0-8.573-3.007-9.964-7.178Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+          </svg>
+        </div>
+        <p class="text-sm font-medium text-gray-700">Ini adalah tampilan preview</p>
+        <p class="mt-1 text-xs text-gray-400">Jawaban tidak disimpan. Tombol kirim tidak aktif di mode preview.</p>
+        <button
+          disabled
+          class="mt-4 inline-flex cursor-not-allowed items-center gap-2 rounded-lg bg-teal-300 px-6 py-2 text-sm font-medium text-white"
+          title="Mode preview — tidak ada pengiriman data"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+          </svg>
+          Kirim Jawaban
+        </button>
+      </div>
+
+      <!-- Print footer -->
+      <div class="mt-8 hidden text-center text-xs text-gray-400 print:block">
+        <p>Dicetak dari SITRAS UNISYA — Preview {{ store.current.title }}</p>
+      </div>
+
+    </main>
+
+    <!-- ═══ EMPTY: tidak ada seksi ═══════════════════════════════════════════════ -->
+    <div
+      v-else-if="!store.loadingDetail"
+      class="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8 text-center"
+    >
+      <svg class="h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+      </svg>
+      <div>
+        <p class="text-sm font-medium text-gray-700">Kuesioner belum memiliki konten</p>
+        <p class="mt-1 text-xs text-gray-400">Tambah seksi dan pertanyaan terlebih dahulu di builder</p>
+      </div>
+      <RouterLink
+        :to="{ name: 'admin.questionnaires.builder', params: { id: qId } }"
+        class="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+      >
+        Buka Builder
       </RouterLink>
-      <span class="text-gray-300">/</span>
-      <h1 class="text-xl font-semibold text-gray-800">Preview Kuesioner #{{ route.params.id }}</h1>
     </div>
-    <div class="bg-white rounded-lg border border-gray-200 p-8 text-center">
-      <p class="text-sm text-gray-400">Preview kuesioner akan diimplementasikan penuh pada Sesi 3B.</p>
-    </div>
+
   </div>
 </template>
+
+<script setup>
+import { ref, computed, reactive, onMounted } from 'vue'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
+
+import { useQuestionnaireStore } from '@/stores/questionnaire'
+import QuestionRenderer from '@/components/forms/QuestionRenderer.vue'
+
+// ─── Route & Store ────────────────────────────────────────────────────────────
+const route  = useRoute()
+const router = useRouter()
+const store  = useQuestionnaireStore()
+const qId    = computed(() => Number(route.params.id))
+
+// ─── View mode ────────────────────────────────────────────────────────────────
+// Admin preview: selalu tampilkan semua seksi sekaligus (viewMode = 'all')
+// Dapat dikembangkan ke 'step' untuk simulasi pengisian responden
+const viewMode    = ref('all')
+const currentStep = ref(0)
+
+// ─── Answers (preview-only, tidak dikirim ke API) ─────────────────────────────
+const answers = reactive({})
+
+function resetAnswers() {
+  Object.keys(answers).forEach(k => delete answers[k])
+}
+
+// ─── Status label ─────────────────────────────────────────────────────────────
+const statusLabel = computed(() => {
+  const map = { draft: 'Draft', aktif: 'Aktif', arsip: 'Diarsipkan' }
+  return map[store.current?.status] ?? store.current?.status ?? ''
+})
+
+// ─── Conditional logic: evaluasi visibilitas pertanyaan ──────────────────────
+/**
+ * Evaluasi apakah satu kondisi terpenuhi berdasarkan jawaban saat ini.
+ * Format conditional_logic: { operator: 'and'|'or', conditions: [{ question_id, operator, value }] }
+ */
+function evaluateCondition(condition) {
+  const answer = answers[condition.question_id]
+  const val    = condition.value
+
+  switch (condition.operator) {
+    case 'equals':
+      return String(answer) === String(val)
+    case 'not_equals':
+      return String(answer) !== String(val)
+    case 'contains':
+      if (Array.isArray(answer)) return answer.includes(val)
+      return String(answer ?? '').includes(String(val))
+    case 'not_contains':
+      if (Array.isArray(answer)) return !answer.includes(val)
+      return !String(answer ?? '').includes(String(val))
+    case 'greater_than':
+      return Number(answer) > Number(val)
+    case 'less_than':
+      return Number(answer) < Number(val)
+    case 'is_empty':
+      return !answer || (Array.isArray(answer) && answer.length === 0)
+    case 'is_not_empty':
+      return !!answer && !(Array.isArray(answer) && answer.length === 0)
+    default:
+      return true
+  }
+}
+
+function isQuestionVisible(q) {
+  const cl = q.conditional_logic
+  if (!cl) return true
+
+  // Support dua format: array langsung atau { operator, conditions }
+  const conditions = Array.isArray(cl) ? cl : (cl.conditions ?? [])
+  if (!conditions.length) return true
+
+  const logicOp = Array.isArray(cl) ? 'and' : (cl.operator ?? 'and')
+
+  if (logicOp === 'or') {
+    return conditions.some(evaluateCondition)
+  }
+  return conditions.every(evaluateCondition)
+}
+
+// ─── Sections & questions yang terlihat ──────────────────────────────────────
+const visibleSections = computed(() =>
+  (store.sections ?? []).filter(sec =>
+    (sec.questions ?? []).length > 0
+  )
+)
+
+function visibleQuestions(sec) {
+  return (sec.questions ?? [])
+    .slice()
+    .sort((a, b) => (a.order_number ?? a.order ?? 0) - (b.order_number ?? b.order ?? 0))
+    .filter(isQuestionVisible)
+}
+
+// ─── Progress (untuk multi-seksi step mode) ───────────────────────────────────
+const progressPercent = computed(() => {
+  if (!visibleSections.value.length) return 0
+  return ((currentStep.value + 1) / visibleSections.value.length) * 100
+})
+
+function goToSection(idx) {
+  currentStep.value = idx
+}
+
+// ─── Navigasi kembali ─────────────────────────────────────────────────────────
+function goBack() {
+  if (window.history.length > 2) {
+    router.back()
+  } else {
+    router.push({ name: 'admin.questionnaires.builder', params: { id: qId.value } })
+  }
+}
+
+// ─── Print ────────────────────────────────────────────────────────────────────
+function printPage() {
+  window.print()
+}
+
+// ─── Load data ────────────────────────────────────────────────────────────────
+async function loadData() {
+  // Jika sudah di-load oleh builder sebelumnya, tidak perlu fetch ulang
+  if (store.current?.id === qId.value && store.sections.length) return
+  try {
+    await store.fetchById(qId.value)
+  } catch {
+    // store.error sudah terisi
+  }
+}
+
+onMounted(loadData)
+</script>
