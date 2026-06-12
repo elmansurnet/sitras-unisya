@@ -13,7 +13,7 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
  *
  * Mendaftarkan semua Artisan command dan jadwal scheduler.
  *
- * Timezone default: Asia/Makassar (WITA, UTC+8) sesuai lokasi server UNISYA.
+ * Timezone default: Asia/Jakarta (WIB, UTC+7) sesuai lokasi server UNISYA.
  * Semua jadwal harus menyertakan ->timezone() secara eksplisit agar tidak
  * terpengaruh oleh perubahan nilai APP_TIMEZONE di .env.
  *
@@ -29,25 +29,25 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
  */
 class Kernel extends ConsoleKernel
 {
-    /**
-     * Define the application's command schedule.
-     *
-     * Urutan jadwal dari tengah malam ke siang:
-     *   00:05 → close expired survey periods (setelah midnight rollover)
-     *   08:00 → send survey reminders (jam kerja pagi)
-     *   */30  → cleanup expired OTPs (setiap 30 menit, cukup untuk OTP 5-menit)
-     */
+    // /**
+    //  * Define the application's command schedule.
+    //  *
+    //  * Urutan jadwal dari tengah malam ke siang:
+    //  *   00:05 → close expired survey periods (setelah midnight rollover)
+    //  *   08:00 → send survey reminders (jam kerja pagi)
+    //  *   */30  → cleanup expired OTPs (setiap 30 menit, cukup untuk OTP 5-menit)
+    //  */
     protected function schedule(Schedule $schedule): void
     {
         // ----------------------------------------------------------------------
         // 1. Tutup Survey Period yang sudah melewati end_date
-        //    Jadwal: setiap hari pukul 00:05 WITA
+        //    Jadwal: setiap hari pukul 00:05 WIB
         //    Alasan 00:05 dan bukan 00:00: beri jeda kecil dari midnight agar
         //    proses DB rollover lainnya selesai terlebih dahulu.
         // ----------------------------------------------------------------------
         $schedule->command(CloseExpiredSurveyPeriods::class)
             ->dailyAt('00:05')
-            ->timezone('Asia/Makassar')
+            ->timezone('Asia/Jakarta')
             ->withoutOverlapping()
             ->onFailure(function () {
                 \Illuminate\Support\Facades\Log::error(
@@ -58,13 +58,13 @@ class Kernel extends ConsoleKernel
 
         // ----------------------------------------------------------------------
         // 2. Kirim Reminder Survei ke alumni/employer yang belum submit
-        //    Jadwal: setiap hari pukul 08:00 WITA (jam kerja)
+        //    Jadwal: setiap hari pukul 08:00 WIB (jam kerja)
         //    Command hanya mengirim pada H-7, H-3, H-1 sebelum end_date.
         //    Hari-hari lain command berjalan tapi tidak mengirim notifikasi.
         // ----------------------------------------------------------------------
         $schedule->command(SendSurveyReminders::class)
             ->dailyAt('08:00')
-            ->timezone('Asia/Makassar')
+            ->timezone('Asia/Jakarta')
             ->withoutOverlapping()
             ->onFailure(function () {
                 \Illuminate\Support\Facades\Log::error(
