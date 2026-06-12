@@ -1,1 +1,7 @@
-// DEPRECATED: Moved to frontend/src/main.js — This file is kept only for Laravel's asset pipeline compatibility. Do not edit.
+/**
+ * resources/js/app.js
+ * File ini TIDAK DIGUNAKAN oleh SPA SITRAS UNISYA.
+ * Kode Vue 3 ada di frontend/src/ dan di-build oleh Vite.
+ * File ini dipertahankan hanya agar scaffold Laravel tidak error.
+ * Lihat: frontend/src/main.js
+ */

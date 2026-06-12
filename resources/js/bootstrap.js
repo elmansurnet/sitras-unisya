@@ -1,1 +1,5 @@
-// DEPRECATED: Moved to frontend/ — This file is kept only for Laravel's asset pipeline compatibility. Do not edit.
+/**
+ * resources/js/bootstrap.js
+ * File ini TIDAK DIGUNAKAN oleh SPA SITRAS UNISYA.
+ * Bootstrap/setup app ada di frontend/src/main.js.
+ */
