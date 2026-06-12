@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.7 | Tanggal: 2026-06-11
+# Versi: 1.0.8 | Tanggal: 2026-06-12
 
 ---
 
@@ -21,6 +21,21 @@ Setiap entri changelog mengikuti format:
 - `Removed` — Konten yang dihapus
 - `Security` — Perbaikan keamanan
 - `Deprecated` — Fitur yang akan dihapus di versi mendatang
+
+---
+
+## [1.0.8] — 2026-06-12
+
+### Changed
+- `app/Http/Controllers/Api/V1/Alumni/WorkHistoryController.php` — refactor: hapus inline `validate()` dan private helper `rules()` / `authorizeSelf()` / `authorizeOwnership()`; inject `StoreWorkHistoryRequest` di `store()` dan `UpdateWorkHistoryRequest` di `update()`; perbaiki `$oldValues` agar capture field relevan sebelum update
+- `08_PHASE_TRACKER.md` — update status Sesi 2A: 14/31 backend selesai, tambah catatan audit 2026-06-12, perjelas task 2A.9 (6 Form Request), koreksi catatan 2A.4 (placeholder, diimplementasi bersama 2B)
+
+### Added
+- `app/Http/Requests/Alumni/UpdateWorkHistoryRequest.php` — Form Request baru untuk `WorkHistoryController@update`: aturan validasi ownership (`authorize()` cek `alumni_id`), rules `company_name`, `position`, `industry_sector_id`, `start_date`, `end_date`, `is_current`, `description`
+
+### Fixed
+- Konsistensi Form Request di seluruh controller Sesi 2A: semua method kini menggunakan Form Request yang di-inject (bukan inline `$request->validate()`), sesuai aturan implementasi di System Instructions
+- Tidak ada file duplikat di `app/Http/Controllers/Api/V1/Admin/alumni/` — direktori tersebut tidak pernah ter-push ke main branch (audit bersih)
 
 ---
 
@@ -935,6 +950,7 @@ Baris "Hapus Employer (soft delete)" tidak ada di matriks izin sebelumnya, padah
 SESUDAH (tambah baris baru di bawahnya):
 | 1.0.6 | 2026-06-09 | Tambah entri penyelesaian Sesi 2A backend — 17 file produksi (migration, model, repository, service, policy, request, controller, job, export, routes); 14/31 task ✅ |
 | 1.0.7 | 2026-06-11 | Tambah entri patch WorkHistoryController refactor — inject Form Request, hapus inline validate, tambah UpdateWorkHistoryRequest; 1 task diperbarui |
+| 1.0.8 | 2026-06-12 | Changed `app/Http/Controllers/Api/V1/Alumni/WorkHistoryController.php`, fixed Konsistensi Form Request di seluruh controller Sesi 2A, dan added `app/Http/Requests/Alumni/UpdateWorkHistoryRequest.php` — Form Request baru |
 
 ---
 

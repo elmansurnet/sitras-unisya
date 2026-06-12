@@ -1,6 +1,6 @@
 # 08_PHASE_TRACKER.md
 # PHASE TRACKER — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.7 | Tanggal: 2026-06-11
+# Versi: 1.0.8 | Tanggal: 2026-06-12
 
 > File ini hanya bisa edit untuk update progress project dan task tidak boleh dikurangi untuk konsistensi project!
 
@@ -134,6 +134,7 @@
 ### Sesi 2A — Manajemen Alumni (Backend + Frontend)
 **Status: 🔄 Berjalan — Backend ✅ Selesai 14/31 | Frontend + Test ⏳ Pending**
 **Tanggal Backend Selesai: 2026-06-09**
+**Tanggal Audit & Cleanup: 2026-06-12**
 **Dependensi:** Fase 1 selesai
 **Estimasi:** 4–5 hari
 
@@ -147,11 +148,11 @@
 | 2A.6 | Service: `AlumniService` (create, update, delete, import, export, sendInvitation) | `app/Services/AlumniService.php` | ✅ |
 | 2A.7 | Service: `ImportExportService` (parseExcel, validateRows, batchInsert, generateTemplate, exportExcel) | `ImportExportService.php` | ✅ |
 | 2A.8 | Policy: `AlumniPolicy` (view, create, update, delete — role-aware) | `AlumniPolicy.php` | ✅ |
- 2A.9 | FormRequest: StoreAlumniRequest, UpdateAlumniRequest, StoreWorkHistoryRequest, UpdateWorkHistoryRequest | Request files | ✅ |
-| 2A.10 | Controller: `Admin/AlumniController` (index, show, store, update, destroy, import, export, importTemplate, sendInvitation) | `AlumniController.php` | ✅ |
+| 2A.9 | FormRequest: `StoreAlumniRequest`, `UpdateAlumniRequest`, `ImportAlumniRequest`, `SendInvitationRequest`, `StoreWorkHistoryRequest`, `UpdateWorkHistoryRequest` | 6 Request files | ✅ |
+| 2A.10 | Controller: `Admin/AlumniController` (index, show, store, update, destroy, import, export, importTemplate, stats, sendInvitation) | `AlumniController.php` | ✅ |
 | 2A.11 | Controller: `Alumni/ProfileController` (show, update, uploadPhoto) | `ProfileController.php` | ✅ |
-| 2A.12 | Controller: Alumni/WorkHistoryController (index, store, update, destroy) — Refactor: inject StoreWorkHistoryRequest & UpdateWorkHistoryRequest (bukan inline validate), $oldValues capture diperbaiki | WorkHistoryController.php | ✅ |
-| 2A.13 | Routes: `/api/v1/admin/alumni/*` + `/api/v1/alumni/*` | `routes/api.php` | ✅ |
+| 2A.12 | Controller: `Alumni/WorkHistoryController` (index, store, update, destroy) — Refactor: inject `StoreWorkHistoryRequest` & `UpdateWorkHistoryRequest`, hapus inline validate & private helper, `$oldValues` capture diperbaiki | `WorkHistoryController.php` | ✅ |
+| 2A.13 | Routes: `/api/v1/admin/alumni/*` + `/api/v1/alumni/*` — static routes didaftarkan SEBELUM `{alumni}` | `routes/api.php` | ✅ |
 | 2A.14 | Job: `GenerateReportExport` (queue: default, generate Excel export besar) | `GenerateReportExport.php` | ✅ |
 | 2A.15 | Frontend: Store `stores/alumni.js` (Pinia: list, current, pagination, filters, CRUD actions) | `stores/alumni.js` | ⏳ |
 | 2A.16 | Frontend: Komponen `common/DataTable.vue` (sortable, selectable, pagination, empty state) | `DataTable.vue` | ⏳ |
@@ -171,7 +172,7 @@
 | 2A.30 | Feature Test: CRUD alumni (create, read, update, delete — per role) | `tests/Feature/Admin/AlumniTest.php` | ⏳ |
 | 2A.31 | Feature Test: Import alumni (berhasil, validasi error, duplikat NIM) | `tests/Feature/Admin/AlumniImportTest.php` | ⏳ |
 
-**Total Sesi 2A: 31 task — ✅ Backend 15/31 selesai | ⏳ Frontend 0/16 pending**
+**Total Sesi 2A: 31 task — ✅ Backend 14/31 selesai | ⏳ Frontend + Test + AlumniObserver 17/31 pending**
 
 ---
 
@@ -512,7 +513,8 @@ Fase 1A (Setup + DB) → Fase 1B (Auth)
 | 1.0.4 | 2026-06-09 | Update progress Sesi 1A selesai (19/19 task ✅); update STATUS RINGKASAN dan RINGKASAN TASK PER FASE |
 | 1.0.5 | 2026-06-09 | Update progress Sesi 1B selesai (28/28 task ✅); update STATUS RINGKASAN dan RINGKASAN TASK PER FASE; counter task selesai 19→47 |
 | 1.0.6 | 2026-06-09 | Update progress Sesi 2A backend selesai (14/31 task ✅): migrations alumni, models, repository, service, policy, form requests, controllers, jobs, routes; counter task selesai 47→61; status Fase 2 berubah dari Pending → Berjalan |
-| 1.0.7 | 2026-06-09 | Update progress Sesi 2A backend selesai (15/31 task ✅): penambahan file app/Http/Requests/Alumni/UpdateWorkHistoryRequest.php |
+| 1.0.7 | 2026-06-11 | Update progress Sesi 2A backend selesai (15/31 task ✅): penambahan file app/Http/Requests/Alumni/UpdateWorkHistoryRequest.php |
+| 1.0.8 | 2026-06-12 | Tidak ada file duplikat di repo (direktori `admin/alumni/` tidak pernah ter-push ke main branch — sudah bersih), `AlumniObserver.php` ada sebagai placeholder (dibuat Sesi 1A), namun body `created/updated/deleted → AuditLog` belum diimplementasi → status tetap ⏳, dikerjakan bersama Sesi 2B, `WorkHistoryController.php` sudah di-refactor: inject Form Request, hapus inline validate, `$oldValues` capture diperbaiki, Semua Form Request Sesi 2A sudah konsisten dengan `02_DATABASE.md` dan `07_SECURITY.md`, Counter backend: 14/31 (2A.4 AlumniObserver tetap ⏳ karena masih placeholder). |
 
 ---
 
