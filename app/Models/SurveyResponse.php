@@ -2,57 +2,74 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/**
- * App\Models\SurveyResponse
- *
- * Stub model — kolom lengkap akan diisi pada sesi 3A.
- * Tabel: survey_responses (02_DATABASE.md §2.6)
- *
- * @property int         $id
- * @property int         $survey_period_id
- * @property int         $alumni_id
- * @property string      $status
- * @property \Carbon\Carbon|null $submitted_at
- * @property \Carbon\Carbon|null $created_at
- * @property \Carbon\Carbon|null $updated_at
- */
 class SurveyResponse extends Model
 {
-    use HasFactory;
-
-    protected $table = 'survey_responses';
-
-    /**
-     * Kolom yang boleh diisi secara mass-assignment.
-     * Akan dilengkapi pada sesi 3A sesuai 02_DATABASE.md §2.6.
-     */
     protected $fillable = [
+        'questionnaire_id',
         'survey_period_id',
+        'respondent_type',
         'alumni_id',
         'employer_id',
-        'questionnaire_id',
         'status',
-        'submitted_at',
         'started_at',
-        'completion_time_seconds',
+        'submitted_at',
         'ip_address',
         'user_agent',
-        'notes',
+        'completion_percentage',
     ];
 
     protected $casts = [
-        'submitted_at' => 'datetime',
-        'started_at'   => 'datetime',
-        'is_complete'  => 'boolean',
+        'started_at'            => 'datetime',
+        'submitted_at'          => 'datetime',
+        'completion_percentage' => 'integer',
     ];
 
-    // ─── Relationships (akan dilengkapi sesi 3A) ──────────────────────────────
+    // -------------------------------------------------------------------------
+    // Relationships
+    // -------------------------------------------------------------------------
 
-    public function alumni()
+    public function questionnaire(): BelongsTo
+    {
+        return $this->belongsTo(Questionnaire::class);
+    }
+
+    public function surveyPeriod(): BelongsTo
+    {
+        return $this->belongsTo(SurveyPeriod::class);
+    }
+
+    public function alumni(): BelongsTo
     {
         return $this->belongsTo(Alumni::class);
+    }
+
+    public function employer(): BelongsTo
+    {
+        return $this->belongsTo(Employer::class);
+    }
+
+    public function answers(): HasMany
+    {
+        return $this->hasMany(SurveyAnswer::class);
+    }
+
+    // -------------------------------------------------------------------------
+    // Accessors
+    // -------------------------------------------------------------------------
+
+    public function getIsCompletedAttribute(): bool
+    {
+        return $this->status === 'selesai';
+    }
+
+    public function getRespondentAttribute(): Alumni|Employer|null
+    {
+        return $this->respondent_type === 'alumni'
+            ? $this->alumni
+            : $this->employer;
     }
 }
