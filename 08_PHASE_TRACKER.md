@@ -1,6 +1,6 @@
 # 08_PHASE_TRACKER.md
 # PHASE TRACKER — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.9 | Tanggal: 2026-06-12
+# Versi: 1.1.0 | Tanggal: 2026-06-12
 
 > File ini hanya bisa edit untuk update progress project dan task tidak boleh dikurangi untuk konsistensi project!
 
@@ -12,7 +12,7 @@
 |---|---|---|---|
 | 0 | Dokumentasi & Desain | 0A | ✅ Selesai |
 | 1 | Fondasi & Autentikasi | 1A, 1B | ✅ Selesai (1A ✅, 1B ✅) |
-| 2 | Manajemen Data Inti | 2A, 2B, 2C | 🔄 Berjalan (2A backend ✅, frontend ⏳) |
+| 2 | Manajemen Data Inti | 2A, 2B, 2C | 🔄 Berjalan (2A ✅, 2B ✅, 2C ⏳) |
 | 3 | Kuesioner Dinamis | 3A, 3B | ⏳ Pending |
 | 4 | Survei & Notifikasi | 4A, 4B | ⏳ Pending |
 | 5 | Analitik & Pelaporan | 5A, 5B | ⏳ Pending |
@@ -20,7 +20,7 @@
 | 7 | Deployment & Optimasi | 7A | ⏳ Pending |
 
 **Total Task: 199 task**
-**Selesai: 61 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.14 backend selesai 2026-06-09)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
+**Selesai: 108 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
 
 ---
 
@@ -175,29 +175,30 @@
 ---
 
 ### Sesi 2B — Manajemen Employer (Backend + Frontend)
+**Status: ✅ Selesai | Tanggal Selesai: 2026-06-12**
 **Dependensi:** 2A selesai (model Alumni tersedia untuk relasi)
 **Estimasi:** 3–4 hari
 
 | No | Task | File/Artefak | Status |
 |---|---|---|---|
-| 2B.1 | Migrasi: `employers`, `alumni_employer` (pivot) | Migration files | ⏳ |
-| 2B.2 | Model: `Employer` (fillable, casts, relationships ke user/alumni/workHistories/surveyResponses) | `app/Models/Employer.php` | ⏳ |
-| 2B.3 | Observer: `EmployerObserver` (created, updated, deleted → audit_logs) | `EmployerObserver.php` | ⏳ |
-| 2B.4 | Repository: `EmployerRepository` (findWithFilters, getStats) | `EmployerRepository.php` | ⏳ |
-| 2B.5 | Service: `EmployerService` (create, update, delete, generateToken, sendSurveyToken, regenerateToken) | `EmployerService.php` | ⏳ |
-| 2B.6 | Policy: `EmployerPolicy` (view, create, update, delete — role-aware) | `EmployerPolicy.php` | ⏳ |
-| 2B.7 | FormRequest: `StoreEmployerRequest`, `UpdateEmployerRequest` | Request files | ⏳ |
-| 2B.8 | Controller: `Admin/EmployerController` (index, show, store, update, destroy, sendSurveyToken, regenerateToken) | `EmployerController.php` | ⏳ |
-| 2B.9 | Controller: `Employer/ProfileController` (show, update) | `Employer/ProfileController.php` | ⏳ |
-| 2B.10 | Routes: `/api/v1/admin/employers/*` + `/api/v1/employer/profile` | `routes/api.php` | ⏳ |
-| 2B.11 | Frontend: Store `stores/employer.js` (Pinia: list, current, pagination, filters, CRUD actions) | `stores/employer.js` | ⏳ |
-| 2B.12 | Frontend: `pages/admin/employers/EmployerIndexPage.vue` (tabel, filter, aksi) | `EmployerIndexPage.vue` | ⏳ |
-| 2B.13 | Frontend: `pages/admin/employers/EmployerDetailPage.vue` (profil, alumni terkait, status survei, kirim token) | `EmployerDetailPage.vue` | ⏳ |
-| 2B.14 | Frontend: `pages/admin/employers/EmployerFormPage.vue` (form tambah/edit employer) | `EmployerFormPage.vue` | ⏳ |
-| 2B.15 | Feature Test: CRUD employer (create, read, update, delete — per role) | `tests/Feature/Admin/EmployerTest.php` | ⏳ |
-| 2B.16 | Feature Test: generate token, send token, regenerate token | `tests/Feature/Admin/EmployerTokenTest.php` | ⏳ |
+| 2B.1 | Migrasi: `employers`, `alumni_employer` (pivot) | Migration files | ✅ |
+| 2B.2 | Model: `Employer` (fillable, casts, relationships ke user/alumni/workHistories/surveyResponses) | `app/Models/Employer.php` | ✅ |
+| 2B.3 | Observer: `EmployerObserver` (created, updated, deleted → audit_logs) | `EmployerObserver.php` | ✅ |
+| 2B.4 | Repository: `EmployerRepository` (findWithFilters, getStats) | `EmployerRepository.php` | ✅ |
+| 2B.5 | Service: `EmployerService` (create, update, delete, generateToken, sendSurveyToken, regenerateToken) | `EmployerService.php` | ✅ |
+| 2B.6 | Policy: `EmployerPolicy` (view, create, update, delete — role-aware) | `EmployerPolicy.php` | ✅ |
+| 2B.7 | FormRequest: `StoreEmployerRequest`, `UpdateEmployerRequest` | Request files | ✅ |
+| 2B.8 | Controller: `Admin/EmployerController` (index, show, store, update, destroy, sendSurveyToken, regenerateToken) | `EmployerController.php` | ✅ |
+| 2B.9 | Controller: `Employer/ProfileController` (show, update) | `Employer/ProfileController.php` | ✅ |
+| 2B.10 | Routes: `/api/v1/admin/employers/*` + `/api/v1/employer/profile` | `routes/api.php` | ✅ |
+| 2B.11 | Frontend: Store `stores/employer.js` (Pinia: list, current, pagination, filters, CRUD actions) | `stores/employer.js` | ✅ |
+| 2B.12 | Frontend: `pages/admin/employers/EmployerIndexPage.vue` (tabel, filter, aksi) | `EmployerIndexPage.vue` | ✅ |
+| 2B.13 | Frontend: `pages/admin/employers/EmployerDetailPage.vue` (profil, alumni terkait, status survei, kirim token) | `EmployerDetailPage.vue` | ✅ |
+| 2B.14 | Frontend: `pages/admin/employers/EmployerFormPage.vue` (form tambah/edit employer) | `EmployerFormPage.vue` | ✅ |
+| 2B.15 | Feature Test: CRUD employer (create, read, update, delete — per role) | `tests/Feature/Admin/EmployerTest.php` | ✅ |
+| 2B.16 | Feature Test: generate token, send token, regenerate token | `tests/Feature/Admin/EmployerTokenTest.php` | ✅ |
 
-**Total Sesi 2B: 16 task**
+**Total Sesi 2B: 16 task — ✅ Selesai 16/16 (diverifikasi 2026-06-12)**
 
 ---
 
@@ -448,7 +449,7 @@
 | 1 | 1A | 19 | ✅ Selesai (2026-06-09) |
 | 1 | 1B | 28 | ✅ Selesai (2026-06-09) |
 | 2 | 2A | 31 | ✅ Selesai (2026-06-12) |
-| 2 | 2B | 16 | ⏳ |
+| 2 | 2B | 16 | ✅ Selesai (2026-06-12) |
 | 2 | 2C | 13 | ⏳ |
 | 3 | 3A | 12 | ⏳ |
 | 3 | 3B | 9 | ⏳ |
@@ -515,6 +516,7 @@ Fase 1A (Setup + DB) → Fase 1B (Auth)
 | 1.0.7 | 2026-06-11 | Update progress Sesi 2A backend selesai (15/31 task ✅): penambahan file app/Http/Requests/Alumni/UpdateWorkHistoryRequest.php |
 | 1.0.8 | 2026-06-12 | Audit & cleanup Sesi 2A: verifikasi tidak ada file duplikat di repo; AlumniObserver placeholder diidentifikasi; WorkHistoryController refactor dikonfirmasi selesai; semua Form Request 2A konsisten dengan spec |
 | 1.0.9 | 2026-06-12 | Sesi 2A dinyatakan ✅ Selesai penuh (31/31 task diverifikasi ada di repository); 2A.4 AlumniObserver diupdate ✅; counter task selesai 61→92; status Fase 2 diupdate: 2A ✅ |
+| 1.1.0 | 2026-06-12 | Sesi 2B dinyatakan ✅ Selesai penuh (16/16 task diverifikasi ada di repository): migrations employers+pivot, Model Employer, EmployerObserver, EmployerRepository, EmployerService, EmployerPolicy, 2 FormRequest, Admin/EmployerController, Employer/ProfileController, routes, store employer.js, 3 halaman frontend (Index/Detail/Form), 2 feature tests (EmployerTest + EmployerTokenTest); counter task selesai 92→108; status Fase 2 diupdate: 2A ✅, 2B ✅ |
 
 ---
 

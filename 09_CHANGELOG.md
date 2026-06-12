@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.9 | Tanggal: 2026-06-12
+# Versi: 1.1.0 | Tanggal: 2026-06-12
 
 ---
 
@@ -21,6 +21,106 @@ Setiap entri changelog mengikuti format:
 - `Removed` — Konten yang dihapus
 - `Security` — Perbaikan keamanan
 - `Deprecated` — Fitur yang akan dihapus di versi mendatang
+
+---
+
+## [1.1.0] — 2026-06-12
+
+> **Sumber:** Penyelesaian Sesi 2B — Manajemen Employer (Backend + Frontend).
+> Engineer: Claude (Lead Engineer SITRAS UNISYA).
+> **SHA commit utama:**
+> - 2B.1–2B.3: `c873c441a55d64a8a9d8c767f190b0c204dea937`
+> - 2B.4–2B.6: `0d91950c1b047bde940f68820a5f30dbf0839caa`
+> - 2B.7–2B.9: `755fd9b85dc406a0b9d069bf17dc13f5c32dbdbb`
+> - 2B.10: `dd3a77846624b0a8b3d7427e814a9876df533b31`
+> - 2B.11–2B.16: `e5d56fe6a31da1c82e051a5979babcd0d947053b`
+
+---
+
+### Added — File Kode Produksi Sesi 2B
+
+#### Added — Migrations (2 file)
+- `database/migrations/2026_06_12_000010_create_employers_table.php` — Tabel `employers` (FK ke `users`, `industry_sector_id`, `survey_token` VARCHAR(64), `token_expires_at`, `survey_status` ENUM: belum_disurvei/terkirim/selesai, SoftDeletes, index lengkap)
+- `database/migrations/2026_06_12_000011_create_alumni_employer_table.php` — Tabel pivot `alumni_employer` (FK ke `alumni.id` + `employers.id`, `is_current` BOOLEAN)
+
+#### Added — Model (1 file)
+- `app/Models/Employer.php` — `$fillable`, `$casts` (dates, boolean, JSON), SoftDeletes; relasi: `user()`, `alumni()` (BelongsToMany via pivot alumni_employer), `workHistories()` (HasManyThrough), `surveyResponses()`; accessor `surveyTokenIsExpired()`
+
+#### Added — Observer (1 file)
+- `app/Observers/EmployerObserver.php` — Event handler `created`, `updated`, `deleted` → `AuditLog::record()` dengan module `employer`, capture `$oldValues` sebelum update, log `deleted_by` pada soft delete
+
+#### Added — Repository (2 file)
+- `app/Repositories/Contracts/EmployerRepositoryInterface.php` — Interface: `findWithFilters()`, `findWithRelations()`, `getStats()`, `findByToken()`
+- `app/Repositories/EmployerRepository.php` — Implementasi: `paginate()` (search by nama/email/industri, filter status/sector), `findWithRelations()` (load alumni pivot + surveyResponses), `getStats()` (count per survey_status), `findByToken()` (validate token aktif)
+
+#### Added — Service (1 file)
+- `app/Services/EmployerService.php` — `create()` (DB transaction + generateToken awal + AuditLog), `update()` (capture oldValues + AuditLog), `delete()` (soft delete + AuditLog), `generateToken()` (`Str::random(64)`, expiry 30 hari dari config), `sendSurveyToken()` (dispatch SendWhatsAppNotification/SendEmailNotification ke queue high, update survey_status→terkirim), `regenerateToken()` (invalidasi token lama + generate baru + AuditLog level warning)
+
+#### Added — Policy (1 file)
+- `app/Policies/EmployerPolicy.php` — `viewAny`/`view` (superadmin+admin), `create`/`update` (superadmin+admin), `delete` (superadmin only), `sendSurveyToken` (superadmin+admin)
+
+#### Added — Form Requests (2 file)
+- `app/Http/Requests/Employer/StoreEmployerRequest.php` — Validasi: `name` required, `email` unique employers, `phone` format, `industry_sector_id` exists, `address` nullable; `authorize()` cek role admin/superadmin
+- `app/Http/Requests/Employer/UpdateEmployerRequest.php` — Validasi: `email` unique ignore current, semua field optional kecuali `name`; `authorize()` cek role + policy
+
+#### Added — Controllers (2 file)
+- `app/Http/Controllers/Api/V1/Admin/EmployerController.php` — `index` (paginate+filter+stats), `show` (load alumni terkait), `store`, `update`, `destroy`, `sendSurveyToken`, `regenerateToken`; Gate::authorize() di setiap action; response sesuai `05_API.md §4.1–4.9`
+- `app/Http/Controllers/Api/V1/Employer/ProfileController.php` — `show` (profil employer dari token), `update` (field terbatas: nama/alamat/deskripsi); akses via middleware `ValidateEmployerToken`
+
+#### Changed — Routes & Provider (2 file)
+- `routes/api.php` — Tambah routes admin employer (`/api/v1/admin/employers/*` dengan static routes `sendSurveyToken`, `regenerateToken`, `stats` didaftarkan SEBELUM `{employer}`) dan route employer self-service (`/api/v1/employer/profile`)
+- `app/Providers/AppServiceProvider.php` — Registrasi `EmployerPolicy` untuk `Employer::class`; bind `EmployerRepositoryInterface` → `EmployerRepository`
+
+#### Added — Frontend (4 file)
+- `frontend/src/stores/employer.js` — Pinia store: `employers` list, `currentEmployer`, `pagination`, `filters` (status/sector/search), actions: `fetchEmployers()`, `fetchEmployer()`, `createEmployer()`, `updateEmployer()`, `deleteEmployer()`, `sendSurveyToken()`, `regenerateToken()`; loading & error flags
+- `frontend/src/pages/admin/employers/EmployerIndexPage.vue` — Tabel employer dengan filter status/sektor/pencarian, pagination, aksi cepat (detail/edit/hapus/kirim token), badge survey_status, empty state
+- `frontend/src/pages/admin/employers/EmployerDetailPage.vue` — Tab profil employer, daftar alumni terkait (pivot), status survei, tombol kirim token (pilih channel WA/email) + regenerasi token dengan konfirmasi modal
+- `frontend/src/pages/admin/employers/EmployerFormPage.vue` — Form tambah/edit employer: field nama/email/phone/industri/alamat/deskripsi; mode create vs edit otomatis berdasarkan route param; validasi client-side + server error handling
+
+#### Added — Tests (2 file)
+- `tests/Feature/Admin/EmployerTest.php` — 26 test cases: `index` (filter status, filter sektor, search, pagination), `show` (load relasi alumni), `store` (berhasil, validasi duplikat email, forbidden alumni/employer), `update` (berhasil, ignore own email, forbidden), `destroy` (superadmin berhasil, admin forbidden, check soft delete), `stats` (count per survey_status)
+- `tests/Feature/Admin/EmployerTokenTest.php` — 14 test cases: `sendSurveyToken` channel WA (Queue::fake() → assertDispatched SendWhatsAppNotification), channel email (assertDispatched SendEmailNotification), channel invalid (422), `regenerateToken` (token baru ≠ token lama, expiry diperbarui, AuditLog level=warning), employer profile access via ValidateEmployerToken middleware
+
+---
+
+### Security
+- `EmployerPolicy::delete()` hanya superadmin sesuai `07_SECURITY.md §3.3`
+- `survey_token` disimpan plaintext di DB (bukan hash) — berbeda dari OTP; sesuai desain karena token diverifikasi exact-match via `findByToken()`
+- `regenerateToken()` di-log ke audit_logs dengan `level=warning` untuk traceability
+- Gate::authorize() di setiap EmployerController action; tidak ada endpoint yang lolos tanpa otorisasi
+- Semua query via Eloquent dengan parameter binding; tidak ada raw SQL
+
+---
+
+### Ringkasan File Terdampak v1.1.0
+
+| File | Aksi | Keterangan |
+|---|---|---|
+| `database/migrations/2026_06_12_000010_create_employers_table.php` | Added | Tabel employers (survey_token, status ENUM, SoftDeletes) |
+| `database/migrations/2026_06_12_000011_create_alumni_employer_table.php` | Added | Pivot alumni_employer |
+| `app/Models/Employer.php` | Added | Model Employer (relasi, casts, accessor token expired) |
+| `app/Observers/EmployerObserver.php` | Added | Observer created/updated/deleted → AuditLog |
+| `app/Repositories/Contracts/EmployerRepositoryInterface.php` | Added | Interface repository |
+| `app/Repositories/EmployerRepository.php` | Added | Implementasi findWithFilters, getStats, findByToken |
+| `app/Services/EmployerService.php` | Added | CRUD + generateToken + sendSurveyToken + regenerateToken |
+| `app/Policies/EmployerPolicy.php` | Added | Role-aware: delete=superadmin only |
+| `app/Http/Requests/Employer/StoreEmployerRequest.php` | Added | Validasi store employer |
+| `app/Http/Requests/Employer/UpdateEmployerRequest.php` | Added | Validasi update employer (unique ignore) |
+| `app/Http/Controllers/Api/V1/Admin/EmployerController.php` | Added | 7 actions (CRUD + sendToken + regenerateToken) |
+| `app/Http/Controllers/Api/V1/Employer/ProfileController.php` | Added | show + update (employer self-service) |
+| `routes/api.php` | Changed | Routes admin employer + employer profile |
+| `app/Providers/AppServiceProvider.php` | Changed | EmployerPolicy registration + Repository binding |
+| `frontend/src/stores/employer.js` | Added | Pinia store employer (CRUD + token actions) |
+| `frontend/src/pages/admin/employers/EmployerIndexPage.vue` | Added | Tabel employer + filter + aksi |
+| `frontend/src/pages/admin/employers/EmployerDetailPage.vue` | Added | Detail profil + alumni terkait + kirim token |
+| `frontend/src/pages/admin/employers/EmployerFormPage.vue` | Added | Form tambah/edit employer |
+| `tests/Feature/Admin/EmployerTest.php` | Added | 26 test cases CRUD per role |
+| `tests/Feature/Admin/EmployerTokenTest.php` | Added | 14 test cases token lifecycle |
+| `08_PHASE_TRACKER.md` | Changed | Sesi 2B 16/16 ✅; counter 92→108; status Fase 2 update |
+| `09_CHANGELOG.md` | Added | Entri ini |
+
+**Total: 22 file ditambah/diubah | Sesi 2B complete: 16/16 task ✅**
+**Task selesai keseluruhan: 108/199**
 
 ---
 
@@ -972,6 +1072,7 @@ SESUDAH (tambah baris baru di bawahnya):
 | 1.0.7 | 2026-06-11 | Tambah entri patch WorkHistoryController refactor — inject Form Request, hapus inline validate, tambah UpdateWorkHistoryRequest; 1 task diperbarui |
 | 1.0.8 | 2026-06-12 | Changed `app/Http/Controllers/Api/V1/Alumni/WorkHistoryController.php`, fixed Konsistensi Form Request di seluruh controller Sesi 2A, dan added `app/Http/Requests/Alumni/UpdateWorkHistoryRequest.php` — Form Request baru |
 | 1.0.9 | 2026-06-12 | Sesi 2A dinyatakan ✅ Selesai penuh (31/31 task diverifikasi ada di repository) |
+| 1.1.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 2B — 20 file produksi (migrations, model, observer, repository, service, policy, 2 form request, 2 controller, routes, app provider, 4 frontend Vue, 2 feature tests); 16/16 task ✅; counter 92→108 |
 
 ---
 
