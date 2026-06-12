@@ -5,15 +5,19 @@ use App\Http\Controllers\Api\V1\Admin\AuditLogController;
 use App\Http\Controllers\Api\V1\Admin\EmployerController as AdminEmployerController;
 use App\Http\Controllers\Api\V1\Admin\FacultyController;
 use App\Http\Controllers\Api\V1\Admin\GraduationYearController;
+use App\Http\Controllers\Api\V1\Admin\NotificationController;
 use App\Http\Controllers\Api\V1\Admin\QuestionnaireController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\StudyProgramController;
+use App\Http\Controllers\Api\V1\Admin\SurveyPeriodController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\Alumni\ProfileController as AlumniProfileController;
+use App\Http\Controllers\Api\V1\Alumni\SurveyController as AlumniSurveyController;
 use App\Http\Controllers\Api\V1\Alumni\WorkHistoryController;
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\OtpController;
 use App\Http\Controllers\Api\V1\Employer\ProfileController as EmployerProfileController;
+use App\Http\Controllers\Api\V1\Employer\SurveyController as EmployerSurveyController;
 use App\Http\Controllers\Api\V1\Public\PublicController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +30,10 @@ use Illuminate\Support\Facades\Route;
 |
 | Middleware order WAJIB untuk protected routes:
 |   auth:sanctum → EnsureAccountActive → CheckRole
+|
+| ATURAN URUTAN ROUTE (PENTING — jangan diubah):
+|   Route spesifik (static path) HARUS didaftarkan SEBELUM route parameter
+|   Contoh: GET /admin/survey-periods/stats SEBELUM GET /admin/survey-periods/{id}
 |
 */
 
@@ -117,7 +125,6 @@ Route::prefix('v1')->group(function () {
 
         // --- Questionnaire Management (3A.10) ---
         // Urutan PENTING: static routes (stats) SEBELUM route parameter {questionnaire}
-        // Action routes pada {questionnaire}: publish, archive, duplicate, reorder
         Route::prefix('questionnaires')->name('questionnaires.')->group(function () {
             Route::get('stats', [QuestionnaireController::class, 'stats'])->name('stats');
 
@@ -131,6 +138,46 @@ Route::prefix('v1')->group(function () {
             Route::patch('/{questionnaire}/archive',    [QuestionnaireController::class, 'archive'])->name('archive');
             Route::post('/{questionnaire}/duplicate',   [QuestionnaireController::class, 'duplicate'])->name('duplicate');
             Route::patch('/{questionnaire}/reorder',    [QuestionnaireController::class, 'reorder'])->name('reorder');
+        });
+
+        // --- Survey Period Management (4A.19) ---
+        // Urutan PENTING: static routes (stats, blast) SEBELUM route parameter {surveyPeriod}
+        Route::prefix('survey-periods')->name('survey-periods.')->group(function () {
+            Route::get('stats',  [SurveyPeriodController::class, 'stats'])->name('stats');
+
+            Route::get('/',      [SurveyPeriodController::class, 'index'])->name('index');
+            Route::post('/',     [SurveyPeriodController::class, 'store'])->name('store');
+
+            Route::get('/{surveyPeriod}',             [SurveyPeriodController::class, 'show'])->name('show');
+            Route::put('/{surveyPeriod}',             [SurveyPeriodController::class, 'update'])->name('update');
+            Route::delete('/{surveyPeriod}',          [SurveyPeriodController::class, 'destroy'])->name('destroy');
+            Route::patch('/{surveyPeriod}/activate',  [SurveyPeriodController::class, 'activate'])->name('activate');
+            Route::patch('/{surveyPeriod}/close',     [SurveyPeriodController::class, 'close'])->name('close');
+            Route::post('/{surveyPeriod}/blast',      [SurveyPeriodController::class, 'blast'])->name('blast');
+            Route::get('/{surveyPeriod}/responses',   [SurveyPeriodController::class, 'responses'])->name('responses');
+        });
+
+        // --- Notification Management (4A.19) ---
+        // Urutan PENTING: static routes (templates static, logs) SEBELUM route parameter
+        Route::prefix('notifications')->name('notifications.')->group(function () {
+            // Template management
+            Route::prefix('templates')->name('templates.')->group(function () {
+                Route::get('/',                          [NotificationController::class, 'indexTemplates'])->name('index');
+                Route::post('/',                         [NotificationController::class, 'storeTemplate'])->name('store');
+                Route::get('/{template}',                [NotificationController::class, 'showTemplate'])->name('show');
+                Route::put('/{template}',                [NotificationController::class, 'updateTemplate'])->name('update');
+                Route::delete('/{template}',             [NotificationController::class, 'destroyTemplate'])->name('destroy');
+                Route::post('/{template}/preview',       [NotificationController::class, 'previewTemplate'])->name('preview');
+                Route::patch('/{template}/toggle-active',[NotificationController::class, 'toggleActive'])->name('toggle-active');
+            });
+
+            // Log management (read-only + retry)
+            Route::prefix('logs')->name('logs.')->group(function () {
+                Route::get('/',              [NotificationController::class, 'indexLogs'])->name('index');
+                Route::get('/stats',         [NotificationController::class, 'logStats'])->name('stats');
+                Route::get('/{log}',         [NotificationController::class, 'showLog'])->name('show');
+                Route::post('/{log}/retry',  [NotificationController::class, 'retryLog'])->name('retry');
+            });
         });
 
         // --- Faculty Management (2C.1) ---
@@ -209,10 +256,21 @@ Route::prefix('v1')->group(function () {
             Route::put('/{alumni}/{workHistory}',      [WorkHistoryController::class, 'update'])->name('update');
             Route::delete('/{alumni}/{workHistory}',   [WorkHistoryController::class, 'destroy'])->name('destroy');
         });
+
+        // Survei alumni (4A.19)
+        // Urutan PENTING: route spesifik (active) SEBELUM route parameter {surveyPeriod}
+        Route::prefix('surveys')->name('surveys.')->group(function () {
+            Route::get('active',                              [AlumniSurveyController::class, 'activeSurvey'])->name('active');
+            Route::get('/{surveyPeriod}',                     [AlumniSurveyController::class, 'show'])->name('show');
+            Route::post('/{surveyPeriod}/start',              [AlumniSurveyController::class, 'start'])->name('start');
+            Route::patch('/{surveyPeriod}/save-draft',        [AlumniSurveyController::class, 'saveDraft'])->name('save-draft');
+            Route::post('/{surveyPeriod}/submit',             [AlumniSurveyController::class, 'submit'])->name('submit');
+            Route::get('/{surveyPeriod}/result',              [AlumniSurveyController::class, 'result'])->name('result');
+        });
     });
 
     // =========================================================================
-    // EMPLOYER — Role: employer (2B.10)
+    // EMPLOYER — Role: employer (2B.10 + 4A.19)
     // =========================================================================
     Route::middleware([
         'auth:sanctum',
@@ -225,6 +283,15 @@ Route::prefix('v1')->group(function () {
         Route::get('profile',  [EmployerProfileController::class, 'show'])->name('profile.show');
         Route::put('profile',  [EmployerProfileController::class, 'update'])->name('profile.update');
 
-        // Survey employer akan didaftarkan di sesi 4A
+        // Survei employer (4A.19)
+        // Urutan PENTING: route spesifik (active) SEBELUM route parameter {surveyPeriod}
+        Route::prefix('surveys')->name('surveys.')->group(function () {
+            Route::get('active',                       [EmployerSurveyController::class, 'activeSurvey'])->name('active');
+            Route::get('/{surveyPeriod}',              [EmployerSurveyController::class, 'show'])->name('show');
+            Route::post('/{surveyPeriod}/start',       [EmployerSurveyController::class, 'start'])->name('start');
+            Route::patch('/{surveyPeriod}/save-draft', [EmployerSurveyController::class, 'saveDraft'])->name('save-draft');
+            Route::post('/{surveyPeriod}/submit',      [EmployerSurveyController::class, 'submit'])->name('submit');
+            Route::get('/{surveyPeriod}/result',       [EmployerSurveyController::class, 'result'])->name('result');
+        });
     });
 });
