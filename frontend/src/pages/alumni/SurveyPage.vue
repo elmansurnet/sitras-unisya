@@ -1,661 +1,429 @@
 <script setup>
 /**
- * pages/alumni/SurveyPage.vue — Halaman Pengisian Survei Alumni
+ * frontend/src/pages/alumni/SurveyPage.vue
+ * Halaman survei alumni: list survei + mode isi survei inline (SurveyFillPanel).
+ * Route: alumni.survey — /alumni/survey
+ * Layout: AlumniLayout (wraps via router)
  *
  * Flow:
- *   1. Mount → fetchSurvey('alumni')
- *   2. Jika status === 'selesai'  → redirect ke alumni.survey.done
- *   3. Jika questionnaire null (belum ada undangan) → tampilkan empty state
- *   4. Render per seksi (is_paginated) dengan SurveyProgressBar + QuestionPreview
- *   5. Navigasi Sebelumnya / Selanjutnya / Simpan Draft / Kirim Survei
- *   6. Kirim → modal konfirmasi → submit() → redirect ke alumni.survey.done
+ *   1. Mount → fetchAvailableSurveys()
+ *   2. Klik 'Isi/Lanjutkan' → mode fill (fetchSurvey(id))
+ *   3. Isi per section, auto-save 30 detik, Simpan Draft manual
+ *   4. Klik Kirim → ConfirmModal → submitSurvey() → router push SurveyDonePage
+ *   5. Klik Batal/Kembali → kembali ke mode list
  *
- * Route  : alumni.survey  (06_UI_UX.md §8)
- * Store  : useSurveyStore
- * Layout : AlumniLayout
+ * Sesuai 04_ARCHITECTURE.md §2, 06_UI_UX.md §8, 05_API.md alumni survey
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useSurveyStore } from '@/stores/survey'
 import SurveyProgressBar from '@/components/survey/SurveyProgressBar.vue'
-import QuestionPreview from '@/components/survey/QuestionPreview.vue'
+import QuestionPreview   from '@/components/survey/QuestionPreview.vue'
 
 const router = useRouter()
+const route  = useRoute()
 const store  = useSurveyStore()
 
-// ---------------------------------------------------------------------------
-// Local UI state
-// ---------------------------------------------------------------------------
-const showConfirmModal  = ref(false)
-const showErrorSummary  = ref(false)  // tampilkan error semua field jika submit gagal validasi
-const savingDraft       = ref(false)  // indikator manual save draft
-const draftSavedMsg     = ref(false)  // feedback "Draft tersimpan"
+// ── Mode: 'list' | 'fill' ────────────────────────────────────────────────────
+const mode           = ref('list')
+const activeSurveyId = ref(null)
 
-// ---------------------------------------------------------------------------
-// Computed helpers
-// ---------------------------------------------------------------------------
-const isSectionPaginated = computed(() =>
-  store.questionnaire?.is_paginated !== false
+// ── List state ───────────────────────────────────────────────────────────────
+const surveys = computed(() => store.availableSurveys)
+const listLoading = computed(() => store.loading && mode.value === 'list')
+const listError   = computed(() => mode.value === 'list' ? store.error : null)
+
+// ── Fill state ───────────────────────────────────────────────────────────────
+const survey         = computed(() => store.currentSurvey)
+const answers        = computed(() => store.answers)
+const fillLoading    = computed(() => store.loading && mode.value === 'fill')
+const fillError      = computed(() => mode.value === 'fill' ? store.error : null)
+const submitting     = computed(() => store.submitting)
+
+const currentSectionIndex = ref(0)
+const savingDraft         = ref(false)
+const draftSavedAt        = ref(null)
+const showConfirmModal    = ref(false)
+const submitError         = ref(null)
+let   autoSaveTimer       = null
+
+const sections = computed(() => survey.value?.sections ?? [])
+const currentSection = computed(() => sections.value[currentSectionIndex.value] ?? null)
+const isLastSection  = computed(() => currentSectionIndex.value === sections.value.length - 1)
+
+const totalQuestions = computed(() =>
+  sections.value.reduce((acc, s) => acc + (s.questions?.length ?? 0), 0)
+)
+const answeredCount = computed(() => Object.keys(answers.value).length)
+const completionPct = computed(() =>
+  totalQuestions.value > 0
+    ? Math.round((answeredCount.value / totalQuestions.value) * 100)
+    : 0
 )
 
-/** Daftar pertanyaan yang ditampilkan — semua jika tidak paginated, seksi aktif jika paginated */
-const visibleQuestions = computed(() => {
-  if (!store.questionnaire) return []
-  if (!isSectionPaginated.value) {
-    // Tampilkan semua pertanyaan dari semua seksi
-    return store.sections.flatMap((s) =>
-      [...(s.questions ?? [])].sort((a, b) => a.order_number - b.order_number)
-    )
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
+onMounted(() => {
+  store.fetchAvailableSurveys()
+  // Cek query param ?submitted=1 dari redirect pasca submit
+  if (route.query.submitted === '1') {
+    // tampilkan notifikasi sukses bisa dilakukan via useToast bila tersedia
   }
-  return store.currentSectionQuestions
 })
 
-/** Judul seksi aktif */
-const currentSectionTitle = computed(() => store.currentSection?.title ?? '')
+onBeforeUnmount(() => clearAutoSave())
 
-/** Judul semua seksi untuk step indicator */
-const sectionTitles = computed(() =>
-  store.sections.map((s) => s.title ?? '')
-)
-
-/** Persentase completion dari store */
-const percentage = computed(() => Math.round(store.completion))
-
-// ---------------------------------------------------------------------------
-// Lifecycle
-// ---------------------------------------------------------------------------
-onMounted(async () => {
-  await loadSurvey()
-})
-
-onUnmounted(() => {
-  // Flush pending debounce sebelum navigasi
-  store.saveDraft('alumni').catch(() => {})
-})
-
-// ---------------------------------------------------------------------------
-// Actions
-// ---------------------------------------------------------------------------
-async function loadSurvey() {
-  try {
-    await store.fetchSurvey('alumni')
-    // Jika sudah selesai, redirect langsung
-    if (store.isCompleted) {
-      router.replace({ name: 'alumni.survey.done' })
-    }
-  } catch {
-    // error ditangani di template via store.error
-  }
+// ── List actions ──────────────────────────────────────────────────────────────
+async function startFill(id) {
+  activeSurveyId.value = id
+  currentSectionIndex.value = 0
+  draftSavedAt.value = null
+  submitError.value  = null
+  mode.value = 'fill'
+  await store.fetchSurvey(id)
+  startAutoSave()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-function handleAnswerUpdate(questionId, value) {
-  // value adalah objek { answer_value, answer_options, answer_text }
-  const { answer_value, answer_options, answer_text } = value
-  // Update satu per satu field yang berubah
-  if (answer_options !== null) {
-    store.setAnswer(questionId, 'answer_options', answer_options, 'alumni')
-  } else if (answer_text !== undefined && answer_text !== null) {
-    store.setAnswer(questionId, 'answer_text', answer_text, 'alumni')
-  } else {
-    store.setAnswer(questionId, 'answer_value', answer_value, 'alumni')
-  }
+function backToList() {
+  clearAutoSave()
+  mode.value = 'list'
+  store.clearCurrentSurvey()
+  activeSurveyId.value = null
 }
 
-async function handleManualSaveDraft() {
+// ── Auto-save ─────────────────────────────────────────────────────────────────
+function startAutoSave() {
+  autoSaveTimer = setInterval(async () => {
+    if (Object.keys(answers.value).length > 0) await triggerSaveDraft()
+  }, 30_000)
+}
+
+function clearAutoSave() {
+  if (autoSaveTimer) { clearInterval(autoSaveTimer); autoSaveTimer = null }
+}
+
+async function triggerSaveDraft() {
+  if (savingDraft.value) return
   savingDraft.value = true
   try {
-    await store.saveDraft('alumni')
-    draftSavedMsg.value = true
-    setTimeout(() => { draftSavedMsg.value = false }, 3000)
+    await store.saveDraft(activeSurveyId.value)
+    draftSavedAt.value = new Date()
   } finally {
     savingDraft.value = false
   }
 }
 
-function handleNext() {
-  if (!isSectionPaginated.value) return
-  showErrorSummary.value = false
-  store.nextSection()
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+// ── Section navigation ────────────────────────────────────────────────────────
+function prevSection() {
+  if (currentSectionIndex.value > 0) { currentSectionIndex.value--; scrollTop() }
+}
+function nextSection() {
+  if (!isLastSection.value) { currentSectionIndex.value++; scrollTop() }
+}
+function scrollTop() { window.scrollTo({ top: 0, behavior: 'smooth' }) }
+
+// ── Answer ────────────────────────────────────────────────────────────────────
+function handleAnswer({ questionId, value }) {
+  store.setAnswer(questionId, value)
 }
 
-function handlePrev() {
-  if (!isSectionPaginated.value) return
-  showErrorSummary.value = false
-  store.prevSection()
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
+// ── Submit ────────────────────────────────────────────────────────────────────
 function openConfirmModal() {
-  // Validasi semua required sebelum buka modal
-  if (!store.canSubmit) {
-    showErrorSummary.value = true
-    // Jika paginated, arahkan ke seksi yang belum selesai
-    if (isSectionPaginated.value) {
-      scrollToFirstError()
-    }
-    return
-  }
+  submitError.value = null
   showConfirmModal.value = true
 }
 
-function scrollToFirstError() {
-  // Cari seksi pertama yang memiliki required question belum terisi
-  for (let i = 0; i < store.sections.length; i++) {
-    const section = store.sections[i]
-    const hasEmpty = (section.questions ?? []).some(
-      (q) => q.is_required && !isAnswered(q.id)
-    )
-    if (hasEmpty) {
-      store.goToSection(i)
-      setTimeout(() => {
-        const firstErr = document.querySelector('.question-wrap--error')
-        firstErr?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }, 100)
-      break
-    }
-  }
-}
-
-function isAnswered(questionId) {
-  const ans = store.answers[questionId]
-  if (!ans) return false
-  const { answer_value, answer_options, answer_text } = ans
-  if (answer_options && answer_options.length > 0) return true
-  if (answer_value !== null && answer_value !== undefined && answer_value !== '') return true
-  if (answer_text  !== null && answer_text  !== undefined && answer_text  !== '') return true
-  return false
-}
-
 async function confirmSubmit() {
-  showConfirmModal.value = false
-  try {
-    await store.submit('alumni')
-    router.push({ name: 'alumni.survey.done' })
-  } catch {
-    // error ditampilkan di bawah modal melalui store.error
+  submitError.value = null
+  const ok = await store.submitSurvey(activeSurveyId.value)
+  if (ok) {
+    showConfirmModal.value = false
+    clearAutoSave()
+    router.push({
+      name: 'alumni.survey.done',
+      params: { id: activeSurveyId.value },
+    })
+  } else {
+    submitError.value = store.error ?? 'Gagal mengirim survei. Silakan coba lagi.'
   }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function statusLabel(status) {
+  return { not_started: 'Belum Dikerjakan', in_progress: 'Sedang Diisi', submitted: 'Sudah Dikirim' }[status] ?? status
+}
+function statusClass(status) {
+  return {
+    not_started: 'bg-amber-100 text-amber-700',
+    in_progress:  'bg-blue-100 text-blue-700',
+    submitted:    'bg-green-100 text-green-700',
+  }[status] ?? 'bg-gray-100 text-gray-600'
+}
+function formatDate(d) {
+  if (!d) return ''
+  return new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+function formatTime(d) {
+  if (!d) return ''
+  return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
 }
 </script>
 
 <template>
-  <div class="survey-page">
-    <!-- ================================================================ -->
-    <!-- SKELETON LOADING -->
-    <!-- ================================================================ -->
-    <template v-if="store.loading">
-      <div class="skeleton-wrap" aria-busy="true" aria-label="Memuat survei...">
-        <div class="skeleton skeleton-heading"></div>
-        <div class="skeleton skeleton-bar"></div>
-        <div class="skeleton skeleton-card" v-for="n in 3" :key="n"></div>
-      </div>
-    </template>
+  <div class="min-h-screen bg-gray-50">
 
-    <!-- ================================================================ -->
-    <!-- ERROR STATE -->
-    <!-- ================================================================ -->
-    <template v-else-if="store.error && !store.questionnaire">
-      <div class="empty-state" role="alert">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
-        </svg>
-        <h2>Gagal Memuat Survei</h2>
-        <p>{{ store.error?.message ?? 'Terjadi kesalahan. Coba lagi.' }}</p>
-        <button class="btn btn-primary" @click="loadSurvey">Coba Lagi</button>
+    <!-- ──────────── MODE: LIST ───────────────────────────────── -->
+    <div v-if="mode === 'list'" class="mx-auto max-w-3xl px-4 py-8">
+      <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">Survei Tersedia</h1>
+        <p class="mt-1 text-sm text-gray-500">Daftar survei tracer study yang perlu Anda isi.</p>
       </div>
-    </template>
 
-    <!-- ================================================================ -->
-    <!-- EMPTY STATE — belum ada survei / undangan -->
-    <!-- ================================================================ -->
-    <template v-else-if="!store.questionnaire">
-      <div class="empty-state">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
-        </svg>
-        <h2>Belum Ada Survei</h2>
-        <p>Anda belum menerima undangan survei. Silakan hubungi admin jika ada pertanyaan.</p>
-        <a href="/alumni/dashboard" class="btn btn-secondary">Kembali ke Beranda</a>
-      </div>
-    </template>
-
-    <!-- ================================================================ -->
-    <!-- KONTEN SURVEI -->
-    <!-- ================================================================ -->
-    <template v-else>
-      <!-- Header survei -->
-      <div class="survey-header">
-        <h1 class="survey-title">{{ store.questionnaire.title }}</h1>
-        <div class="survey-meta">
-          <span v-if="store.questionnaire.estimated_minutes" class="meta-item">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd"/>
-            </svg>
-            {{ store.questionnaire.estimated_minutes }} menit
-          </span>
-          <span v-if="store.period" class="meta-item">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fill-rule="evenodd" d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zm-1 5.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H4.75z" clip-rule="evenodd"/>
-            </svg>
-            Batas: {{ new Date(store.period.end_date).toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' }) }}
-          </span>
+      <!-- Loading skeleton -->
+      <div v-if="listLoading" class="space-y-4">
+        <div v-for="i in 3" :key="i" class="animate-pulse rounded-xl border border-gray-200 bg-white p-6">
+          <div class="mb-3 h-4 w-1/3 rounded bg-gray-200" />
+          <div class="mb-2 h-3 w-2/3 rounded bg-gray-100" />
+          <div class="h-3 w-1/2 rounded bg-gray-100" />
         </div>
       </div>
 
-      <!-- Progress bar -->
-      <SurveyProgressBar
-        :current-section="store.currentSectionIndex"
-        :total-sections="store.totalSections"
-        :percentage="percentage"
-        :section-titles="sectionTitles"
-        class="survey-progress-bar"
-      />
-
-      <!-- Judul seksi aktif (jika paginated) -->
-      <div v-if="isSectionPaginated && currentSectionTitle" class="section-heading">
-        <h2>{{ currentSectionTitle }}</h2>
+      <!-- Error -->
+      <div v-else-if="listError" class="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <p class="text-sm font-medium text-red-700">{{ listError }}</p>
+        <button class="mt-3 text-sm text-red-600 underline" @click="store.fetchAvailableSurveys()">Coba lagi</button>
       </div>
 
-      <!-- Error summary banner -->
-      <div v-if="showErrorSummary" class="error-banner" role="alert" aria-live="polite">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+      <!-- Empty -->
+      <div v-else-if="surveys.length === 0" class="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
+        <svg class="mx-auto mb-4 h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-3-3v6M3 12a9 9 0 1118 0 9 9 0 01-18 0z" />
         </svg>
-        <span>Harap lengkapi semua pertanyaan yang wajib diisi (ditandai <strong>*</strong>).</span>
+        <p class="text-sm font-medium text-gray-500">Tidak ada survei aktif saat ini.</p>
+        <p class="mt-1 text-xs text-gray-400">Silakan kembali lagi nanti.</p>
       </div>
 
-      <!-- Draft saved feedback -->
-      <transition name="fade">
-        <div v-if="draftSavedMsg" class="draft-saved-msg" aria-live="polite">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/>
-          </svg>
-          Draft tersimpan
-        </div>
-      </transition>
-
-      <!-- Daftar pertanyaan -->
-      <div class="questions-list">
-        <QuestionPreview
-          v-for="question in visibleQuestions"
-          :key="question.id"
-          :question="question"
-          :model-value="store.answers[question.id] ?? { answer_value: null, answer_options: null, answer_text: null }"
-          :show-error="showErrorSummary && question.is_required && !isAnswered(question.id)"
-          @update:model-value="handleAnswerUpdate(question.id, $event)"
-        />
-      </div>
-
-      <!-- Navigasi bawah -->
-      <div class="survey-nav">
-        <!-- Tombol Sebelumnya -->
-        <button
-          v-if="isSectionPaginated && !store.isFirstSection"
-          type="button"
-          class="btn btn-secondary"
-          @click="handlePrev"
-          :disabled="store.submitting"
+      <!-- Survey cards -->
+      <div v-else class="space-y-4">
+        <div
+          v-for="sv in surveys"
+          :key="sv.id"
+          class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition hover:shadow-md"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fill-rule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clip-rule="evenodd"/>
-          </svg>
-          Sebelumnya
-        </button>
-        <div v-else class="nav-spacer"></div>
-
-        <!-- Tombol Simpan Draft -->
-        <button
-          type="button"
-          class="btn btn-ghost"
-          @click="handleManualSaveDraft"
-          :disabled="savingDraft || store.submitting"
-        >
-          <svg v-if="!savingDraft" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z"/>
-            <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/>
-          </svg>
-          <svg v-else class="spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clip-rule="evenodd"/>
-          </svg>
-          {{ savingDraft ? 'Menyimpan...' : 'Simpan Draft' }}
-        </button>
-
-        <!-- Tombol Selanjutnya / Kirim -->
-        <template v-if="isSectionPaginated">
-          <button
-            v-if="!store.isLastSection"
-            type="button"
-            class="btn btn-primary"
-            @click="handleNext"
-            :disabled="store.submitting"
-          >
-            Selanjutnya
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fill-rule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clip-rule="evenodd"/>
-            </svg>
-          </button>
-          <button
-            v-else
-            type="button"
-            class="btn btn-success"
-            @click="openConfirmModal"
-            :disabled="store.submitting"
-          >
-            <span v-if="!store.submitting">Kirim Survei</span>
-            <span v-else class="btn-loading">Mengirim...</span>
-          </button>
-        </template>
-        <template v-else>
-          <!-- Mode non-paginated: tombol kirim langsung -->
-          <button
-            type="button"
-            class="btn btn-success"
-            @click="openConfirmModal"
-            :disabled="store.submitting"
-          >
-            <span v-if="!store.submitting">Kirim Survei</span>
-            <span v-else class="btn-loading">Mengirim...</span>
-          </button>
-        </template>
-      </div>
-
-      <!-- Error submit -->
-      <p v-if="store.error && !store.loading" class="submit-error" role="alert">
-        {{ store.error?.message ?? 'Gagal mengirim survei. Coba lagi.' }}
-      </p>
-    </template>
-
-    <!-- ================================================================ -->
-    <!-- MODAL KONFIRMASI SUBMIT -->
-    <!-- ================================================================ -->
-    <Teleport to="body">
-      <div
-        v-if="showConfirmModal"
-        class="modal-overlay"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="modal-title"
-        @click.self="showConfirmModal = false"
-      >
-        <div class="modal-box">
-          <div class="modal-icon modal-icon--warning">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path fill-rule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
-            </svg>
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <h2 class="truncate text-base font-semibold text-gray-900">{{ sv.title }}</h2>
+              <p v-if="sv.description" class="mt-1 text-sm text-gray-500 line-clamp-2">{{ sv.description }}</p>
+            </div>
+            <span :class="statusClass(sv.alumni_status)" class="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium">
+              {{ statusLabel(sv.alumni_status) }}
+            </span>
           </div>
-          <h2 id="modal-title" class="modal-title">Kirim Survei?</h2>
-          <p class="modal-body">
-            Jawaban yang telah dikirim <strong>tidak dapat diubah</strong>.
-            Pastikan semua jawaban sudah benar sebelum mengirim.
-          </p>
-          <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" @click="showConfirmModal = false">Periksa Lagi</button>
-            <button type="button" class="btn btn-success" @click="confirmSubmit" :disabled="store.submitting">
-              <span v-if="!store.submitting">Ya, Kirim Sekarang</span>
-              <span v-else class="btn-loading">Mengirim...</span>
+
+          <div class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
+            <span v-if="sv.end_date">⏰ Batas: {{ formatDate(sv.end_date) }}</span>
+            <span v-if="sv.total_questions">📋 {{ sv.total_questions }} pertanyaan</span>
+            <span v-if="sv.completion_percentage != null">✅ {{ sv.completion_percentage }}% selesai</span>
+          </div>
+
+          <div class="mt-5 flex justify-end">
+            <button
+              v-if="sv.alumni_status !== 'submitted'"
+              class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 active:bg-teal-800"
+              @click="startFill(sv.id)"
+            >
+              {{ sv.alumni_status === 'in_progress' ? 'Lanjutkan Isi' : 'Isi Survei' }}
             </button>
+            <span v-else class="rounded-lg bg-green-50 px-4 py-2 text-sm font-medium text-green-700">
+              Survei telah dikirim
+            </span>
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- ──────────── MODE: FILL ───────────────────────────────── -->
+    <template v-else-if="mode === 'fill'">
+
+      <!-- Loading -->
+      <div v-if="fillLoading" class="flex min-h-[60vh] items-center justify-center">
+        <div class="text-center">
+          <svg class="mx-auto mb-4 h-10 w-10 animate-spin text-teal-600" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+          </svg>
+          <p class="text-sm text-gray-500">Memuat survei…</p>
+        </div>
+      </div>
+
+      <!-- Fetch error -->
+      <div v-else-if="fillError && !survey" class="mx-auto max-w-xl px-4 py-16 text-center">
+        <p class="text-sm font-medium text-red-600">{{ fillError }}</p>
+        <button class="mt-4 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="backToList">
+          ← Kembali ke daftar
+        </button>
+      </div>
+
+      <!-- Survey form -->
+      <template v-else-if="survey">
+        <!-- Sticky header -->
+        <header class="sticky top-0 z-20 border-b border-gray-200 bg-white shadow-sm">
+          <div class="mx-auto max-w-3xl px-4 py-3">
+            <div class="flex items-center gap-3">
+              <!-- Back button -->
+              <button
+                class="shrink-0 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100"
+                aria-label="Kembali ke daftar survei"
+                @click="backToList"
+              >
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <div class="min-w-0 flex-1">
+                <h1 class="truncate text-sm font-semibold text-gray-900 sm:text-base">{{ survey.title }}</h1>
+                <p v-if="currentSection" class="mt-0.5 text-xs text-gray-400">
+                  Bagian {{ currentSectionIndex + 1 }} dari {{ sections.length }}: {{ currentSection.title }}
+                </p>
+              </div>
+              <!-- Auto-save indicator -->
+              <div class="shrink-0 text-right text-xs text-gray-400">
+                <span v-if="savingDraft">Menyimpan…</span>
+                <span v-else-if="draftSavedAt">Tersimpan {{ formatTime(draftSavedAt) }}</span>
+              </div>
+            </div>
+            <!-- Progress -->
+            <div class="mt-3">
+              <SurveyProgressBar
+                :percentage="completionPct"
+                :answered="answeredCount"
+                :total="totalQuestions"
+              />
+            </div>
+          </div>
+        </header>
+
+        <!-- Body -->
+        <main class="mx-auto max-w-3xl px-4 py-8">
+          <!-- Section description -->
+          <div v-if="currentSection?.description" class="mb-6 rounded-lg bg-teal-50 px-4 py-3 text-sm text-teal-800">
+            {{ currentSection.description }}
+          </div>
+
+          <!-- Questions -->
+          <div v-if="currentSection" class="space-y-6">
+            <QuestionPreview
+              v-for="(q, idx) in currentSection.questions"
+              :key="q.id"
+              :question="q"
+              :index="idx + 1"
+              :model-value="answers[q.id]"
+              @update:model-value="handleAnswer({ questionId: q.id, value: $event })"
+            />
+          </div>
+
+          <!-- Navigation -->
+          <div class="mt-10 flex items-center justify-between gap-4">
+            <div class="flex gap-2">
+              <button
+                v-if="currentSectionIndex > 0"
+                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100"
+                @click="prevSection"
+              >
+                ← Sebelumnya
+              </button>
+              <button
+                class="rounded-lg border border-teal-200 px-4 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50 active:bg-teal-100 disabled:opacity-40"
+                :disabled="savingDraft"
+                @click="triggerSaveDraft"
+              >
+                {{ savingDraft ? 'Menyimpan…' : 'Simpan Draft' }}
+              </button>
+            </div>
+            <div>
+              <button
+                v-if="!isLastSection"
+                class="rounded-lg bg-teal-600 px-5 py-2 text-sm font-medium text-white hover:bg-teal-700 active:bg-teal-800"
+                @click="nextSection"
+              >
+                Selanjutnya →
+              </button>
+              <button
+                v-else
+                class="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 active:bg-green-800 disabled:opacity-50"
+                :disabled="submitting"
+                @click="openConfirmModal"
+              >
+                {{ submitting ? 'Mengirim…' : 'Kirim Survei' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Section stepper dots -->
+          <div v-if="sections.length > 1" class="mt-6 flex justify-center gap-2">
+            <button
+              v-for="(sec, i) in sections"
+              :key="i"
+              :class="[
+                'h-2.5 rounded-full transition-all',
+                i === currentSectionIndex ? 'w-6 bg-teal-600' : 'w-2.5 bg-gray-300 hover:bg-gray-400',
+              ]"
+              :aria-label="`Bagian ${i + 1}: ${sec.title}`"
+              @click="currentSectionIndex = i; scrollTop()"
+            />
+          </div>
+        </main>
+      </template>
+    </template>
+
+    <!-- ──────────── CONFIRM MODAL ─────────────────────────── -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="showConfirmModal"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          @click.self="showConfirmModal = false"
+        >
+          <div
+            class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-modal-title"
+          >
+            <h2 id="confirm-modal-title" class="text-base font-semibold text-gray-900">Kirim Survei?</h2>
+            <p class="mt-2 text-sm text-gray-500">
+              Anda telah menjawab <strong>{{ answeredCount }}</strong> dari
+              <strong>{{ totalQuestions }}</strong> pertanyaan ({{ completionPct }}%).
+              Survei yang sudah dikirim tidak dapat diubah.
+            </p>
+            <p v-if="submitError" class="mt-3 text-sm font-medium text-red-600">{{ submitError }}</p>
+            <div class="mt-5 flex justify-end gap-3">
+              <button
+                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                :disabled="submitting"
+                @click="showConfirmModal = false"
+              >
+                Batal
+              </button>
+              <button
+                class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                :disabled="submitting"
+                @click="confirmSubmit"
+              >
+                {{ submitting ? 'Mengirim…' : 'Ya, Kirim' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
     </Teleport>
+
   </div>
 </template>
-
-<style scoped>
-/* ===== Layout ===== */
-.survey-page {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem 4rem;
-}
-
-/* ===== Skeleton ===== */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.skeleton-wrap { display: flex; flex-direction: column; gap: 1rem; }
-
-.skeleton {
-  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: 0.5rem;
-}
-
-.skeleton-heading { height: 2rem; width: 60%; }
-.skeleton-bar { height: 0.5rem; width: 100%; }
-.skeleton-card { height: 120px; width: 100%; }
-
-/* ===== Empty / Error state ===== */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 4rem 2rem;
-  color: #64748b;
-  gap: 0.75rem;
-}
-
-.empty-state svg { width: 3rem; height: 3rem; color: #94a3b8; }
-.empty-state h2 { font-size: 1.25rem; font-weight: 600; color: #0f172a; margin: 0; }
-.empty-state p { margin: 0; max-width: 36ch; font-size: 0.9375rem; }
-
-/* ===== Survey header ===== */
-.survey-header {
-  margin-bottom: 0.5rem;
-}
-
-.survey-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 0.375rem;
-  line-height: 1.3;
-}
-
-.survey-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.8125rem;
-  color: #64748b;
-}
-
-.meta-item svg { width: 1rem; height: 1rem; }
-
-/* ===== Progress bar ===== */
-.survey-progress-bar {
-  margin: 0.75rem 0 1rem;
-}
-
-/* ===== Section heading ===== */
-.section-heading {
-  padding: 0.75rem 1rem;
-  background: #f0fdf9;
-  border-left: 4px solid #0d9488;
-  border-radius: 0 0.5rem 0.5rem 0;
-  margin-bottom: 1rem;
-}
-
-.section-heading h2 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #0f766e;
-}
-
-/* ===== Error / draft banners ===== */
-.error-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0.75rem 1rem;
-  background: #fff1f2;
-  border: 1px solid #fecdd3;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  color: #be123c;
-  margin-bottom: 1rem;
-}
-
-.error-banner svg { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
-
-.draft-saved-msg {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  color: #15803d;
-  margin-bottom: 0.75rem;
-}
-
-.draft-saved-msg svg { width: 1.125rem; height: 1.125rem; flex-shrink: 0; }
-
-/* ===== Questions list ===== */
-.questions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-/* ===== Navigation ===== */
-.survey-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e2e8f0;
-  flex-wrap: wrap;
-}
-
-.nav-spacer { flex: 1; }
-
-.submit-error {
-  margin-top: 0.75rem;
-  font-size: 0.875rem;
-  color: #ef4444;
-  text-align: center;
-}
-
-/* ===== Buttons ===== */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.5rem 1.25rem;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  border-radius: 0.5rem;
-  border: none;
-  cursor: pointer;
-  transition: background-color 150ms ease, opacity 150ms ease, transform 100ms ease;
-  white-space: nowrap;
-}
-
-.btn:active { transform: scale(0.97); }
-.btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.btn svg { width: 1.125rem; height: 1.125rem; }
-
-.btn-primary  { background: #0d9488; color: #fff; }
-.btn-primary:hover:not(:disabled) { background: #0f766e; }
-.btn-secondary { background: #fff; color: #334155; border: 1px solid #cbd5e1; }
-.btn-secondary:hover:not(:disabled) { background: #f8fafc; }
-.btn-ghost { background: transparent; color: #475569; border: 1px solid #e2e8f0; }
-.btn-ghost:hover:not(:disabled) { background: #f8fafc; }
-.btn-success { background: #16a34a; color: #fff; }
-.btn-success:hover:not(:disabled) { background: #15803d; }
-
-.btn-loading { opacity: 0.8; }
-
-/* ===== Modal ===== */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 1rem;
-  animation: fadeIn 150ms ease;
-}
-
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-.modal-box {
-  background: #fff;
-  border-radius: 1rem;
-  padding: 2rem 1.75rem;
-  max-width: 440px;
-  width: 100%;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
-  animation: scaleIn 150ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
-.modal-icon {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1rem;
-}
-
-.modal-icon svg { width: 3rem; height: 3rem; }
-.modal-icon--warning svg { color: #f59e0b; }
-
-.modal-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  text-align: center;
-  color: #0f172a;
-  margin: 0 0 0.5rem;
-}
-
-.modal-body {
-  text-align: center;
-  font-size: 0.9375rem;
-  color: #475569;
-  margin: 0 0 1.5rem;
-  line-height: 1.6;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-/* ===== Spin animation (draft saving) ===== */
-.spin {
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-/* ===== Fade transition ===== */
-.fade-enter-active, .fade-leave-active { transition: opacity 300ms ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-
-/* ===== Responsive ===== */
-@media (max-width: 480px) {
-  .survey-nav { justify-content: center; }
-  .btn { padding: 0.5rem 1rem; font-size: 0.875rem; }
-  .survey-title { font-size: 1.25rem; }
-}
-</style>

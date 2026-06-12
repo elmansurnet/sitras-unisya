@@ -1,14 +1,17 @@
 <script setup>
 /**
- * pages/alumni/SurveyDonePage.vue — Halaman Survei Selesai (Alumni)
+ * frontend/src/pages/alumni/SurveyDonePage.vue
+ * Halaman konfirmasi submit survei berhasil.
+ * Route: alumni.survey.done — /alumni/survey/:id/done
+ * Layout: AlumniLayout (wraps via router)
  *
- * Ditampilkan setelah alumni berhasil submit survei.
- * Menampilkan animasi konfetti CSS, info submitted_at,
- * dan tombol kembali ke dashboard.
+ * Menampilkan:
+ * - Ikon sukses animasi
+ * - Judul survei & waktu submit
+ * - Completion percentage
+ * - Tombol kembali ke dashboard
  *
- * Route  : alumni.survey.done  (06_UI_UX.md §8, §10.4)
- * Store  : useSurveyStore (ambil submitted_at & questionnaire title)
- * Layout : AlumniLayout
+ * Sesuai 04_ARCHITECTURE.md §2, 06_UI_UX.md §8
  */
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -17,259 +20,109 @@ import { useSurveyStore } from '@/stores/survey'
 const router = useRouter()
 const store  = useSurveyStore()
 
-/** Tanggal & waktu submit — format lokal Indonesia */
-const submittedAt = computed(() => {
-  const raw = store.response?.submitted_at
-  if (!raw) return null
-  return new Date(raw).toLocaleString('id-ID', {
-    weekday: 'long',
-    day    : 'numeric',
-    month  : 'long',
-    year   : 'numeric',
-    hour   : '2-digit',
-    minute : '2-digit',
-    timeZone: 'Asia/Makassar',
-  }) + ' WITA'
-})
-
-const surveyTitle = computed(() => store.questionnaire?.title ?? 'Survei')
+const survey    = computed(() => store.lastSubmittedSurvey ?? store.currentSurvey)
+const submittedAt = computed(() => store.lastSubmittedAt)
+const completion  = computed(() => store.lastCompletionPct ?? 100)
 
 onMounted(() => {
-  // Bersihkan store setelah render selesai agar tidak ada data tersisa
-  // saat alumni kembali ke halaman lain
-  // Tidak langsung reset agar animasi dan data masih bisa dibaca saat render pertama
+  // Bersihkan state pengisian survei agar data tidak tersisa
+  store.clearCurrentSurvey()
 })
 
+function formatDatetime(d) {
+  if (!d) return ''
+  return new Date(d).toLocaleString('id-ID', {
+    day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
 function goToDashboard() {
-  store.resetStore()
-  router.push({ name: 'alumni.dashboard' })
+  router.push({ name: 'alumni.home' })
+}
+
+function goToSurveyList() {
+  router.push({ name: 'alumni.survey' })
 }
 </script>
 
 <template>
-  <div class="done-page" aria-live="polite">
-    <!-- Konfetti animasi CSS -->
-    <div class="confetti-wrap" aria-hidden="true">
-      <span v-for="n in 18" :key="n" class="confetti-piece" :style="{
-        '--x'    : `${Math.random() * 100}%`,
-        '--delay': `${(n * 0.12).toFixed(2)}s`,
-        '--dur'  : `${1.2 + (n % 5) * 0.3}s`,
-        '--color': ['#0d9488','#f59e0b','#3b82f6','#ec4899','#22c55e','#a855f7'][n % 6],
-        '--size' : `${8 + (n % 4) * 3}px`,
-      }"></span>
+  <div class="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-16">
+    <div class="w-full max-w-md text-center">
+
+      <!-- Success icon -->
+      <div class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
+        <svg
+          class="h-10 w-10 text-green-600"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+
+      <!-- Heading -->
+      <h1 class="text-2xl font-bold text-gray-900">Survei Berhasil Dikirim!</h1>
+      <p class="mt-2 text-sm text-gray-500">
+        Terima kasih atas partisipasi Anda dalam survei tracer study UNISYA.
+      </p>
+
+      <!-- Survey info card -->
+      <div class="mt-8 rounded-xl border border-gray-200 bg-white p-6 text-left shadow-sm">
+        <dl class="space-y-4">
+          <!-- Judul survei -->
+          <div v-if="survey">
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Survei</dt>
+            <dd class="mt-1 text-sm font-semibold text-gray-900">{{ survey.title }}</dd>
+          </div>
+
+          <!-- Waktu submit -->
+          <div v-if="submittedAt">
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Dikirim pada</dt>
+            <dd class="mt-1 text-sm text-gray-700">{{ formatDatetime(submittedAt) }}</dd>
+          </div>
+
+          <!-- Completion -->
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Kelengkapan jawaban</dt>
+            <dd class="mt-2">
+              <div class="flex items-center gap-3">
+                <div class="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
+                  <div
+                    class="h-full rounded-full bg-green-500 transition-all duration-700"
+                    :style="{ width: `${completion}%` }"
+                  />
+                </div>
+                <span class="shrink-0 text-sm font-semibold text-green-700">{{ completion }}%</span>
+              </div>
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- CTA buttons -->
+      <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+        <button
+          class="rounded-lg bg-teal-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-teal-700 active:bg-teal-800"
+          @click="goToDashboard"
+        >
+          Kembali ke Dashboard
+        </button>
+        <button
+          class="rounded-lg border border-gray-300 px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          @click="goToSurveyList"
+        >
+          Lihat Survei Lain
+        </button>
+      </div>
+
+      <!-- Info tambahan -->
+      <p class="mt-8 text-xs text-gray-400">
+        Data Anda digunakan untuk meningkatkan kualitas pendidikan di Universitas Islam Syarifuddin.
+      </p>
     </div>
-
-    <!-- Ikon sukses -->
-    <div class="success-icon" aria-hidden="true">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-      </svg>
-    </div>
-
-    <!-- Judul -->
-    <h1 class="done-title">Terima Kasih!</h1>
-
-    <!-- Pesan -->
-    <p class="done-message">
-      Survei <strong>{{ surveyTitle }}</strong> Anda telah berhasil dikirim.
-      Kontribusi Anda sangat berarti bagi pengembangan kualitas institusi kami.
-    </p>
-
-    <!-- Waktu submit -->
-    <div v-if="submittedAt" class="submitted-at">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd"/>
-      </svg>
-      <span>Dikirim pada: {{ submittedAt }}</span>
-    </div>
-
-    <!-- CTA -->
-    <button type="button" class="btn-dashboard" @click="goToDashboard">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-        <path fill-rule="evenodd" d="M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z" clip-rule="evenodd"/>
-      </svg>
-      Kembali ke Beranda
-    </button>
-
-    <!-- Quote islami -->
-    <p class="islamic-quote" lang="ar" dir="rtl">
-      وَمَنْ جَاهَدَ فَإِنَّمَا يُجَاهِدُ لِنَفْسِهِ
-    </p>
-    <p class="islamic-quote-trans">"Barangsiapa yang bersungguh-sungguh, sesungguhnya itu untuk dirinya sendiri." — QS. Al-Ankabut: 6</p>
   </div>
 </template>
-
-<style scoped>
-/* ===== Layout ===== */
-.done-page {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 3rem 1.5rem 4rem;
-  max-width: 560px;
-  margin: 0 auto;
-  position: relative;
-  overflow: hidden;
-}
-
-/* ===== Konfetti ===== */
-.confetti-wrap {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.confetti-piece {
-  position: absolute;
-  top: -16px;
-  left: var(--x);
-  width: var(--size);
-  height: var(--size);
-  background: var(--color);
-  border-radius: 2px;
-  animation: confettiFall var(--dur) var(--delay) ease-in forwards;
-  opacity: 0;
-}
-
-@keyframes confettiFall {
-  0%   { opacity: 1; transform: translateY(0) rotate(0deg); }
-  100% { opacity: 0; transform: translateY(110vh) rotate(540deg); }
-}
-
-/* ===== Success icon ===== */
-.success-icon {
-  position: relative;
-  z-index: 1;
-  width: 5rem;
-  height: 5rem;
-  background: #f0fdf4;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 1.25rem;
-  animation: popIn 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes popIn {
-  from { transform: scale(0.5); opacity: 0; }
-  to   { transform: scale(1);   opacity: 1; }
-}
-
-.success-icon svg {
-  width: 3rem;
-  height: 3rem;
-  color: #16a34a;
-}
-
-/* ===== Text ===== */
-.done-title {
-  position: relative;
-  z-index: 1;
-  font-size: 2rem;
-  font-weight: 800;
-  color: #0f172a;
-  margin: 0 0 0.75rem;
-  animation: slideUp 400ms 100ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.done-message {
-  position: relative;
-  z-index: 1;
-  font-size: 1rem;
-  color: #475569;
-  max-width: 38ch;
-  line-height: 1.7;
-  margin: 0 0 1.25rem;
-  animation: slideUp 400ms 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-/* ===== Submitted at ===== */
-.submitted-at {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 9999px;
-  padding: 0.375rem 1rem;
-  font-size: 0.8125rem;
-  color: #475569;
-  margin-bottom: 1.5rem;
-  animation: slideUp 400ms 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.submitted-at svg {
-  width: 1rem;
-  height: 1rem;
-  color: #0d9488;
-  flex-shrink: 0;
-}
-
-/* ===== CTA button ===== */
-.btn-dashboard {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1.5rem;
-  background: #0d9488;
-  color: #fff;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  border: none;
-  border-radius: 0.625rem;
-  cursor: pointer;
-  transition: background 150ms ease, transform 100ms ease;
-  animation: slideUp 400ms 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.btn-dashboard:hover { background: #0f766e; }
-.btn-dashboard:active { transform: scale(0.97); }
-.btn-dashboard svg { width: 1.125rem; height: 1.125rem; }
-
-/* ===== Islamic quote ===== */
-.islamic-quote {
-  position: relative;
-  z-index: 1;
-  margin-top: 2.5rem;
-  font-size: 1.25rem;
-  color: #0d9488;
-  font-weight: 600;
-  line-height: 1.8;
-  animation: slideUp 400ms 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.islamic-quote-trans {
-  position: relative;
-  z-index: 1;
-  font-size: 0.8125rem;
-  color: #94a3b8;
-  font-style: italic;
-  margin-top: 0.25rem;
-  max-width: 44ch;
-  animation: slideUp 400ms 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(16px); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
-}
-
-/* ===== Reduced motion ===== */
-@media (prefers-reduced-motion: reduce) {
-  .confetti-piece,
-  .success-icon,
-  .done-title,
-  .done-message,
-  .submitted-at,
-  .btn-dashboard,
-  .islamic-quote,
-  .islamic-quote-trans { animation: none; opacity: 1; transform: none; }
-}
-</style>
