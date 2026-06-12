@@ -1,6 +1,6 @@
 # 08_PHASE_TRACKER.md
 # PHASE TRACKER — SISTEM TRACER STUDY UNISYA
-# Versi: 1.4.0 | Tanggal: 2026-06-12
+# Versi: 1.5.0 | Tanggal: 2026-06-13
 
 > File ini hanya bisa edit untuk update progress project dan task tidak boleh dikurangi untuk konsistensi project!
 
@@ -14,13 +14,13 @@
 | 1 | Fondasi & Autentikasi | 1A, 1B | ✅ Selesai (1A ✅, 1B ✅) |
 | 2 | Manajemen Data Inti | 2A, 2B, 2C | ✅ Selesai (2A ✅, 2B ✅, 2C ✅) |
 | 3 | Kuesioner Dinamis | 3A, 3B | ✅ Selesai (3A ✅, 3B ✅) |
-| 4 | Survei & Notifikasi | 4A, 4B | ⏳ Pending |
+| 4 | Survei & Notifikasi | 4A, 4B | 🔄 Sedang dikerjakan (4A ✅, 4B ⏳) |
 | 5 | Analitik & Pelaporan | 5A, 5B | ⏳ Pending |
 | 6 | Keamanan & Hardening | 6A | ⏳ Pending |
 | 7 | Deployment & Optimasi | 7A | ⏳ Pending |
 
 **Total Task: 199 task**
-**Selesai: 142 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12, 3B.1–3B.9 selesai 2026-06-12)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
+**Selesai: 142 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12, 3B.1–3B.9 selesai 2026-06-12, 4A.1–4A.28 selesai 2026-06-13)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
 
 ---
 
@@ -277,6 +277,7 @@
 ## FASE 4 — SURVEI & NOTIFIKASI
 
 ### Sesi 4A — Survei & Notifikasi Backend
+**Status: ✅ Selesai | Tanggal Selesai: 2026-06-13**
 **Dependensi:** Fase 2 + Fase 3 selesai
 **Estimasi:** 4–5 hari
 
@@ -287,36 +288,36 @@
 
 | No | Task | File/Artefak | Status |
 |---|---|---|---|
-| 4A.1 | Migrasi: `survey_periods`, `alumni_survey_period` (pivot), `survey_responses`, `survey_answers` | Migration files | ⏳ |
-| 4A.2 | Migrasi: `notification_templates`, `notification_logs` | Migration files | ⏳ |
-| 4A.3 | Model: `SurveyPeriod` (fillable, casts JSON: target_graduation_years, relationships ke alumni/responses) | `SurveyPeriod.php` | ⏳ |
-| 4A.4 | Model: `SurveyResponse` (fillable, relationships ke questionnaire/alumni/employer/answers) | `SurveyResponse.php` | ⏳ |
-| 4A.5 | Model: `SurveyAnswer` (fillable, casts JSON: answer_options, relationship ke response/question) | `SurveyAnswer.php` | ⏳ |
-| 4A.6 | Model: `NotificationTemplate` (fillable, casts JSON: variables, relationship ke logs) | `NotificationTemplate.php` | ⏳ |
-| 4A.7 | Model: `NotificationLog` (fillable, casts JSON: provider_response) | `NotificationLog.php` | ⏳ |
-| 4A.8 | Observer: `SurveyResponseObserver` (submitted → update alumni/employer survey_status → audit_log) | `SurveyResponseObserver.php` | ⏳ |
-| 4A.9 | Service: `SurveyService` (getSurveyForAlumni, getSurveyForEmployer, saveDraft, submit, validateAnswers, calculateCompletion) | `SurveyService.php` | ⏳ |
-| 4A.10 | Service: `NotificationService` (renderTemplate, sendToAlumni, sendToEmployer, blastPeriod, logSend) | `NotificationService.php` | ⏳ |
-| 4A.11 | Service: `WhatsAppService` (sendMessage via WA Gateway UNISYA `wacenter.unisya.ac.id` — POST JSON dengan parameter `api_key`, `sender`, `number`, `message`, `footer` opsional; baca config dari `system_settings` key: `wa_gateway_url`, `wa_api_key`, `wa_sender`; aktifkan `full=1` untuk dapat `message_id`; simpan ke `notification_logs.provider_response`; handle response `status: true/false`; retry logic) | `WhatsAppService.php` | ⏳ |
-| 4A.12 | Controller: `Admin/SurveyPeriodController` (index, show, store, update, activate, close, sendInvitations) | `SurveyPeriodController.php` | ⏳ |
-| 4A.13 | Controller: `Admin/NotificationController` — CRUD templates: index, show, store, update, destroy | `NotificationController.php` | ⏳ |
-| 4A.14 | Controller: `Admin/NotificationController` — Log listing: index dengan filter (type, status, recipient_type, date_from, date_to) | `NotificationController.php` | ⏳ |
-| 4A.15 | Controller: `Alumni/SurveyController` (show, saveDraft, submit) | `Alumni/SurveyController.php` | ⏳ |
-| 4A.16 | Controller: `Employer/SurveyController` (show, saveDraft, submit) | `Employer/SurveyController.php` | ⏳ |
-| 4A.17 | FormRequest: `SaveDraftRequest`, `SubmitSurveyRequest` | Request files | ⏳ |
-| 4A.18 | Job: `ProcessSurveyBlast` (queue: low — loop alumni sasaran, dispatch SendWhatsApp/EmailNotification per alumni) | `ProcessSurveyBlast.php` | ⏳ |
-| 4A.19 | Routes: `/api/v1/admin/survey-periods/*`, `/api/v1/admin/notifications/*`, `/api/v1/alumni/survey/*`, `/api/v1/employer/survey/*` | `routes/api.php` | ⏳ |
-| 4A.20 | Scheduler Command: `SendSurveyReminders` (kirim reminder ke alumni belum submit, daily 08:00) | `SendSurveyReminders.php` | ⏳ |
-| 4A.21 | Scheduler Command: `CloseExpiredSurveyPeriods` (auto-close periode lewat end_date, daily 00:00) | `CloseExpiredSurveyPeriods.php` | ⏳ |
-| 4A.22 | Scheduler Command: `CleanupExpiredOtps` (hapus otp_codes expired, hourly) | `CleanupExpiredOtps.php` | ⏳ |
-| 4A.23 | Seeder: `NotificationTemplateSeeder` (template default: survey_invitation, otp_login, survey_reminder, employer_survey_invitation — untuk WA dan Email) | `NotificationTemplateSeeder.php` | ⏳ |
-| 4A.24 | Feature Test: survey flow alumni (start, saveDraft, submit — status update) | `tests/Feature/Survey/AlumniSurveyTest.php` | ⏳ |
-| 4A.25 | Feature Test: survey flow employer (start, saveDraft, submit) | `tests/Feature/Survey/EmployerSurveyTest.php` | ⏳ |
-| 4A.26 | Feature Test: blast invitations (queue dispatched, alumni status updated) | `tests/Feature/Survey/BlastTest.php` | ⏳ |
-| 4A.27 | Feature Test: notification template CRUD | `tests/Feature/Admin/NotificationTemplateTest.php` | ⏳ |
-| 4A.28 | Feature Test: notification log listing (filter type, status, date) | `tests/Feature/Admin/NotificationLogTest.php` | ⏳ |
+| 4A.1 | Migrasi: `survey_periods`, `alumni_survey_period` (pivot), `survey_responses`, `survey_answers` | Migration files | ✅ |
+| 4A.2 | Migrasi: `notification_templates`, `notification_logs` | Migration files | ✅ |
+| 4A.3 | Model: `SurveyPeriod` (fillable, casts JSON: target_graduation_years, relationships ke alumni/responses) | `SurveyPeriod.php` | ✅ |
+| 4A.4 | Model: `SurveyResponse` (fillable, relationships ke questionnaire/alumni/employer/answers) | `SurveyResponse.php` | ✅ |
+| 4A.5 | Model: `SurveyAnswer` (fillable, casts JSON: answer_options, relationship ke response/question) | `SurveyAnswer.php` | ✅ |
+| 4A.6 | Model: `NotificationTemplate` (fillable, casts JSON: variables, relationship ke logs) | `NotificationTemplate.php` | ✅ |
+| 4A.7 | Model: `NotificationLog` (fillable, casts JSON: provider_response) | `NotificationLog.php` | ✅ |
+| 4A.8 | Observer: `SurveyResponseObserver` (submitted → update alumni/employer survey_status → audit_log) | `SurveyResponseObserver.php` | ✅ |
+| 4A.9 | Service: `SurveyService` (getSurveyForAlumni, getSurveyForEmployer, saveDraft, submit, validateAnswers, calculateCompletion) | `SurveyService.php` | ✅ |
+| 4A.10 | Service: `NotificationService` (renderTemplate, sendToAlumni, sendToEmployer, blastPeriod, logSend) | `NotificationService.php` | ✅ |
+| 4A.11 | Service: `WhatsAppService` (sendMessage via WA Gateway UNISYA `wacenter.unisya.ac.id` — POST JSON dengan parameter `api_key`, `sender`, `number`, `message`, `footer` opsional; baca config dari `system_settings` key: `wa_gateway_url`, `wa_api_key`, `wa_sender`; aktifkan `full=1` untuk dapat `message_id`; simpan ke `notification_logs.provider_response`; handle response `status: true/false`; retry logic) | `WhatsAppService.php` | ✅ |
+| 4A.12 | Controller: `Admin/SurveyPeriodController` (index, show, store, update, activate, close, sendInvitations) | `SurveyPeriodController.php` | ✅ |
+| 4A.13 | Controller: `Admin/NotificationController` — CRUD templates: index, show, store, update, destroy | `NotificationController.php` | ✅ |
+| 4A.14 | Controller: `Admin/NotificationController` — Log listing: index dengan filter (type, status, recipient_type, date_from, date_to) | `NotificationController.php` | ✅ |
+| 4A.15 | Controller: `Alumni/SurveyController` (show, saveDraft, submit) | `Alumni/SurveyController.php` | ✅ |
+| 4A.16 | Controller: `Employer/SurveyController` (show, saveDraft, submit) | `Employer/SurveyController.php` | ✅ |
+| 4A.17 | FormRequest: `SaveDraftRequest`, `SubmitSurveyRequest` | Request files | ✅ |
+| 4A.18 | Job: `ProcessSurveyBlast` (queue: low — loop alumni sasaran, dispatch SendWhatsApp/EmailNotification per alumni) | `ProcessSurveyBlast.php` | ✅ |
+| 4A.19 | Routes: `/api/v1/admin/survey-periods/*`, `/api/v1/admin/notifications/*`, `/api/v1/alumni/survey/*`, `/api/v1/employer/survey/*` | `routes/api.php` | ✅ |
+| 4A.20 | Scheduler Command: `SendSurveyReminders` (kirim reminder ke alumni belum submit, daily 08:00) | `SendSurveyReminders.php` | ✅ |
+| 4A.21 | Scheduler Command: `CloseExpiredSurveyPeriods` (auto-close periode lewat end_date, daily 00:00) | `CloseExpiredSurveyPeriods.php` | ✅ |
+| 4A.22 | Scheduler Command: `CleanupExpiredOtps` (hapus otp_codes expired, hourly) | `CleanupExpiredOtps.php` | ✅ |
+| 4A.23 | Seeder: `NotificationTemplateSeeder` (template default: survey_invitation, otp_login, survey_reminder, employer_survey_invitation — untuk WA dan Email) | `NotificationTemplateSeeder.php` | ✅ |
+| 4A.24 | Feature Test: survey flow alumni (start, saveDraft, submit — status update) | `tests/Feature/Survey/AlumniSurveyTest.php` | ✅ |
+| 4A.25 | Feature Test: survey flow employer (start, saveDraft, submit) | `tests/Feature/Survey/EmployerSurveyTest.php` | ✅ |
+| 4A.26 | Feature Test: blast invitations (queue dispatched, alumni status updated) | `tests/Feature/Survey/BlastTest.php` | ✅ |
+| 4A.27 | Feature Test: notification template CRUD | `tests/Feature/Admin/NotificationTemplateTest.php` | ✅ |
+| 4A.28 | Feature Test: notification log listing (filter type, status, date) | `tests/Feature/Admin/NotificationLogTest.php` | ✅ |
 
-**Total Sesi 4A: 28 task**
+**Total Sesi 4A: 28 task - ✅ Selesai 28/28 (diverifikasi 2026-06-13)**
 
 ---
 
@@ -456,7 +457,7 @@
 | 2 | 2C | 13 | ✅ Selesai (2026-06-12) |
 | 3 | 3A | 12 | ✅ Selesai (2026-06-12) |
 | 3 | 3B | 9 | ✅ Selesai (2026-06-12) |
-| 4 | 4A | 28 | ⏳ |
+| 4 | 4A | 28 | ✅ Selesai (2026-06-13) |
 | 4 | 4B | 12 | ⏳ |
 | 5 | 5A | 11 | ⏳ |
 | 5 | 5B | 10 | ⏳ |
@@ -523,6 +524,7 @@ Fase 1A (Setup + DB) → Fase 1B (Auth)
 | 1.2.0 | 2026-06-12 | Sesi 2C dinyatakan ✅ Selesai penuh (13/13 task diverifikasi ada di repository): 6 controller (Faculty, StudyProgram, GraduationYear, User, Setting, AuditLog), 6 folder FormRequest (Faculty, StudyProgram, GraduationYear, User, Setting), routes api.php update, 6 halaman frontend settings (Faculty, StudyProgram, GraduationYear, UserManagement, SystemSetting, AuditLog); Fase 2 dinyatakan ✅ selesai penuh (2A+2B+2C); counter task selesai 108→121 |
 | 1.3.0 | 2026-06-12 | Sesi 3A ✅ Selesai penuh (12/12 task): 4 migrations, 4 models, QuestionnaireService, QuestionnairePolicy, 3 FormRequest, QuestionnaireController (13 actions), routes, unit test + feature test; counter 121→133; Fase 3: 3A ✅, 3B ⏳ |
 | 1.4.0 | 2026-06-12 | Sesi 3B dinyatakan ✅ Selesai penuh (9/9 task): stores/questionnaire.js, QuestionnaireIndexPage, QuestionnaireBuilderPage (drag-drop), QuestionEditor, QuestionRenderer (10 tipe + toolbar builder), ConditionalLogicEditor, QuestionnairePreviewPage (final: all+step mode, answer counter, ARIA); counter task selesai 133→142; status Fase 3 diupdate: 3B ✅ |
+| 1.5.0 | 2026-06-13 | Sesi 4A dinyatakan Selesai penuh 28/28 task diverifikasi ada di repository. 4A.1–4A.2 migrations survey_periods, alumni_survey_period, survey_responses, survey_answers, notification_templates, notification_logs. 4A.3–4A.7 models SurveyPeriod, SurveyResponse, SurveyAnswer, NotificationTemplate, NotificationLog. 4A.8 SurveyResponseObserver, 4A.9 SurveyService, 4A.10 NotificationService, 4A.11 WhatsAppService, update AppServiceProvider. 4A.12 AdminSurveyPeriodController, 4A.13–4A.14 AdminNotificationController (CRUD template + log listing), 4A.15 AlumniSurveyController, 4A.16 EmployerSurveyController, 4A.17 SaveDraftRequest & SubmitSurveyRequest. 4A.18 ProcessSurveyBlast job, 4A.19 routes/api.php update, 4A.20 SendSurveyReminders, 4A.21 CloseExpiredSurveyPeriods, 4A.22 CleanupExpiredOtps, 4A.23 NotificationTemplateSeeder, update DatabaseSeeder, app/Console/Kernel.php scheduler. 4A.24–4A.28 Feature Tests: AlumniSurveyTest, EmployerSurveyTest, BlastTest, NotificationTemplateTest, NotificationLogTest. counter task selesai 142→170. Status Fase 4 diupdate 4A ✅ |
 
 ---
 

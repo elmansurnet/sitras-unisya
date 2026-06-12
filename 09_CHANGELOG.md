@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.4.0 | Tanggal: 2026-06-12
+# Versi: 1.5.0 | Tanggal: 2026-06-13
 
 ---
 
@@ -21,6 +21,52 @@ Setiap entri changelog mengikuti format:
 - `Removed` — Konten yang dihapus
 - `Security` — Perbaikan keamanan
 - `Deprecated` — Fitur yang akan dihapus di versi mendatang
+
+---
+
+## [1.5.0] — 2026-06-13
+
+### Added
+- `database/migrations/*_create_survey_periods_table.php` — tabel survey_periods
+- `database/migrations/*_create_alumni_survey_period_table.php` — pivot alumni ↔ periode survei
+- `database/migrations/*_create_survey_responses_table.php` — tabel survey_responses
+- `database/migrations/*_create_survey_answers_table.php` — tabel survey_answers
+- `database/migrations/*_create_notification_templates_table.php` — tabel notification_templates
+- `database/migrations/*_create_notification_logs_table.php` — tabel notification_logs
+- `app/Models/SurveyPeriod.php` — model dengan cast JSON target_graduation_years, relasi alumni/responses
+- `app/Models/SurveyResponse.php` — model relasi ke questionnaire, alumni, employer, answers
+- `app/Models/SurveyAnswer.php` — model dengan cast JSON answer_options
+- `app/Models/NotificationTemplate.php` — model dengan cast JSON variables, relasi ke logs
+- `app/Models/NotificationLog.php` — model dengan cast JSON provider_response
+- `app/Observers/SurveyResponseObserver.php` — update alumni/employer survey_status + audit log saat submitted
+- `app/Services/SurveyService.php` — getSurveyForAlumni, getSurveyForEmployer, saveDraft, submit, validateAnswers, calculateCompletion
+- `app/Services/NotificationService.php` — renderTemplate, sendToAlumni, sendToEmployer, blastPeriod, logSend
+- `app/Services/WhatsAppService.php` — sendMessage via WA Gateway UNISYA (wacenter.unisya.ac.id), baca config dari system_settings, retry logic, simpan provider_response
+- `app/Http/Controllers/Api/V1/Admin/SurveyPeriodController.php` — index, show, store, update, activate, close, sendInvitations
+- `app/Http/Controllers/Api/V1/Admin/NotificationController.php` — CRUD templates (index, show, store, update, destroy) + log listing dengan filter
+- `app/Http/Controllers/Api/V1/Alumni/SurveyController.php` — show, saveDraft, submit
+- `app/Http/Controllers/Api/V1/Employer/SurveyController.php` — show, saveDraft, submit (auth via survey_token)
+- `app/Http/Requests/Survey/SaveDraftRequest.php` — validasi draft survey alumni & employer
+- `app/Http/Requests/Survey/SubmitSurveyRequest.php` — validasi submit survey dengan cek required questions
+- `app/Jobs/ProcessSurveyBlast.php` — job queue low, loop alumni sasaran, dispatch notifikasi per alumni
+- `app/Console/Commands/SendSurveyReminders.php` — kirim reminder alumni belum submit, daily 08:00 WITA
+- `app/Console/Commands/CloseExpiredSurveyPeriods.php` — auto-close periode melewati end_date, daily 00:05 WITA
+- `app/Console/Commands/CleanupExpiredOtps.php` — hapus otp_codes expired, setiap 30 menit
+- `app/Console/Kernel.php` — registrasi jadwal scheduler: survey:close-expired, survey:send-reminders, otp:cleanup
+- `database/seeders/NotificationTemplateSeeder.php` — 8 template default (survey_invitation, otp_login, survey_reminder, employer_survey_invitation × WA & Email)
+- `tests/Feature/Survey/AlumniSurveyTest.php` — 11 test: GET survey, saveDraft (idempotent, status update), submit (status update, double-submit 409, required validation)
+- `tests/Feature/Survey/EmployerSurveyTest.php` — 9 test: token valid/invalid/expired, draft, submit, double-submit 409, required validation
+- `tests/Feature/Survey/BlastTest.php` — 9 test: Queue::assertPushedOn('low'), validasi channel, RBAC, blast ke period non-active → 422
+- `tests/Feature/Admin/NotificationTemplateTest.php` — 12 test: CRUD lengkap, unique type+event, enum validation, RBAC
+- `tests/Feature/Admin/NotificationLogTest.php` — 13 test: filter type/status/recipient_type/date_from/date_to/kombinasi, paginasi
+
+### Changed
+- `app/Providers/AppServiceProvider.php` — register SurveyResponseObserver, binding SurveyService & NotificationService
+- `routes/api.php` — tambah group: /admin/survey-periods, /admin/notifications, /alumni/survey, /employer/survey
+- `database/seeders/DatabaseSeeder.php` — call NotificationTemplateSeeder
+
+### Files Changed
+39 file (6 migration, 5 model, 1 observer, 3 service, 4 controller, 2 request, 1 job, 3 command, 1 kernel, 1 seeder, 5 test, 3 update existing + app/Console/Kernel.php)
 
 ---
 
@@ -1344,6 +1390,7 @@ SESUDAH (tambah baris baru di bawahnya):
 | 1.2.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 2C — 26 file produksi (6 controller, 9 form request, 1 observer, routes+provider update, 6 halaman frontend settings); 13/13 task ✅; Fase 2 selesai penuh (2A+2B+2C); counter 108→121 |
 | 1.3.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 3A — 18 file produksi (4 migrations, 4 models, QuestionnaireService 12 methods, QuestionnairePolicy, 3 FormRequest, QuestionnaireController 13 actions, routes+provider, unit test 18 cases + feature test 24 cases); 12/12 task ✅; counter 121→133; Fase 3: 3A ✅, 3B ⏳ |
 | 1.4.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 3B — 7 file produksi frontend (store, 3 page, 3 component); QuestionnairePreviewPage replace stub → final; 9/9 task ✅; counter 133→142 |
+| 1.5.0 | 2026-06-13 | Sesi 4A dinyatakan Selesai penuh 28/28 task diverifikasi ada di repository. Counter task selesai 142→170. Status Fase 4 diupdate 4A ✅ |
 
 ---
 
