@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Admin\AuditLogController;
 use App\Http\Controllers\Api\V1\Admin\EmployerController as AdminEmployerController;
 use App\Http\Controllers\Api\V1\Admin\FacultyController;
 use App\Http\Controllers\Api\V1\Admin\GraduationYearController;
+use App\Http\Controllers\Api\V1\Admin\QuestionnaireController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\StudyProgramController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
@@ -114,6 +115,24 @@ Route::prefix('v1')->group(function () {
             Route::post('/{employer}/regenerate-token',  [AdminEmployerController::class, 'regenerateToken'])->name('regenerate-token');
         });
 
+        // --- Questionnaire Management (3A.10) ---
+        // Urutan PENTING: static routes (stats) SEBELUM route parameter {questionnaire}
+        // Action routes pada {questionnaire}: publish, archive, duplicate, reorder
+        Route::prefix('questionnaires')->name('questionnaires.')->group(function () {
+            Route::get('stats', [QuestionnaireController::class, 'stats'])->name('stats');
+
+            Route::get('/',    [QuestionnaireController::class, 'index'])->name('index');
+            Route::post('/',   [QuestionnaireController::class, 'store'])->name('store');
+
+            Route::get('/{questionnaire}',              [QuestionnaireController::class, 'show'])->name('show');
+            Route::put('/{questionnaire}',              [QuestionnaireController::class, 'update'])->name('update');
+            Route::delete('/{questionnaire}',           [QuestionnaireController::class, 'destroy'])->name('destroy');
+            Route::patch('/{questionnaire}/publish',    [QuestionnaireController::class, 'publish'])->name('publish');
+            Route::patch('/{questionnaire}/archive',    [QuestionnaireController::class, 'archive'])->name('archive');
+            Route::post('/{questionnaire}/duplicate',   [QuestionnaireController::class, 'duplicate'])->name('duplicate');
+            Route::patch('/{questionnaire}/reorder',    [QuestionnaireController::class, 'reorder'])->name('reorder');
+        });
+
         // --- Faculty Management (2C.1) ---
         Route::prefix('faculties')->name('faculties.')->group(function () {
             Route::get('/',              [FacultyController::class, 'index'])->name('index');
@@ -142,7 +161,6 @@ Route::prefix('v1')->group(function () {
         });
 
         // --- User Management (2C.4) — superadmin only (Gate di controller) ---
-        // Urutan: static 'password' SEBELUM route parameter {user}
         Route::prefix('users')->name('users.')->group(function () {
             Route::get('/',                      [UserController::class, 'index'])->name('index');
             Route::post('/',                     [UserController::class, 'store'])->name('store');
@@ -153,7 +171,6 @@ Route::prefix('v1')->group(function () {
         });
 
         // --- System Settings (2C.5) — superadmin only (Gate di controller) ---
-        // Urutan: 'bulk' (static) SEBELUM route parameter {key}
         Route::prefix('settings')->name('settings.')->group(function () {
             Route::get('/',          [SettingController::class, 'index'])->name('index');
             Route::patch('/bulk',    [SettingController::class, 'bulkUpdate'])->name('bulk');
@@ -162,7 +179,6 @@ Route::prefix('v1')->group(function () {
         });
 
         // --- Audit Log (2C.6) — superadmin only, read-only (Gate di controller) ---
-        // Urutan: static 'modules' dan 'actions' SEBELUM route parameter {auditLog}
         Route::prefix('audit-logs')->name('audit-logs.')->group(function () {
             Route::get('/',              [AuditLogController::class, 'index'])->name('index');
             Route::get('/modules',       [AuditLogController::class, 'modules'])->name('modules');
