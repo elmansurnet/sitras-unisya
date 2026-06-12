@@ -1,530 +1,849 @@
 <script setup>
 /**
- * frontend/src/pages/admin/survey-periods/SurveyPeriodDetailPage.vue
- * Halaman create / edit periode survei — admin panel.
- * Route  :
- *   admin.survey-periods.create — /admin/survey-periods/create  (params.id = undefined)
- *   admin.survey-periods.detail — /admin/survey-periods/:id     (params.id = angka)
- * Layout : AdminLayout (wraps via router)
+ * pages/admin/survey-periods/SurveyPeriodDetailPage.vue
  *
- * Form fields (sesuai 02_DATABASE.md survey_periods):
- *   name, description, start_date, end_date,
- *   target_graduation_years (multi-select checkboxes),
- *   quota (opsional)
+ * Halaman Create / Edit Periode Survei.
  *
- * Saat mode edit:
- *   - Tampilkan statistik respons (read-only) di panel samping
- *   - Tombol Aktifkan / Tutup tersedia jika status memungkinkan
+ * Mode:
+ *  - Create : route admin.survey-periods.create  (id = undefined)
+ *  - Edit   : route admin.survey-periods.detail  (id = :id)
  *
- * Sesuai 04_ARCHITECTURE.md §2, 05_API.md §admin-survey-periods, 02_DATABASE.md
+ * Fitur:
+ *  - Form: nama, tahun akademik, start_date, end_date, questionnaire, target angkatan
+ *  - Load daftar kuesioner (store questionnaire atau endpoint GET /admin/questionnaires)
+ *  - Load daftar graduation years untuk multi-select angkatan target
+ *  - Simpan (create/update) → redirect ke index
+ *  - Aktifkan / Tutup langsung dari halaman detail
+ *  - Kirim Undangan Blast dengan konfirmasi
+ *  - Readonly form saat status = ditutup
+ *  - Tabel respons singkat (nama alumni, status, submitted_at)
+ *
+ * Store   : useSurveyAdminStore
+ * Route   : /admin/survey-periods/create
+ *           /admin/survey-periods/:id
  */
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useSurveyPeriodStore } from '@/stores/surveyPeriod'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter }             from 'vue-router'
+import { useSurveyAdminStore }             from '@/stores/surveyAdmin'
+import { useToast }                        from '@/composables/useToast'
+import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import Badge        from '@/components/common/Badge.vue'
+import Pagination   from '@/components/common/Pagination.vue'
+import api          from '@/services/api'
 
 const route  = useRoute()
 const router = useRouter()
-const store  = useSurveyPeriodStore()
+const store  = useSurveyAdminStore()
+const toast  = useToast()
 
-// ── Mode ─────────────────────────────────────────────────────────────────────
-const isEdit    = computed(() => !!route.params.id && route.params.id !== 'create')
-const periodId  = computed(() => isEdit.value ? Number(route.params.id) : null)
-const pageTitle = computed(() => isEdit.value ? 'Edit Periode Survei' : 'Buat Periode Survei')
+// ---------------------------------------------------------------------------
+// Mode
+// ---------------------------------------------------------------------------
+const isCreate = computed(() => !route.params.id)
+const periodId = computed(() => route.params.id ? Number(route.params.id) : null)
 
-// ── Form state ────────────────────────────────────────────────────────────────
-const form = reactive({
+// ---------------------------------------------------------------------------
+// Form state
+// ---------------------------------------------------------------------------
+const form = ref({
   name                    : '',
-  description             : '',
+  academic_year           : '',
   start_date              : '',
   end_date                : '',
-  target_graduation_years : [],  // array of number
-  quota                   : '',
+  questionnaire_id        : '',
+  target_graduation_years : [],   // array of graduation_year id
+  description             : '',
 })
 
-const errors       = ref({})
-const saveSuccess  = ref(false)
-const fetchError   = ref(null)
+const formErrors   = ref({})
+const saving       = ref(false)
+const pageLoading  = ref(false)
+const currentPeriod = ref(null)
 
-// ── Tahun lulus untuk multi-select ─────────────────────────────────────────
-// Buat pilihan: 10 tahun ke belakang sampai tahun sekarang
-const CURRENT_YEAR   = new Date().getFullYear()
-const YEAR_OPTIONS   = Array.from({ length: 15 }, (_, i) => CURRENT_YEAR - i)
+// Opsi dropdown
+const questionnaires    = ref([])   // { id, title }
+const graduationYears   = ref([])   // { id, year }
 
-function toggleYear(yr) {
-  const idx = form.target_graduation_years.indexOf(yr)
-  if (idx === -1) form.target_graduation_years.push(yr)
-  else form.target_graduation_years.splice(idx, 1)
+// Confirm modal
+const confirmModal = ref({ open: false, title: '', message: '', onConfirm: null })
+
+// Blast state
+const blasting   = ref(false)
+const activating = ref(false)
+const closing    = ref(false)
+
+// Responses mini-table
+const responses     = ref([])
+const responsesPage = ref(1)
+const responsesTotal= ref(0)
+const responsesLoading = ref(false)
+
+// ---------------------------------------------------------------------------
+// Computed
+// ---------------------------------------------------------------------------
+const isReadonly = computed(() => currentPeriod.value?.status === 'ditutup')
+const periodStatus = computed(() => currentPeriod.value?.status ?? null)
+
+const responseColumns = [
+  { key: 'alumni_name',    label: 'Alumni' },
+  { key: 'status',         label: 'Status' },
+  { key: 'completion',     label: 'Progres', align: 'center' },
+  { key: 'submitted_at',   label: 'Dikirim Pada' },
+]
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function formatDate(d) {
+  if (!d) return '-'
+  return new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-function isYearSelected(yr) {
-  return form.target_graduation_years.includes(yr)
+function badgeVariant(status) {
+  return { draft: 'secondary', aktif: 'success', ditutup: 'danger', selesai: 'primary' }[status] ?? 'secondary'
 }
 
-function selectAllYears()  { form.target_graduation_years = [...YEAR_OPTIONS] }
-function clearAllYears()   { form.target_graduation_years = [] }
-
-// ── Computed dari store ───────────────────────────────────────────────────────
-const current    = computed(() => store.current)
-const submitting = computed(() => store.submitting)
-const loading    = computed(() => store.loading)
-
-// ── Hydrate form dari data yang diambil ──────────────────────────────────────
-function hydrate(data) {
-  form.name                    = data.name ?? ''
-  form.description             = data.description ?? ''
-  form.start_date              = data.start_date ? data.start_date.slice(0, 10) : ''
-  form.end_date                = data.end_date   ? data.end_date.slice(0, 10)   : ''
-  form.target_graduation_years = data.target_graduation_years ?? []
-  form.quota                   = data.quota ?? ''
+function clearError(field) {
+  delete formErrors.value[field]
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
 onMounted(async () => {
-  store.clearCurrent()
-  if (isEdit.value) {
-    try {
-      const data = await store.fetchDetail(periodId.value)
-      hydrate(data)
-    } catch {
-      fetchError.value = store.error ?? 'Gagal memuat data periode survei.'
+  pageLoading.value = true
+  try {
+    await Promise.all([
+      loadQuestionnaires(),
+      loadGraduationYears(),
+    ])
+    if (!isCreate.value) {
+      await loadPeriod()
+      await loadResponses()
     }
+  } finally {
+    pageLoading.value = false
   }
 })
 
-// ── Validasi ─────────────────────────────────────────────────────────────────
-function validate() {
-  const e = {}
-  if (!form.name.trim())       e.name       = 'Nama periode wajib diisi.'
-  if (!form.start_date)        e.start_date = 'Tanggal mulai wajib diisi.'
-  if (!form.end_date)          e.end_date   = 'Tanggal selesai wajib diisi.'
-  if (form.start_date && form.end_date && form.end_date < form.start_date) {
-    e.end_date = 'Tanggal selesai harus setelah tanggal mulai.'
+async function loadQuestionnaires() {
+  try {
+    const { data } = await api.get('/admin/questionnaires', { params: { per_page: 100, status: 'aktif' } })
+    questionnaires.value = data.data ?? []
+  } catch {
+    // silent — dropdown dikosongkan
   }
-  errors.value = e
-  return Object.keys(e).length === 0
 }
 
-// ── Submit ───────────────────────────────────────────────────────────────────
-async function handleSubmit() {
-  saveSuccess.value = false
-  if (!validate()) return
-
-  const payload = {
-    name                    : form.name.trim(),
-    description             : form.description.trim() || null,
-    start_date              : form.start_date,
-    end_date                : form.end_date,
-    target_graduation_years : form.target_graduation_years,
-    quota                   : form.quota ? Number(form.quota) : null,
-  }
-
+async function loadGraduationYears() {
   try {
-    if (isEdit.value) {
-      await store.update(periodId.value, payload)
-      saveSuccess.value = true
-      setTimeout(() => (saveSuccess.value = false), 3000)
-    } else {
-      const created = await store.create(payload)
-      // Redirect ke halaman detail yang baru dibuat
-      router.replace({
-        name  : 'admin.survey-periods.detail',
-        params: { id: created.id },
-      })
+    const { data } = await api.get('/admin/settings/graduation-years', { params: { per_page: 100 } })
+    graduationYears.value = data.data ?? []
+  } catch {
+    // silent
+  }
+}
+
+async function loadPeriod() {
+  try {
+    const data = await store.fetchPeriod(periodId.value)
+    currentPeriod.value = data
+    // Isi form dari data period
+    form.value = {
+      name                    : data.name ?? '',
+      academic_year           : data.academic_year ?? '',
+      start_date              : data.start_date?.substring(0, 10) ?? '',
+      end_date                : data.end_date?.substring(0, 10) ?? '',
+      questionnaire_id        : data.questionnaire_id ?? '',
+      target_graduation_years : data.target_graduation_years ?? [],
+      description             : data.description ?? '',
     }
   } catch {
-    // Error sudah ada di store.error
+    toast.error('Gagal memuat data periode survei.')
+    router.push({ name: 'admin.survey-periods.index' })
   }
 }
 
-// ── Aksi status dari halaman detail ──────────────────────────────────────────
-const confirmModal = reactive({
-  show: false, title: '', message: '',
-  confirmLabel: '', confirmClass: 'bg-teal-600 hover:bg-teal-700',
-  action: () => {},
-})
-
-function openConfirm({ title, message, confirmLabel, confirmClass, action }) {
-  Object.assign(confirmModal, { title, message, confirmLabel, confirmClass, action, show: true })
+async function loadResponses(page = 1) {
+  if (!periodId.value) return
+  responsesLoading.value = true
+  try {
+    const { data } = await api.get(`/admin/survey-periods/${periodId.value}/responses`, {
+      params: { page, per_page: 10 },
+    })
+    responses.value      = data.data ?? []
+    responsesTotal.value = data.meta?.total ?? 0
+    responsesPage.value  = page
+  } catch {
+    // silent — tabel dikosongkan
+  } finally {
+    responsesLoading.value = false
+  }
 }
 
-function doActivate() {
-  openConfirm({
-    title        : 'Aktifkan Periode Survei?',
-    message      : 'Periode akan diaktifkan. Alumni yang sesuai dapat mulai mengisi survei.',
-    confirmLabel : 'Aktifkan',
-    confirmClass : 'bg-green-600 hover:bg-green-700',
-    action       : async () => {
-      await store.activate(periodId.value)
-      if (!store.error) {
-        confirmModal.show = false
-        await store.fetchDetail(periodId.value)
-        hydrate(store.current)
-      }
-    },
-  })
+// ---------------------------------------------------------------------------
+// Validasi form sederhana
+// ---------------------------------------------------------------------------
+function validateForm() {
+  const errors = {}
+  if (!form.value.name.trim())           errors.name           = 'Nama periode wajib diisi.'
+  if (!form.value.academic_year.trim())  errors.academic_year  = 'Tahun akademik wajib diisi.'
+  if (!form.value.start_date)            errors.start_date     = 'Tanggal mulai wajib diisi.'
+  if (!form.value.end_date)              errors.end_date       = 'Tanggal selesai wajib diisi.'
+  if (!form.value.questionnaire_id)      errors.questionnaire_id = 'Pilih kuesioner yang akan digunakan.'
+  if (form.value.start_date && form.value.end_date && form.value.start_date >= form.value.end_date) {
+    errors.end_date = 'Tanggal selesai harus setelah tanggal mulai.'
+  }
+  formErrors.value = errors
+  return Object.keys(errors).length === 0
 }
 
-function doClose() {
-  openConfirm({
-    title        : 'Tutup Periode Survei?',
-    message      : 'Periode akan ditutup. Alumni tidak dapat mengisi survei setelah ini.',
-    confirmLabel : 'Tutup',
-    confirmClass : 'bg-amber-600 hover:bg-amber-700',
-    action       : async () => {
-      await store.close(periodId.value)
-      if (!store.error) {
-        confirmModal.show = false
-        await store.fetchDetail(periodId.value)
-        hydrate(store.current)
-      }
-    },
-  })
+// ---------------------------------------------------------------------------
+// Simpan (create / update)
+// ---------------------------------------------------------------------------
+async function handleSave() {
+  if (!validateForm()) return
+  saving.value = true
+  try {
+    const payload = { ...form.value }
+    if (isCreate.value) {
+      const created = await store.createPeriod(payload)
+      toast.success('Periode survei berhasil dibuat.')
+      router.push({ name: 'admin.survey-periods.detail', params: { id: created.id } })
+    } else {
+      await store.updatePeriod(periodId.value, payload)
+      toast.success('Periode survei berhasil diperbarui.')
+      await loadPeriod()
+    }
+  } catch (err) {
+    const serverErrors = err.response?.data?.errors ?? {}
+    if (Object.keys(serverErrors).length) {
+      formErrors.value = serverErrors
+    } else {
+      toast.error(err.response?.data?.message ?? 'Gagal menyimpan periode survei.')
+    }
+  } finally {
+    saving.value = false
+  }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const STATUS_MAP = {
-  draft   : { label: 'Draft',   cls: 'bg-gray-100 text-gray-600'   },
-  active  : { label: 'Aktif',   cls: 'bg-green-100 text-green-700' },
-  closed  : { label: 'Ditutup', cls: 'bg-red-100 text-red-700'     },
-  expired : { label: 'Expired', cls: 'bg-amber-100 text-amber-700' },
+// ---------------------------------------------------------------------------
+// Aksi status
+// ---------------------------------------------------------------------------
+function confirmActivate() {
+  confirmModal.value = {
+    open    : true,
+    title   : 'Aktifkan Periode',
+    message : `Aktifkan periode "${currentPeriod.value?.name}"? Alumni bisa diundang setelah periode aktif.`,
+    onConfirm: doActivate,
+  }
 }
-const statusLabel = (s) => STATUS_MAP[s]?.label ?? s
-const statusClass = (s) => STATUS_MAP[s]?.cls   ?? 'bg-gray-100 text-gray-600'
 
-function formatDatetime(d) {
-  if (!d) return '—'
-  return new Date(d).toLocaleString('id-ID', {
-    day: 'numeric', month: 'long', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
+function confirmClose() {
+  confirmModal.value = {
+    open    : true,
+    title   : 'Tutup Periode',
+    message : 'Menutup periode ini akan menghentikan penerimaan jawaban. Tindakan tidak dapat dibatalkan.',
+    onConfirm: doClose,
+  }
+}
+
+function confirmBlast() {
+  confirmModal.value = {
+    open    : true,
+    title   : 'Kirim Undangan Massal',
+    message : `Kirim undangan survei ke semua alumni target periode ini? Proses berjalan di background queue dan mungkin memakan beberapa menit.`,
+    onConfirm: doBlast,
+  }
+}
+
+async function doActivate() {
+  activating.value = true
+  try {
+    await store.activatePeriod(periodId.value)
+    toast.success('Periode berhasil diaktifkan.')
+    await loadPeriod()
+  } catch (err) {
+    toast.error(err.response?.data?.message ?? 'Gagal mengaktifkan periode.')
+  } finally {
+    activating.value = false
+  }
+}
+
+async function doClose() {
+  closing.value = true
+  try {
+    await store.closePeriod(periodId.value)
+    toast.success('Periode berhasil ditutup.')
+    await loadPeriod()
+  } catch (err) {
+    toast.error(err.response?.data?.message ?? 'Gagal menutup periode.')
+  } finally {
+    closing.value = false
+  }
+}
+
+async function doBlast() {
+  blasting.value = true
+  try {
+    await store.blastInvitations(periodId.value, form.value.questionnaire_id)
+    toast.success('Undangan massal berhasil diantrekan.')
+  } catch (err) {
+    toast.error(err.response?.data?.message ?? 'Gagal mengirim undangan.')
+  } finally {
+    blasting.value = false
+  }
+}
+
+function handleConfirm() {
+  if (confirmModal.value.onConfirm) confirmModal.value.onConfirm()
+  confirmModal.value.open = false
+}
+
+function handleCancelConfirm() {
+  confirmModal.value.open = false
+}
+
+// ---------------------------------------------------------------------------
+// Checkbox multi-select angkatan
+// ---------------------------------------------------------------------------
+function toggleGraduationYear(yearId) {
+  const idx = form.value.target_graduation_years.indexOf(yearId)
+  if (idx === -1) form.value.target_graduation_years.push(yearId)
+  else            form.value.target_graduation_years.splice(idx, 1)
+}
+
+function isYearSelected(yearId) {
+  return form.value.target_graduation_years.includes(yearId)
 }
 </script>
 
 <template>
-  <div class="space-y-6">
-
-    <!-- ── BREADCRUMB / BACK ──────────────────────────────────────────── -->
-    <div class="flex items-center gap-3">
-      <button
-        class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-        @click="router.push({ name: 'admin.survey-periods.index' })"
-      >
-        &larr; Kembali
-      </button>
-      <h1 class="text-xl font-semibold text-gray-900">{{ pageTitle }}</h1>
-      <!-- Status badge (edit mode) -->
-      <span
-        v-if="isEdit && current"
-        :class="statusClass(current.status)"
-        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-      >
-        {{ statusLabel(current.status) }}
-      </span>
+  <div class="survey-period-detail">
+    <!-- Loading overlay -->
+    <div v-if="pageLoading" class="page-loading">
+      <span class="spinner spinner--lg" aria-label="Memuat data..."/>
     </div>
 
-    <!-- ── LOADING ───────────────────────────────────────────────────── -->
-    <div v-if="loading && !current && isEdit" class="space-y-4">
-      <div v-for="i in 4" :key="i" class="h-10 animate-pulse rounded-lg bg-gray-100" />
-    </div>
-
-    <!-- ── FETCH ERROR ────────────────────────────────────────────────── -->
-    <div
-      v-else-if="fetchError"
-      class="rounded-xl border border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-700"
-    >
-      {{ fetchError }}
-    </div>
-
-    <!-- ── MAIN CONTENT ──────────────────────────────────────────────── -->
     <template v-else>
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <!-- ── Breadcrumb & Header ──────────────────────────────────────── -->
+      <div class="page-header">
+        <div class="page-header__left">
+          <button class="back-btn" @click="router.push({ name: 'admin.survey-periods.index' })">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Kembali
+          </button>
+          <h1 class="page-title">
+            {{ isCreate ? 'Buat Periode Survei' : currentPeriod?.name ?? 'Detail Periode' }}
+          </h1>
+          <Badge v-if="periodStatus" :variant="badgeVariant(periodStatus)" class="status-badge">
+            {{ { draft: 'Draft', aktif: 'Aktif', ditutup: 'Ditutup' }[periodStatus] ?? periodStatus }}
+          </Badge>
+        </div>
 
-        <!-- ── FORM (kiri 2/3) ───────────────────────────────────────── -->
-        <div class="lg:col-span-2">
-          <form class="space-y-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm" @submit.prevent="handleSubmit">
+        <!-- Tombol aksi status (hanya mode edit) -->
+        <div v-if="!isCreate" class="header-actions">
+          <button
+            v-if="periodStatus === 'draft'"
+            class="btn btn-success"
+            :disabled="activating"
+            @click="confirmActivate"
+          >
+            <span v-if="activating" class="spinner spinner--xs" aria-hidden="true"/>
+            <span v-else>Aktifkan</span>
+          </button>
 
-            <!-- Success banner -->
-            <div
-              v-if="saveSuccess"
-              class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
-            >
-              ✅ Perubahan berhasil disimpan.
-            </div>
+          <button
+            v-if="periodStatus === 'aktif'"
+            class="btn btn-primary"
+            :disabled="blasting"
+            @click="confirmBlast"
+          >
+            <span v-if="blasting" class="spinner spinner--xs" aria-hidden="true"/>
+            <span v-else>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="display:inline;vertical-align:-2px"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Kirim Undangan
+            </span>
+          </button>
 
-            <!-- Server error -->
-            <div
-              v-if="store.error && !submitting"
-              class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-            >
-              {{ store.error }}
-            </div>
+          <button
+            v-if="periodStatus === 'aktif'"
+            class="btn btn-danger"
+            :disabled="closing"
+            @click="confirmClose"
+          >
+            <span v-if="closing" class="spinner spinner--xs" aria-hidden="true"/>
+            <span v-else>Tutup Periode</span>
+          </button>
+        </div>
+      </div>
 
-            <!-- Nama Periode -->
-            <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700">
-                Nama Periode <span class="text-red-500">*</span>
-              </label>
+      <!-- ── Form Card ────────────────────────────────────────────────── -->
+      <div class="card form-card">
+        <h2 class="card-section-title">Informasi Periode</h2>
+
+        <fieldset :disabled="isReadonly" class="form-fieldset">
+          <div class="form-grid">
+            <!-- Nama -->
+            <div class="form-group form-group--wide">
+              <label class="form-label" for="sp-name">Nama Periode <span class="required">*</span></label>
               <input
+                id="sp-name"
                 v-model="form.name"
                 type="text"
-                placeholder="Contoh: Tracer Study Angkatan 2021"
-                :class="[
-                  'w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1',
-                  errors.name
-                    ? 'border-red-300 focus:border-red-400 focus:ring-red-400'
-                    : 'border-gray-300 focus:border-teal-500 focus:ring-teal-500',
-                ]"
+                class="form-input"
+                :class="{ 'form-input--error': formErrors.name }"
+                placeholder="Contoh: Tracer Study Angkatan 2020"
+                maxlength="255"
+                @input="clearError('name')"
               />
-              <p v-if="errors.name" class="mt-1 text-xs text-red-600">{{ errors.name }}</p>
+              <p v-if="formErrors.name" class="form-error">{{ formErrors.name }}</p>
+            </div>
+
+            <!-- Tahun Akademik -->
+            <div class="form-group">
+              <label class="form-label" for="sp-academic-year">Tahun Akademik <span class="required">*</span></label>
+              <input
+                id="sp-academic-year"
+                v-model="form.academic_year"
+                type="text"
+                class="form-input"
+                :class="{ 'form-input--error': formErrors.academic_year }"
+                placeholder="2024/2025"
+                maxlength="20"
+                @input="clearError('academic_year')"
+              />
+              <p v-if="formErrors.academic_year" class="form-error">{{ formErrors.academic_year }}</p>
+            </div>
+
+            <!-- Start Date -->
+            <div class="form-group">
+              <label class="form-label" for="sp-start">Tanggal Mulai <span class="required">*</span></label>
+              <input
+                id="sp-start"
+                v-model="form.start_date"
+                type="date"
+                class="form-input"
+                :class="{ 'form-input--error': formErrors.start_date }"
+                @change="clearError('start_date')"
+              />
+              <p v-if="formErrors.start_date" class="form-error">{{ formErrors.start_date }}</p>
+            </div>
+
+            <!-- End Date -->
+            <div class="form-group">
+              <label class="form-label" for="sp-end">Tanggal Selesai <span class="required">*</span></label>
+              <input
+                id="sp-end"
+                v-model="form.end_date"
+                type="date"
+                class="form-input"
+                :class="{ 'form-input--error': formErrors.end_date }"
+                @change="clearError('end_date')"
+              />
+              <p v-if="formErrors.end_date" class="form-error">{{ formErrors.end_date }}</p>
+            </div>
+
+            <!-- Questionnaire -->
+            <div class="form-group form-group--wide">
+              <label class="form-label" for="sp-questionnaire">Kuesioner <span class="required">*</span></label>
+              <select
+                id="sp-questionnaire"
+                v-model="form.questionnaire_id"
+                class="form-input"
+                :class="{ 'form-input--error': formErrors.questionnaire_id }"
+                @change="clearError('questionnaire_id')"
+              >
+                <option value="" disabled>— Pilih kuesioner —</option>
+                <option v-for="q in questionnaires" :key="q.id" :value="q.id">
+                  {{ q.title }}
+                </option>
+              </select>
+              <p v-if="formErrors.questionnaire_id" class="form-error">{{ formErrors.questionnaire_id }}</p>
+              <p class="form-hint">Kuesioner yang ditampilkan hanya yang berstatus aktif.</p>
             </div>
 
             <!-- Deskripsi -->
-            <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700">Deskripsi</label>
+            <div class="form-group form-group--full">
+              <label class="form-label" for="sp-desc">Deskripsi <span class="optional">(opsional)</span></label>
               <textarea
+                id="sp-desc"
                 v-model="form.description"
+                class="form-input form-textarea"
                 rows="3"
-                placeholder="Penjelasan singkat tentang periode survei ini…"
-                class="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                placeholder="Catatan atau keterangan tambahan tentang periode ini"
+                maxlength="1000"
               />
             </div>
+          </div>
 
-            <!-- Tanggal Mulai & Selesai -->
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-700">
-                  Tanggal Mulai <span class="text-red-500">*</span>
-                </label>
-                <input
-                  v-model="form.start_date"
-                  type="date"
-                  :class="[
-                    'w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1',
-                    errors.start_date
-                      ? 'border-red-300 focus:border-red-400 focus:ring-red-400'
-                      : 'border-gray-300 focus:border-teal-500 focus:ring-teal-500',
-                  ]"
-                />
-                <p v-if="errors.start_date" class="mt-1 text-xs text-red-600">{{ errors.start_date }}</p>
-              </div>
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-700">
-                  Tanggal Selesai <span class="text-red-500">*</span>
-                </label>
-                <input
-                  v-model="form.end_date"
-                  type="date"
-                  :class="[
-                    'w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1',
-                    errors.end_date
-                      ? 'border-red-300 focus:border-red-400 focus:ring-red-400'
-                      : 'border-gray-300 focus:border-teal-500 focus:ring-teal-500',
-                  ]"
-                />
-                <p v-if="errors.end_date" class="mt-1 text-xs text-red-600">{{ errors.end_date }}</p>
-              </div>
-            </div>
-
-            <!-- Target Angkatan Lulus -->
-            <div>
-              <div class="mb-2 flex items-center justify-between">
-                <label class="text-sm font-medium text-gray-700">Target Angkatan Lulus</label>
-                <div class="flex gap-2">
-                  <button type="button" class="text-xs text-teal-600 hover:underline" @click="selectAllYears">Pilih Semua</button>
-                  <span class="text-gray-300">|</span>
-                  <button type="button" class="text-xs text-gray-500 hover:underline" @click="clearAllYears">Hapus Semua</button>
-                </div>
-              </div>
-              <p class="mb-3 text-xs text-gray-400">Kosongkan untuk menargetkan semua angkatan.</p>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="yr in YEAR_OPTIONS"
-                  :key="yr"
-                  type="button"
-                  :class="[
-                    'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                    isYearSelected(yr)
-                      ? 'bg-teal-600 text-white hover:bg-teal-700'
-                      : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50',
-                  ]"
-                  @click="toggleYear(yr)"
-                >
-                  {{ yr }}
-                </button>
-              </div>
-            </div>
-
-            <!-- Kuota (opsional) -->
-            <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700">Kuota Responden</label>
-              <p class="mb-2 text-xs text-gray-400">Opsional. Kosongkan jika tidak ada batasan kuota.</p>
-              <input
-                v-model="form.quota"
-                type="number"
-                min="1"
-                placeholder="Contoh: 500"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 sm:w-48"
-              />
-            </div>
-
-            <!-- Submit -->
-            <div class="flex justify-end gap-3 border-t border-gray-100 pt-4">
-              <button
-                type="button"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                @click="router.push({ name: 'admin.survey-periods.index' })"
+          <!-- Target Angkatan -->
+          <div class="form-group form-group--full" style="margin-top: var(--space-4)">
+            <label class="form-label">Target Angkatan Lulus <span class="optional">(kosongkan = semua angkatan)</span></label>
+            <div class="year-checkboxes">
+              <label
+                v-for="gy in graduationYears"
+                :key="gy.id"
+                class="year-checkbox"
               >
-                Batal
-              </button>
-              <button
-                type="submit"
-                :disabled="submitting"
-                class="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-5 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
-              >
-                <svg v-if="submitting" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                  <path stroke-linecap="round" d="M12 3a9 9 0 1 0 9 9" />
-                </svg>
-                {{ submitting ? 'Menyimpan…' : (isEdit ? 'Simpan Perubahan' : 'Buat Periode') }}
-              </button>
+                <input
+                  type="checkbox"
+                  :checked="isYearSelected(gy.id)"
+                  :disabled="isReadonly"
+                  @change="toggleGraduationYear(gy.id)"
+                />
+                {{ gy.year }}
+              </label>
             </div>
-          </form>
+          </div>
+        </fieldset>
+
+        <!-- Tombol simpan -->
+        <div v-if="!isReadonly" class="form-actions">
+          <button
+            class="btn btn-ghost"
+            @click="router.push({ name: 'admin.survey-periods.index' })"
+          >
+            Batal
+          </button>
+          <button
+            class="btn btn-primary"
+            :disabled="saving"
+            @click="handleSave"
+          >
+            <span v-if="saving" class="spinner spinner--xs" aria-hidden="true"/>
+            <span v-else>{{ isCreate ? 'Buat Periode' : 'Simpan Perubahan' }}</span>
+          </button>
         </div>
 
-        <!-- ── PANEL KANAN (statistik + aksi status) ──────────────────── -->
-        <div class="space-y-4">
-
-          <!-- Aksi Status (hanya edit mode) -->
-          <div v-if="isEdit && current" class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h3 class="mb-3 text-sm font-semibold text-gray-700">Aksi Periode</h3>
-            <div class="space-y-2">
-              <button
-                v-if="current.status === 'draft'"
-                class="w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-                :disabled="submitting"
-                @click="doActivate"
-              >
-                ▶ Aktifkan Periode
-              </button>
-              <button
-                v-if="current.status === 'active'"
-                class="w-full rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
-                :disabled="submitting"
-                @click="doClose"
-              >
-                ■ Tutup Periode
-              </button>
-              <p
-                v-if="current.status === 'closed'"
-                class="text-xs text-gray-400 text-center py-2"
-              >
-                Periode sudah ditutup dan tidak dapat diubah.
-              </p>
-            </div>
-          </div>
-
-          <!-- Statistik Respons (hanya edit mode) -->
-          <div v-if="isEdit && current" class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h3 class="mb-3 text-sm font-semibold text-gray-700">Statistik Respons</h3>
-            <dl class="space-y-3">
-              <div class="flex justify-between text-sm">
-                <dt class="text-gray-500">Total Alumni Target</dt>
-                <dd class="font-medium text-gray-900 tabular-nums">
-                  {{ current.total_alumni_count ?? '—' }}
-                </dd>
-              </div>
-              <div class="flex justify-between text-sm">
-                <dt class="text-gray-500">Diundang</dt>
-                <dd class="font-medium text-gray-900 tabular-nums">
-                  {{ current.invited_count ?? '—' }}
-                </dd>
-              </div>
-              <div class="flex justify-between text-sm">
-                <dt class="text-gray-500">Sudah Submit</dt>
-                <dd class="font-medium text-green-700 tabular-nums">
-                  {{ current.submitted_count ?? '—' }}
-                </dd>
-              </div>
-              <div class="flex justify-between text-sm">
-                <dt class="text-gray-500">Belum Submit</dt>
-                <dd class="font-medium text-amber-600 tabular-nums">
-                  {{ current.in_progress_count ?? '—' }}
-                </dd>
-              </div>
-
-              <!-- Progress bar -->
-              <div v-if="current.submitted_count != null && current.total_alumni_count">
-                <div class="mt-1 h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                  <div
-                    class="h-full rounded-full bg-teal-500 transition-all"
-                    :style="{ width: `${Math.round((current.submitted_count / current.total_alumni_count) * 100)}%` }"
-                  />
-                </div>
-                <p class="mt-1 text-right text-xs text-gray-400">
-                  {{ Math.round((current.submitted_count / current.total_alumni_count) * 100) }}% selesai
-                </p>
-              </div>
-            </dl>
-
-            <!-- Meta -->
-            <div class="mt-4 border-t border-gray-100 pt-3 space-y-1 text-xs text-gray-400">
-              <p>Dibuat: {{ formatDatetime(current.created_at) }}</p>
-              <p v-if="current.updated_at">Diperbarui: {{ formatDatetime(current.updated_at) }}</p>
-            </div>
-          </div>
-
-          <!-- Info card (create mode) -->
-          <div v-if="!isEdit" class="rounded-xl border border-blue-100 bg-blue-50 p-4">
-            <h3 class="mb-2 text-sm font-semibold text-blue-800">Petunjuk</h3>
-            <ul class="space-y-1.5 text-xs text-blue-700">
-              <li>• Isi nama dan tanggal periode survei.</li>
-              <li>• Pilih angkatan lulus yang menjadi target, atau kosongkan untuk semua angkatan.</li>
-              <li>• Setelah disimpan, aktifkan periode untuk memulai pengumpulan respons.</li>
-              <li>• Kirim undangan via menu <strong>Kirim Undangan</strong> di halaman daftar.</li>
-            </ul>
-          </div>
-
+        <!-- Info readonly -->
+        <div v-else class="readonly-notice">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Periode ini sudah ditutup. Data tidak dapat diubah.
         </div>
+      </div>
+
+      <!-- ── Tabel Respons (hanya mode edit) ─────────────────────────── -->
+      <div v-if="!isCreate" class="card responses-card">
+        <div class="card-header">
+          <h2 class="card-section-title">Respons Alumni</h2>
+          <span class="response-meta">Total: {{ responsesTotal }} respons</span>
+        </div>
+
+        <div v-if="responsesLoading" class="loading-block">
+          <span class="spinner" aria-label="Memuat respons..."/>
+        </div>
+
+        <template v-else>
+          <div v-if="responses.length === 0" class="empty-state">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="empty-icon">
+              <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/>
+            </svg>
+            <p>Belum ada alumni yang mengisi survei pada periode ini.</p>
+          </div>
+
+          <table v-else class="responses-table">
+            <thead>
+              <tr>
+                <th>Alumni</th>
+                <th>Status</th>
+                <th style="text-align:center">Progres</th>
+                <th>Dikirim Pada</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in responses" :key="r.id">
+                <td>
+                  <div class="alumni-name">{{ r.alumni?.name ?? '—' }}</div>
+                  <div class="alumni-nim">{{ r.alumni?.nim ?? '' }}</div>
+                </td>
+                <td>
+                  <Badge :variant="badgeVariant(r.status)">{{ r.status }}</Badge>
+                </td>
+                <td style="text-align:center">
+                  <div class="progress-bar-wrap">
+                    <div class="progress-bar">
+                      <div class="progress-fill" :style="{ width: (r.completion_percentage ?? 0) + '%' }"/>
+                    </div>
+                    <span class="progress-pct">{{ r.completion_percentage ?? 0 }}%</span>
+                  </div>
+                </td>
+                <td class="date-cell">{{ formatDate(r.submitted_at) }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Pagination respons -->
+          <Pagination
+            v-if="Math.ceil(responsesTotal / 10) > 1"
+            :current-page="responsesPage"
+            :last-page="Math.ceil(responsesTotal / 10)"
+            :total="responsesTotal"
+            class="table-pagination"
+            @change="loadResponses"
+          />
+        </template>
       </div>
     </template>
 
-    <!-- ── CONFIRM MODAL ─────────────────────────────────────────────── -->
-    <Teleport to="body">
-      <div
-        v-if="confirmModal.show"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-        @click.self="confirmModal.show = false"
-      >
-        <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-          <h2 class="mb-2 text-base font-semibold text-gray-900">{{ confirmModal.title }}</h2>
-          <p class="mb-6 text-sm text-gray-500">{{ confirmModal.message }}</p>
-          <p v-if="store.error" class="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-            {{ store.error }}
-          </p>
-          <div class="flex justify-end gap-3">
-            <button
-              class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-              @click="confirmModal.show = false"
-            >
-              Batal
-            </button>
-            <button
-              :disabled="submitting"
-              :class="confirmModal.confirmClass"
-              class="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              @click="confirmModal.action"
-            >
-              <span v-if="submitting" class="inline-flex items-center gap-1">
-                <svg class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                  <path stroke-linecap="round" d="M12 3a9 9 0 1 0 9 9" />
-                </svg>
-                Memproses…
-              </span>
-              <span v-else>{{ confirmModal.confirmLabel }}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
+    <!-- ── Confirm Modal ──────────────────────────────────────────────── -->
+    <ConfirmModal
+      :open="confirmModal.open"
+      :title="confirmModal.title"
+      :message="confirmModal.message"
+      @confirm="handleConfirm"
+      @cancel="handleCancelConfirm"
+    />
   </div>
 </template>
+
+<style scoped>
+.survey-period-detail { padding: var(--space-6); max-width: 900px; margin-inline: auto; }
+
+/* Loading fullpage */
+.page-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+/* Header */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+}
+.page-header__left { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.page-title  { font-size: var(--text-xl); font-weight: 700; color: var(--color-text); margin: 0; }
+.status-badge{ flex-shrink: 0; }
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: var(--space-1) 0;
+}
+.back-btn:hover { color: var(--color-text); }
+
+.header-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+/* Card */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+.card-section-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--space-5) 0;
+}
+.response-meta { font-size: var(--text-sm); color: var(--color-text-muted); }
+
+/* Form */
+.form-fieldset { border: none; padding: 0; margin: 0; }
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4) var(--space-6);
+}
+.form-group { display: flex; flex-direction: column; gap: var(--space-1); }
+.form-group--wide { grid-column: span 2; }
+.form-group--full { grid-column: 1 / -1; }
+
+.form-label   { font-size: var(--text-sm); font-weight: 500; color: var(--color-text); }
+.required     { color: var(--color-notification); margin-left: 2px; }
+.optional     { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 400; }
+
+.form-input {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  transition: border-color var(--transition-interactive);
+}
+.form-input:focus    { outline: none; border-color: var(--color-primary); }
+.form-input--error   { border-color: var(--color-notification); }
+.form-input:disabled { opacity: 0.6; cursor: not-allowed; }
+.form-textarea       { resize: vertical; min-height: 80px; }
+
+.form-error { font-size: var(--text-xs); color: var(--color-notification); margin: 0; }
+.form-hint  { font-size: var(--text-xs); color: var(--color-text-muted); margin: 0; }
+
+/* Graduation year checkboxes */
+.year-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-2);
+}
+.year-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  user-select: none;
+}
+.year-checkbox input { cursor: pointer; width: 15px; height: 15px; accent-color: var(--color-primary); }
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.readonly-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-offset);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* Responses */
+.responses-card { padding: 0; overflow: hidden; }
+.responses-card .card-header { padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--color-border); margin: 0; }
+.responses-card .card-section-title { margin: 0; }
+
+.responses-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.responses-table th {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--color-surface-offset);
+  border-bottom: 1px solid var(--color-border);
+}
+.responses-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+  vertical-align: middle;
+}
+.responses-table tbody tr:last-child td { border-bottom: none; }
+.responses-table tbody tr:hover td      { background: var(--color-surface-offset); }
+
+.alumni-name { font-weight: 500; }
+.alumni-nim  { font-size: var(--text-xs); color: var(--color-text-muted); }
+.date-cell   { font-size: var(--text-xs); color: var(--color-text-muted); white-space: nowrap; }
+
+.progress-bar-wrap { display: flex; align-items: center; gap: var(--space-2); justify-content: center; }
+.progress-bar {
+  width: 80px; height: 6px;
+  background: var(--color-surface-offset-2);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+.progress-pct { font-size: var(--text-xs); color: var(--color-text-muted); min-width: 30px; text-align: right; }
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-12) var(--space-8);
+  color: var(--color-text-muted);
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+.empty-icon { color: var(--color-text-faint); }
+
+.loading-block {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-8);
+}
+
+.table-pagination { padding: var(--space-4) var(--space-6); border-top: 1px solid var(--color-border); }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background var(--transition-interactive), color var(--transition-interactive), border-color var(--transition-interactive);
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-primary { background: var(--color-primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
+.btn-success { background: var(--color-success); color: #fff; }
+.btn-success:hover:not(:disabled) { background: var(--color-success-hover); }
+.btn-danger  { background: var(--color-notification); color: #fff; }
+.btn-danger:hover:not(:disabled)  { background: var(--color-notification-hover); }
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+.btn-ghost:hover:not(:disabled) { background: var(--color-surface-offset); color: var(--color-text); }
+
+.spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.spinner--xs { width: 12px; height: 12px; }
+.spinner--lg { width: 36px; height: 36px; border-width: 3px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .form-group--wide { grid-column: span 1; }
+  .page-header { flex-direction: column; }
+  .responses-table th:nth-child(4),
+  .responses-table td:nth-child(4) { display: none; }
+}
+</style>

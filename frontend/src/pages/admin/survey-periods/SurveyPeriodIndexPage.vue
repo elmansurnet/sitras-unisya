@@ -1,584 +1,472 @@
 <script setup>
 /**
- * frontend/src/pages/admin/survey-periods/SurveyPeriodIndexPage.vue
- * Halaman daftar periode survei — admin panel.
- * Route  : admin.survey-periods.index — /admin/survey-periods
- * Layout : AdminLayout (wraps via router)
+ * pages/admin/survey-periods/SurveyPeriodIndexPage.vue
+ *
+ * Halaman daftar Periode Survei untuk admin/superadmin.
  *
  * Fitur:
- *  - Tabel periode survei dengan filter status & search
- *  - Aksi per baris: Lihat Detail, Aktifkan, Tutup, Kirim Undangan, Hapus
- *  - Modal konfirmasi untuk aksi destructive
- *  - Modal kirim undangan: pilih questionnaire
- *  - Pagination
+ *  - List semua periode survei (paginated)
+ *  - Filter berdasarkan status (draft | aktif | ditutup)
+ *  - Buat periode baru → navigasi ke SurveyPeriodDetailPage (mode create)
+ *  - Per baris: Lihat Detail, Aktifkan, Tutup, Kirim Undangan (Blast)
+ *  - Badge warna per status
+ *  - Konfirmasi sebelum Aktifkan / Tutup / Blast
  *
- * Sesuai 04_ARCHITECTURE.md §2, 05_API.md §admin-survey-periods, 06_UI_UX.md §8
+ * Store   : useSurveyAdminStore (stores/surveyAdmin.js)
+ * Komponen: DataTable, FilterBar, Badge, ConfirmModal, Pagination, useToast
+ * Route   : /admin/survey-periods  → admin.survey-periods.index
  */
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useSurveyPeriodStore } from '@/stores/surveyPeriod'
-import { useQuestionnaireStore } from '@/stores/questionnaire'
+import { useSurveyAdminStore } from '@/stores/surveyAdmin'
+import { useToast } from '@/composables/useToast'
+import DataTable    from '@/components/common/DataTable.vue'
+import Badge        from '@/components/common/Badge.vue'
+import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import Pagination   from '@/components/common/Pagination.vue'
 
 const router = useRouter()
-const store  = useSurveyPeriodStore()
-const qStore = useQuestionnaireStore()
+const store  = useSurveyAdminStore()
+const toast  = useToast()
 
-// ── Filters ───────────────────────────────────────────────────────────────────
-const filters = reactive({ ...store.filters })
+// ---------------------------------------------------------------------------
+// State lokal
+// ---------------------------------------------------------------------------
+const filterStatus   = ref('')
+const confirmModal   = ref({ open: false, title: '', message: '', onConfirm: null })
+const blastingId     = ref(null)   // id periode yang sedang di-blast
+const activatingId   = ref(null)
+const closingId      = ref(null)
 
-async function applyFilters() {
-  store.setFilters({ ...filters })
-  await store.fetchList(1)
-}
+// ---------------------------------------------------------------------------
+// Kolom tabel
+// ---------------------------------------------------------------------------
+const columns = [
+  { key: 'name',            label: 'Nama Periode',       sortable: true },
+  { key: 'academic_year',   label: 'Tahun Akademik' },
+  { key: 'questionnaire',   label: 'Kuesioner' },
+  { key: 'date_range',      label: 'Periode' },
+  { key: 'status',          label: 'Status' },
+  { key: 'response_count',  label: 'Respons',            align: 'center' },
+  { key: 'actions',         label: 'Aksi',               align: 'center' },
+]
 
-async function resetFilters() {
-  store.resetFilters()
-  Object.assign(filters, store.filters)
-  await store.fetchList(1)
-}
+// ---------------------------------------------------------------------------
+// Filter options
+// ---------------------------------------------------------------------------
+const statusOptions = [
+  { value: '',        label: 'Semua Status' },
+  { value: 'draft',   label: 'Draft' },
+  { value: 'aktif',   label: 'Aktif' },
+  { value: 'ditutup', label: 'Ditutup' },
+]
 
-async function changePage(page) {
-  await store.fetchList(page)
-}
+// ---------------------------------------------------------------------------
+// Computed
+// ---------------------------------------------------------------------------
+const periods = computed(() => store.periods ?? [])
+const pagination = computed(() => store.pagination)
 
-// ── Confirm modal (Activate / Close / Delete) ─────────────────────────────────
-const modal = reactive({
-  show         : false,
-  title        : '',
-  message      : '',
-  confirmLabel : 'Ya',
-  confirmClass : 'bg-teal-600 hover:bg-teal-700',
-  action       : () => {},
+const filteredPeriods = computed(() => {
+  if (!filterStatus.value) return periods.value
+  return periods.value.filter((p) => p.status === filterStatus.value)
 })
 
-function openModal({ title, message, confirmLabel, confirmClass, action }) {
-  Object.assign(modal, { title, message, confirmLabel, confirmClass, action, show: true })
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function formatDate(dateStr) {
+  if (!dateStr) return '-'
+  return new Date(dateStr).toLocaleDateString('id-ID', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  })
 }
 
-// ── Invitation modal ──────────────────────────────────────────────────────────
-const invModal = reactive({
-  show            : false,
-  periodId        : null,
-  periodName      : '',
-  questionnaireId : null,
-  sending         : false,
-  error           : '',
-  successMsg      : '',
-})
-
-const publishedQuestionnaires = computed(() =>
-  qStore.list.filter((q) => q.status === 'published')
-)
-
-function openInvModal(period) {
-  invModal.periodId        = period.id
-  invModal.periodName      = period.name
-  invModal.questionnaireId = null
-  invModal.error           = ''
-  invModal.successMsg      = ''
-  invModal.show            = true
-}
-
-async function sendInvitations() {
-  if (!invModal.questionnaireId) {
-    invModal.error = 'Pilih kuesioner terlebih dahulu.'
-    return
+function badgeVariant(status) {
+  const map = {
+    draft   : 'secondary',
+    aktif   : 'success',
+    ditutup : 'danger',
   }
-  invModal.sending = true
-  invModal.error   = ''
+  return map[status] ?? 'secondary'
+}
+
+function badgeLabel(status) {
+  const map = {
+    draft   : 'Draft',
+    aktif   : 'Aktif',
+    ditutup : 'Ditutup',
+  }
+  return map[status] ?? status
+}
+
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
+onMounted(async () => {
+  await loadPeriods()
+})
+
+async function loadPeriods(page = 1) {
   try {
-    const result = await store.sendInvitations(invModal.periodId, invModal.questionnaireId)
-    invModal.successMsg = `Undangan berhasil dikirim ke ${result?.sent ?? 0} alumni.`
-    await store.fetchList(store.pagination.currentPage)
+    await store.fetchPeriods({ page })
   } catch {
-    invModal.error = store.error ?? 'Gagal mengirim undangan.'
-  } finally {
-    invModal.sending = false
+    toast.error('Gagal memuat daftar periode survei.')
   }
 }
 
-// ── Row actions ───────────────────────────────────────────────────────────────
-function goToDetail(id) {
+// ---------------------------------------------------------------------------
+// Aksi tabel
+// ---------------------------------------------------------------------------
+function goCreate() {
+  router.push({ name: 'admin.survey-periods.create' })
+}
+
+function goDetail(id) {
   router.push({ name: 'admin.survey-periods.detail', params: { id } })
 }
 
 function confirmActivate(period) {
-  openModal({
-    title        : 'Aktifkan Periode Survei?',
-    message      : `"${period.name}" akan diaktifkan. Alumni yang sesuai kriteria dapat mulai mengisi survei.`,
-    confirmLabel : 'Aktifkan',
-    confirmClass : 'bg-green-600 hover:bg-green-700',
-    action       : async () => {
-      await store.activate(period.id)
-      if (!store.error) modal.show = false
-    },
-  })
+  confirmModal.value = {
+    open    : true,
+    title   : 'Aktifkan Periode Survei',
+    message : `Aktifkan periode "${period.name}"? Alumni akan bisa mengisi survei setelah diundang.`,
+    onConfirm: () => doActivate(period.id),
+  }
 }
 
 function confirmClose(period) {
-  openModal({
-    title        : 'Tutup Periode Survei?',
-    message      : `"${period.name}" akan ditutup. Alumni tidak dapat mengisi survei setelah ditutup.`,
-    confirmLabel : 'Tutup',
-    confirmClass : 'bg-amber-600 hover:bg-amber-700',
-    action       : async () => {
-      await store.close(period.id)
-      if (!store.error) modal.show = false
-    },
-  })
+  confirmModal.value = {
+    open    : true,
+    title   : 'Tutup Periode Survei',
+    message : `Tutup periode "${period.name}"? Tindakan ini tidak dapat dibatalkan.`,
+    onConfirm: () => doClose(period.id),
+  }
 }
 
-function confirmDelete(period) {
-  openModal({
-    title        : 'Hapus Periode Survei?',
-    message      : `"${period.name}" akan dihapus permanen. Aksi ini tidak dapat dibatalkan.`,
-    confirmLabel : 'Hapus',
-    confirmClass : 'bg-red-600 hover:bg-red-700',
-    action       : async () => {
-      await store.destroy(period.id)
-      if (!store.error) {
-        modal.show = false
-        await store.fetchList(store.pagination.currentPage)
-      }
-    },
-  })
+function confirmBlast(period) {
+  confirmModal.value = {
+    open    : true,
+    title   : 'Kirim Undangan Massal',
+    message : `Kirim undangan survei ke semua alumni pada periode "${period.name}"? Proses ini berjalan di background queue.`,
+    onConfirm: () => doBlast(period.id, period.questionnaire_id),
+  }
 }
 
-// ── Badge helpers ─────────────────────────────────────────────────────────────
-const STATUS_MAP = {
-  draft   : { label: 'Draft',   cls: 'bg-gray-100 text-gray-600'   },
-  active  : { label: 'Aktif',   cls: 'bg-green-100 text-green-700' },
-  closed  : { label: 'Ditutup', cls: 'bg-red-100 text-red-700'     },
-  expired : { label: 'Expired', cls: 'bg-amber-100 text-amber-700' },
+async function doActivate(id) {
+  activatingId.value = id
+  try {
+    await store.activatePeriod(id)
+    toast.success('Periode survei berhasil diaktifkan.')
+  } catch (err) {
+    toast.error(err.response?.data?.message ?? 'Gagal mengaktifkan periode.')
+  } finally {
+    activatingId.value = null
+  }
 }
 
-function statusLabel(s) { return STATUS_MAP[s]?.label ?? s }
-function statusClass(s) { return STATUS_MAP[s]?.cls  ?? 'bg-gray-100 text-gray-600' }
-
-function formatDate(iso) {
-  if (!iso) return '—'
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  }).format(new Date(iso))
+async function doClose(id) {
+  closingId.value = id
+  try {
+    await store.closePeriod(id)
+    toast.success('Periode survei berhasil ditutup.')
+  } catch (err) {
+    toast.error(err.response?.data?.message ?? 'Gagal menutup periode.')
+  } finally {
+    closingId.value = null
+  }
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────────
-onMounted(async () => {
-  await store.fetchList(1)
-  // Muat questionnaire published untuk keperluan dropdown kirim undangan
-  if (!qStore.list.length) await qStore.fetchList(1)
-})
+async function doBlast(periodId, questionnaireId) {
+  blastingId.value = periodId
+  try {
+    await store.blastInvitations(periodId, questionnaireId)
+    toast.success('Undangan massal berhasil diantrekan. Proses berjalan di background.')
+  } catch (err) {
+    toast.error(err.response?.data?.message ?? 'Gagal mengirim undangan massal.')
+  } finally {
+    blastingId.value = null
+  }
+}
+
+function handleConfirm() {
+  if (confirmModal.value.onConfirm) confirmModal.value.onConfirm()
+  confirmModal.value.open = false
+}
+
+function handleCancelConfirm() {
+  confirmModal.value.open = false
+}
 </script>
 
 <template>
-  <div class="space-y-6">
-
-    <!-- ── PAGE HEADER ───────────────────────────────────────────────── -->
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="text-xl font-semibold text-gray-900">Periode Survei</h1>
-        <p class="mt-1 text-sm text-gray-500">Kelola periode tracer study alumni dan employer.</p>
+  <div class="survey-period-index">
+    <!-- ── Header ─────────────────────────────────────────────────────── -->
+    <div class="page-header">
+      <div class="page-header__left">
+        <h1 class="page-title">Periode Survei</h1>
+        <p class="page-subtitle">Kelola periode pelaksanaan tracer study</p>
       </div>
-      <button
-        class="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-teal-700"
-        @click="router.push({ name: 'admin.survey-periods.create' })"
-      >
-        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      <button class="btn btn-primary" @click="goCreate">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
         Buat Periode
       </button>
     </div>
 
-    <!-- ── FILTERS ────────────────────────────────────────────────────── -->
-    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <!-- Search -->
-        <div class="sm:col-span-2">
-          <label class="mb-1 block text-xs font-medium text-gray-600">Cari</label>
-          <input
-            v-model="filters.search"
-            type="text"
-            placeholder="Nama periode…"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-            @keyup.enter="applyFilters"
-          />
-        </div>
-
-        <!-- Status -->
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Status</label>
-          <select
-            v-model="filters.status"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-          >
-            <option value="">Semua Status</option>
-            <option value="draft">Draft</option>
-            <option value="active">Aktif</option>
-            <option value="closed">Ditutup</option>
-          </select>
-        </div>
-
-        <!-- Actions -->
-        <div class="flex items-end gap-2">
-          <button
-            class="flex-1 rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700"
-            @click="applyFilters"
-          >
-            Filter
-          </button>
-          <button
-            v-if="store.hasFilters"
-            class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-            title="Reset filter"
-            @click="resetFilters"
-          >
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
+    <!-- ── Filter ─────────────────────────────────────────────────────── -->
+    <div class="filter-row">
+      <label class="filter-label" for="filter-status">Status:</label>
+      <select
+        id="filter-status"
+        v-model="filterStatus"
+        class="select-input select-input--sm"
+      >
+        <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
+          {{ opt.label }}
+        </option>
+      </select>
     </div>
 
-    <!-- ── TABLE ──────────────────────────────────────────────────────── -->
-    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-
-      <!-- Skeleton -->
-      <div v-if="store.loading" class="space-y-3 p-4">
-        <div v-for="i in 5" :key="i" class="h-12 animate-pulse rounded bg-gray-100" />
-      </div>
-
-      <!-- Empty -->
-      <div
-        v-else-if="!store.list.length"
-        class="flex flex-col items-center justify-center py-16 text-gray-400"
+    <!-- ── Tabel ──────────────────────────────────────────────────────── -->
+    <div class="card">
+      <DataTable
+        :columns="columns"
+        :rows="filteredPeriods"
+        :loading="store.loading"
+        empty-message="Belum ada periode survei."
       >
-        <svg class="mb-3 h-12 w-12" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
-        </svg>
-        <p class="font-medium">Belum ada periode survei</p>
-        <p class="mt-1 text-sm">Klik <strong>Buat Periode</strong> untuk memulai.</p>
-      </div>
+        <!-- Nama Periode -->
+        <template #cell-name="{ row }">
+          <button
+            class="link-btn"
+            @click="goDetail(row.id)"
+          >
+            {{ row.name }}
+          </button>
+        </template>
 
-      <!-- Data -->
-      <div v-else class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Nama Periode</th>
-              <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Periode</th>
-              <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500">Target Angkatan</th>
-              <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500">Respons</th>
-              <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Status</th>
-              <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Aksi</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100 bg-white">
-            <tr
-              v-for="period in store.list"
-              :key="period.id"
-              class="transition-colors hover:bg-gray-50"
+        <!-- Kuesioner -->
+        <template #cell-questionnaire="{ row }">
+          {{ row.questionnaire?.title ?? '-' }}
+        </template>
+
+        <!-- Rentang Tanggal -->
+        <template #cell-date_range="{ row }">
+          <span class="date-range">
+            {{ formatDate(row.start_date) }} — {{ formatDate(row.end_date) }}
+          </span>
+        </template>
+
+        <!-- Status Badge -->
+        <template #cell-status="{ row }">
+          <Badge :variant="badgeVariant(row.status)">
+            {{ badgeLabel(row.status) }}
+          </Badge>
+        </template>
+
+        <!-- Jumlah Respons -->
+        <template #cell-response_count="{ row }">
+          <span class="response-count">
+            {{ row.response_count ?? 0 }}
+            <span class="response-total">/ {{ row.target_alumni_count ?? '—' }}</span>
+          </span>
+        </template>
+
+        <!-- Aksi -->
+        <template #cell-actions="{ row }">
+          <div class="action-group">
+            <!-- Lihat Detail -->
+            <button
+              class="btn btn-ghost btn-sm"
+              title="Lihat / Edit Detail"
+              @click="goDetail(row.id)"
             >
-              <!-- Nama -->
-              <td class="max-w-xs px-4 py-3">
-                <button
-                  class="text-left font-medium text-teal-700 hover:underline text-sm"
-                  @click="goToDetail(period.id)"
-                >
-                  {{ period.name }}
-                </button>
-                <p v-if="period.description" class="mt-0.5 truncate text-xs text-gray-400">
-                  {{ period.description }}
-                </p>
-              </td>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              Detail
+            </button>
 
-              <!-- Tanggal -->
-              <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
-                {{ formatDate(period.start_date) }} — {{ formatDate(period.end_date) }}
-              </td>
+            <!-- Aktifkan (hanya dari draft) -->
+            <button
+              v-if="row.status === 'draft'"
+              class="btn btn-success btn-sm"
+              :disabled="activatingId === row.id"
+              title="Aktifkan Periode"
+              @click="confirmActivate(row)"
+            >
+              <span v-if="activatingId === row.id" class="spinner spinner--xs" aria-hidden="true"/>
+              <span v-else>Aktifkan</span>
+            </button>
 
-              <!-- Angkatan -->
-              <td class="px-4 py-3 text-center">
-                <div v-if="period.target_graduation_years?.length" class="flex flex-wrap justify-center gap-1">
-                  <span
-                    v-for="yr in period.target_graduation_years.slice(0, 3)"
-                    :key="yr"
-                    class="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
-                  >
-                    {{ yr }}
-                  </span>
-                  <span
-                    v-if="period.target_graduation_years.length > 3"
-                    class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500"
-                  >
-                    +{{ period.target_graduation_years.length - 3 }}
-                  </span>
-                </div>
-                <span v-else class="text-xs text-gray-400">Semua</span>
-              </td>
+            <!-- Kirim Undangan (hanya saat aktif) -->
+            <button
+              v-if="row.status === 'aktif'"
+              class="btn btn-primary btn-sm"
+              :disabled="blastingId === row.id"
+              title="Kirim Undangan Massal"
+              @click="confirmBlast(row)"
+            >
+              <span v-if="blastingId === row.id" class="spinner spinner--xs" aria-hidden="true"/>
+              <span v-else>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="display:inline;vertical-align:-2px;margin-right:3px">
+                  <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+                Undangan
+              </span>
+            </button>
 
-              <!-- Respons -->
-              <td class="px-4 py-3 text-center">
-                <span v-if="period.submitted_count != null" class="tabular-nums text-sm text-gray-700">
-                  {{ period.submitted_count }}
-                  <span v-if="period.total_alumni_count != null" class="text-gray-400">
-                    / {{ period.total_alumni_count }}
-                  </span>
-                </span>
-                <span v-else class="text-xs text-gray-400">—</span>
-              </td>
-
-              <!-- Status -->
-              <td class="px-4 py-3">
-                <span
-                  :class="statusClass(period.status)"
-                  class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                >
-                  {{ statusLabel(period.status) }}
-                </span>
-              </td>
-
-              <!-- Aksi -->
-              <td class="px-4 py-3">
-                <div class="flex items-center justify-end gap-1">
-                  <!-- Detail -->
-                  <button
-                    class="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                    title="Lihat Detail"
-                    @click="goToDetail(period.id)"
-                  >
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.641 0-8.574-3.007-9.964-7.178Z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                    </svg>
-                  </button>
-
-                  <!-- Kirim Undangan (hanya active) -->
-                  <button
-                    v-if="period.status === 'active'"
-                    class="rounded p-1.5 text-gray-400 hover:bg-teal-50 hover:text-teal-600"
-                    title="Kirim Undangan"
-                    @click="openInvModal(period)"
-                  >
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
-                    </svg>
-                  </button>
-
-                  <!-- Aktifkan (hanya draft) -->
-                  <button
-                    v-if="period.status === 'draft'"
-                    class="rounded p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600"
-                    title="Aktifkan"
-                    @click="confirmActivate(period)"
-                  >
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
-                    </svg>
-                  </button>
-
-                  <!-- Tutup (hanya active) -->
-                  <button
-                    v-if="period.status === 'active'"
-                    class="rounded p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-600"
-                    title="Tutup Periode"
-                    @click="confirmClose(period)"
-                  >
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
-                    </svg>
-                  </button>
-
-                  <!-- Hapus (hanya draft) -->
-                  <button
-                    v-if="period.status === 'draft'"
-                    class="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                    title="Hapus"
-                    @click="confirmDelete(period)"
-                  >
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                    </svg>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+            <!-- Tutup (hanya saat aktif) -->
+            <button
+              v-if="row.status === 'aktif'"
+              class="btn btn-danger btn-sm"
+              :disabled="closingId === row.id"
+              title="Tutup Periode"
+              @click="confirmClose(row)"
+            >
+              <span v-if="closingId === row.id" class="spinner spinner--xs" aria-hidden="true"/>
+              <span v-else>Tutup</span>
+            </button>
+          </div>
+        </template>
+      </DataTable>
 
       <!-- Pagination -->
-      <div
-        v-if="store.pagination.total > 0"
-        class="flex items-center justify-between border-t border-gray-200 px-4 py-3"
-      >
-        <p class="text-sm text-gray-500">
-          Menampilkan
-          {{ (store.pagination.currentPage - 1) * store.pagination.perPage + 1 }}–{{
-            Math.min(store.pagination.currentPage * store.pagination.perPage, store.pagination.total)
-          }}
-          dari {{ store.pagination.total }} periode
-        </p>
-        <div class="flex gap-2">
-          <button
-            :disabled="store.pagination.currentPage <= 1"
-            class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-            @click="changePage(store.pagination.currentPage - 1)"
-          >
-            &laquo; Prev
-          </button>
-          <button
-            :disabled="store.pagination.currentPage >= store.pagination.lastPage"
-            class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-            @click="changePage(store.pagination.currentPage + 1)"
-          >
-            Next &raquo;
-          </button>
-        </div>
-      </div>
+      <Pagination
+        v-if="pagination && pagination.last_page > 1"
+        :current-page="pagination.current_page"
+        :last-page="pagination.last_page"
+        :total="pagination.total"
+        class="table-pagination"
+        @change="loadPeriods"
+      />
     </div>
 
-    <!-- ── CONFIRM MODAL ──────────────────────────────────────────────── -->
-    <Teleport to="body">
-      <div
-        v-if="modal.show"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-        @click.self="modal.show = false"
-      >
-        <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-          <h2 class="mb-2 text-base font-semibold text-gray-900">{{ modal.title }}</h2>
-          <p class="mb-6 text-sm text-gray-500">{{ modal.message }}</p>
-          <p v-if="store.error" class="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-            {{ store.error }}
-          </p>
-          <div class="flex justify-end gap-3">
-            <button
-              class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-              @click="modal.show = false"
-            >
-              Batal
-            </button>
-            <button
-              :disabled="store.submitting"
-              :class="modal.confirmClass"
-              class="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              @click="modal.action"
-            >
-              <span v-if="store.submitting" class="inline-flex items-center gap-1">
-                <svg class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                  <path stroke-linecap="round" d="M12 3a9 9 0 1 0 9 9" />
-                </svg>
-                Memproses…
-              </span>
-              <span v-else>{{ modal.confirmLabel }}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- ── SEND INVITATION MODAL ──────────────────────────────────────── -->
-    <Teleport to="body">
-      <Transition
-        enter-active-class="transition duration-200 ease-out"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition duration-150 ease-in"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
-        <div
-          v-if="invModal.show"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-          @click.self="invModal.show = false"
-        >
-          <div
-            class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="inv-modal-title"
-          >
-            <h2 id="inv-modal-title" class="mb-1 text-base font-semibold text-gray-900">
-              Kirim Undangan Survei
-            </h2>
-            <p class="mb-4 text-sm text-gray-500">
-              Periode: <strong>{{ invModal.periodName }}</strong>
-            </p>
-
-            <!-- Success -->
-            <div
-              v-if="invModal.successMsg"
-              class="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
-            >
-              {{ invModal.successMsg }}
-            </div>
-
-            <template v-else>
-              <!-- Pilih Kuesioner -->
-              <div class="mb-4">
-                <label class="mb-1 block text-xs font-medium text-gray-700">
-                  Kuesioner <span class="text-red-500">*</span>
-                </label>
-                <select
-                  v-model="invModal.questionnaireId"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                >
-                  <option :value="null" disabled>Pilih kuesioner yang akan digunakan…</option>
-                  <option
-                    v-for="q in publishedQuestionnaires"
-                    :key="q.id"
-                    :value="q.id"
-                  >
-                    {{ q.title }} ({{ q.type }})
-                  </option>
-                </select>
-                <p v-if="!publishedQuestionnaires.length" class="mt-1 text-xs text-amber-600">
-                  Tidak ada kuesioner berstatus Published. Publish kuesioner terlebih dahulu.
-                </p>
-              </div>
-
-              <!-- Error -->
-              <p v-if="invModal.error" class="mb-4 text-sm font-medium text-red-600">
-                {{ invModal.error }}
-              </p>
-
-              <div class="flex justify-end gap-3">
-                <button
-                  class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                  @click="invModal.show = false"
-                >
-                  Batal
-                </button>
-                <button
-                  :disabled="invModal.sending || !invModal.questionnaireId"
-                  class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
-                  @click="sendInvitations"
-                >
-                  <span v-if="invModal.sending" class="inline-flex items-center gap-1">
-                    <svg class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                      <path stroke-linecap="round" d="M12 3a9 9 0 1 0 9 9" />
-                    </svg>
-                    Mengirim…
-                  </span>
-                  <span v-else>Kirim Undangan</span>
-                </button>
-              </div>
-            </template>
-
-            <!-- Tombol tutup jika sukses -->
-            <div v-if="invModal.successMsg" class="flex justify-end">
-              <button
-                class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
-                @click="invModal.show = false"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
+    <!-- ── Confirm Modal ──────────────────────────────────────────────── -->
+    <ConfirmModal
+      :open="confirmModal.open"
+      :title="confirmModal.title"
+      :message="confirmModal.message"
+      @confirm="handleConfirm"
+      @cancel="handleCancelConfirm"
+    />
   </div>
 </template>
+
+<style scoped>
+.survey-period-index { padding: var(--space-6); max-width: var(--content-wide); margin-inline: auto; }
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.page-title   { font-size: var(--text-xl); font-weight: 700; color: var(--color-text); margin: 0; }
+.page-subtitle{ font-size: var(--text-sm); color: var(--color-text-muted); margin-top: var(--space-1); }
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.filter-label { font-size: var(--text-sm); color: var(--color-text-muted); white-space: nowrap; }
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-btn:hover { color: var(--color-primary-hover); }
+
+.date-range   { font-size: var(--text-xs); color: var(--color-text-muted); white-space: nowrap; }
+
+.response-count { font-size: var(--text-sm); font-weight: 600; }
+.response-total { font-size: var(--text-xs); color: var(--color-text-muted); margin-left: 2px; }
+
+.action-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.table-pagination { padding: var(--space-4) var(--space-6); border-top: 1px solid var(--color-border); }
+
+/* ── Buttons (minimal, inherit dari global style) ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background var(--transition-interactive), color var(--transition-interactive), border-color var(--transition-interactive);
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btn-primary  { background: var(--color-primary); color: #fff; }
+.btn-primary:hover:not(:disabled)  { background: var(--color-primary-hover); }
+
+.btn-success  { background: var(--color-success); color: #fff; }
+.btn-success:hover:not(:disabled)  { background: var(--color-success-hover); }
+
+.btn-danger   { background: var(--color-notification); color: #fff; }
+.btn-danger:hover:not(:disabled)   { background: var(--color-notification-hover); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+.btn-ghost:hover:not(:disabled) { background: var(--color-surface-offset); color: var(--color-text); }
+
+.btn-sm { padding: var(--space-1) var(--space-3); font-size: var(--text-xs); }
+
+.select-input {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.select-input--sm { padding: var(--space-1) var(--space-2); font-size: var(--text-xs); }
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.spinner--xs { width: 12px; height: 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
