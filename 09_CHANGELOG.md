@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.1.0 | Tanggal: 2026-06-12
+# Versi: 1.1.0 | Tanggal: 2026-06-12 
 
 ---
 
