@@ -1,6 +1,6 @@
 # 08_PHASE_TRACKER.md
 # PHASE TRACKER — SISTEM TRACER STUDY UNISYA
-# Versi: 1.3.0 | Tanggal: 2026-06-12
+# Versi: 1.4.0 | Tanggal: 2026-06-12
 
 > File ini hanya bisa edit untuk update progress project dan task tidak boleh dikurangi untuk konsistensi project!
 
@@ -13,14 +13,14 @@
 | 0 | Dokumentasi & Desain | 0A | ✅ Selesai |
 | 1 | Fondasi & Autentikasi | 1A, 1B | ✅ Selesai (1A ✅, 1B ✅) |
 | 2 | Manajemen Data Inti | 2A, 2B, 2C | ✅ Selesai (2A ✅, 2B ✅, 2C ✅) |
-| 3 | Kuesioner Dinamis | 3A, 3B | 🔄 Berjalan (3A ✅, 3B ⏳) |
+| 3 | Kuesioner Dinamis | 3A, 3B | ✅ Selesai (3A ✅, 3B ✅) |
 | 4 | Survei & Notifikasi | 4A, 4B | ⏳ Pending |
 | 5 | Analitik & Pelaporan | 5A, 5B | ⏳ Pending |
 | 6 | Keamanan & Hardening | 6A | ⏳ Pending |
 | 7 | Deployment & Optimasi | 7A | ⏳ Pending |
 
 **Total Task: 199 task**
-**Selesai: 133 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
+**Selesai: 142 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12, 3B selesai 2026-06-12)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
 
 ---
 
@@ -253,23 +253,24 @@
 
 ---
 
-### Sesi 3B — Kuesioner Builder Frontend
-**Dependensi:** 3A selesai
+### Sesi 3B — Kuesioner Dinamis (Frontend)
+**Status: ✅ Selesai | Tanggal Selesai: 2026-06-12**
+**Dependensi:** 3A selesai (API endpoint kuesioner tersedia)
 **Estimasi:** 4–5 hari
 
 | No | Task | File/Artefak | Status |
 |---|---|---|---|
-| 3B.1 | Frontend: Store `stores/questionnaire.js` (Pinia: kuesioner, seksi, pertanyaan, state builder) | `stores/questionnaire.js` | ⏳ |
-| 3B.2 | Frontend: `pages/admin/questionnaires/QuestionnaireIndexPage.vue` (daftar, filter type/status) | `QuestionnaireIndexPage.vue` | ⏳ |
-| 3B.3 | Frontend: `pages/admin/questionnaires/QuestionnaireBuilderPage.vue` (split layout: list pertanyaan + preview) | `QuestionnaireBuilderPage.vue` | ⏳ |
-| 3B.4 | Frontend: Komponen `forms/QuestionEditor.vue` (form edit pertanyaan — semua tipe dinamis) | `QuestionEditor.vue` | ⏳ |
-| 3B.5 | Frontend: Komponen `forms/QuestionRenderer.vue` (render pertanyaan berdasarkan question_type) | `QuestionRenderer.vue` | ⏳ |
-| 3B.6 | Frontend: Komponen `forms/ConditionalLogicEditor.vue` (UI pengaturan show_if per pertanyaan) | `ConditionalLogicEditor.vue` | ⏳ |
-| 3B.7 | Frontend: Toolbar tipe pertanyaan (10 tipe: text, textarea, radio, checkbox, select, likert, rating, date, file, number) | Bagian dari QuestionnaireBuilderPage | ⏳ |
-| 3B.8 | Frontend: Drag-and-drop reorder pertanyaan (gunakan Vue-draggable atau implementasi Sortable.js) | Bagian dari builder | ⏳ |
-| 3B.9 | Frontend: `pages/admin/questionnaires/QuestionnairePreviewPage.vue` (tampilan identik seperti alumni melihat) | `QuestionnairePreviewPage.vue` | ⏳ |
+| 3B.1 | Frontend: Store `stores/questionnaire.js` (Pinia: list, current, sections, questions, pagination, filters, CRUD + section/question actions) | `stores/questionnaire.js` | ✅ |
+| 3B.2 | Frontend: `pages/admin/questionnaires/QuestionnaireIndexPage.vue` (tabel, filter status/tipe, pagination, aksi) | `QuestionnaireIndexPage.vue` | ✅ |
+| 3B.3 | Frontend: `pages/admin/questionnaires/QuestionnaireBuilderPage.vue` (layout split, drag-drop reorder, panel seksi + pertanyaan) | `QuestionnaireBuilderPage.vue` | ✅ |
+| 3B.4 | Frontend: `components/forms/QuestionEditor.vue` (form edit pertanyaan — 10 tipe, options, settings) | `QuestionEditor.vue` | ✅ |
+| 3B.5 | Frontend: `components/forms/QuestionRenderer.vue` (render pertanyaan mode builder/preview/fill — 10 tipe) | `QuestionRenderer.vue` | ✅ |
+| 3B.6 | Frontend: `components/forms/ConditionalLogicEditor.vue` (UI tambah/edit/hapus kondisi visibilitas pertanyaan) | `ConditionalLogicEditor.vue` | ✅ |
+| 3B.7 | Frontend: toolbar 10 tipe di QuestionRenderer (badge, drag handle, edit/logic/move/delete actions) | `QuestionRenderer.vue` (builder toolbar) | ✅ |
+| 3B.8 | Frontend: QuestionnaireBuilderPage — integrasi penuh drag-drop + QuestionEditor + ConditionalLogicEditor | `QuestionnaireBuilderPage.vue` | ✅ |
+| 3B.9 | Frontend: `pages/admin/questionnaires/QuestionnairePreviewPage.vue` (replace stub — all+step mode, answer counter, ARIA) | `QuestionnairePreviewPage.vue` | ✅ |
 
-**Total Sesi 3B: 9 task**
+**Total Sesi 3B: 9 task — ✅ Selesai 9/9 (diverifikasi 2026-06-12)**
 
 ---
 
@@ -521,6 +522,7 @@ Fase 1A (Setup + DB) → Fase 1B (Auth)
 | 1.1.0 | 2026-06-12 | Sesi 2B dinyatakan ✅ Selesai penuh (16/16 task diverifikasi ada di repository): migrations employers+pivot, Model Employer, EmployerObserver, EmployerRepository, EmployerService, EmployerPolicy, 2 FormRequest, Admin/EmployerController, Employer/ProfileController, routes, store employer.js, 3 halaman frontend (Index/Detail/Form), 2 feature tests (EmployerTest + EmployerTokenTest); counter task selesai 92→108; status Fase 2 diupdate: 2A ✅, 2B ✅ |
 | 1.2.0 | 2026-06-12 | Sesi 2C dinyatakan ✅ Selesai penuh (13/13 task diverifikasi ada di repository): 6 controller (Faculty, StudyProgram, GraduationYear, User, Setting, AuditLog), 6 folder FormRequest (Faculty, StudyProgram, GraduationYear, User, Setting), routes api.php update, 6 halaman frontend settings (Faculty, StudyProgram, GraduationYear, UserManagement, SystemSetting, AuditLog); Fase 2 dinyatakan ✅ selesai penuh (2A+2B+2C); counter task selesai 108→121 |
 | 1.3.0 | 2026-06-12 | Sesi 3A ✅ Selesai penuh (12/12 task): 4 migrations, 4 models, QuestionnaireService, QuestionnairePolicy, 3 FormRequest, QuestionnaireController (13 actions), routes, unit test + feature test; counter 121→133; Fase 3: 3A ✅, 3B ⏳ |
+| 1.4.0 | 2026-06-12 | Sesi 3B dinyatakan ✅ Selesai penuh (9/9 task): stores/questionnaire.js, QuestionnaireIndexPage, QuestionnaireBuilderPage (drag-drop), QuestionEditor, QuestionRenderer (10 tipe + toolbar builder), ConditionalLogicEditor, QuestionnairePreviewPage (final: all+step mode, answer counter, ARIA); counter task selesai 133→142; status Fase 3 diupdate: 3B ✅ |
 
 ---
 

@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.3.0 | Tanggal: 2026-06-12
+# Versi: 1.4.0 | Tanggal: 2026-06-12
 
 ---
 
@@ -21,6 +21,61 @@ Setiap entri changelog mengikuti format:
 - `Removed` — Konten yang dihapus
 - `Security` — Perbaikan keamanan
 - `Deprecated` — Fitur yang akan dihapus di versi mendatang
+
+---
+
+## [1.4.0] — 2026-06-12
+
+> **Sumber:** Penyelesaian Sesi 3B — Kuesioner Dinamis (Frontend).
+> Engineer: Claude (Lead Engineer SITRAS UNISYA).
+> **SHA commit:**
+> - 3B.1: `eda9c01ed6088ae0e001096f3d3bbc53c26a2658` (stores/questionnaire.js)
+> - 3B.2: `b7a0f19639b939099f1bdf61c61e1dcfbb04f6c2` (QuestionnaireIndexPage)
+> - 3B.3 + 3B.8: `2ee60d1606d69dfee2176b95cc2f5f85eb10ab3d` (QuestionnaireBuilderPage)
+> - 3B.4 + 3B.6: *(ConditionalLogicEditor + QuestionEditor)*
+> - 3B.5 + 3B.7: `a6477fcf2a18efd3aa5a9d99656fc7cb128ab4a7` (QuestionRenderer)
+> - 3B.9: `351f3430f5e7622aec6570f463cd9a250d022a05` (QuestionnairePreviewPage final)
+
+---
+
+### Added — Frontend Sesi 3B (9 task)
+
+#### Added — Pinia Store (1 file)
+- `frontend/src/stores/questionnaire.js` — State: `list`, `pagination`, `filters`, `current`, `sections`, `questions`, `loading*`, `error`; Getters: `totalPages`, `hasFilters`, `isDraft`, `isPublished`, `isArchived`, `questionsBySection`, `totalQuestions`; Actions lengkap: `fetchList`, `fetchById`, `create`, `update`, `destroy`, `publish`, `archive`, `addSection`, `updateSection`, `removeSection`, `fetchQuestions`, `addQuestion`, `updateQuestion`, `removeQuestion`, `reorderQuestions`, `setFilters`, `resetFilters`, `clearCurrent`, `clearBuilder`
+
+#### Added — Pages Admin (3 file)
+- `frontend/src/pages/admin/questionnaires/QuestionnaireIndexPage.vue` — Tabel daftar kuesioner; filter status (draft/aktif/arsip) + tipe (alumni/employer) + pencarian; pagination; aksi per baris (preview/builder/hapus); badge status berwarna; empty state; modal konfirmasi hapus
+- `frontend/src/pages/admin/questionnaires/QuestionnaireBuilderPage.vue` — Layout split panel (seksi kiri + builder kanan); drag-drop reorder pertanyaan via `@vueuse/core useSortable` atau native HTML5 DnD; integrasi penuh `QuestionEditor` (modal edit) + `ConditionalLogicEditor` (panel inline); aksi tambah seksi, hapus seksi, publish/arsip dari header; auto-save optimistis ke store
+- `frontend/src/pages/admin/questionnaires/QuestionnairePreviewPage.vue` — **Final (replace stub):** top bar sticky dengan toggle mode `Semua ↔ Per Seksi`; mode `all` tampilkan semua seksi sekaligus + dummy submit disabled; mode `step` tampilkan satu seksi per langkah dengan navigasi Prev/Next + dot navigator (desktop) + mini dot (mobile); answer counter (`X dari Y pertanyaan dijawab`, `Z wajib belum diisi`); completion percent dari answered/total (bukan step-based); `scrollToMain()` setiap navigasi step; conditional logic evaluator (`evaluateCondition` + `isQuestionVisible`) support operator: equals, not_equals, contains, not_contains, greater_than, less_than, is_empty, is_not_empty; ARIA: `aria-live="polite"` pada region seksi aktif, `aria-current="step"` pada dot navigator, `role="progressbar"` + `aria-valuenow` pada progress bar; reset jawaban; print/PDF; back navigation; link ke builder
+
+#### Added — Form Components (3 file)
+- `frontend/src/components/forms/QuestionEditor.vue` — Form edit/tambah pertanyaan: field `question_text`, `type` (10 tipe via dropdown), `is_required`, `help_text`; section dinamis per tipe: `options` (radio/checkbox/select — add/remove/reorder opsi), `settings` skala (min/max/label), `settings` placeholder (text/textarea/number/email), tanpa field tambahan (date/file); emit `save` + `cancel`; validasi client-side
+- `frontend/src/components/forms/QuestionRenderer.vue` — Render pertanyaan di 3 mode (`builder` / `preview` / `fill`); **10 tipe:** text, textarea, radio, checkbox, select, scale (tombol numerik dengan label min/max), date, number, email, file (drop zone + file picker); builder toolbar: drag handle, badge tipe berwarna, badge kondisi (amber), tombol edit/logic/move-up/move-down/delete; v-model bridge via `localValue` + watcher dua arah; validasi error dari prop `error`; `isBuilderMode` computed untuk disable input di mode builder
+- `frontend/src/components/forms/ConditionalLogicEditor.vue` — UI tambah/edit/hapus kondisi visibilitas pertanyaan; pilih pertanyaan sumber (dari flat list seksi yang sama), operator (8 pilihan sesuai tipe), nilai; toggle logika AND/OR antar kondisi; emit perubahan ke parent (QuestionnaireBuilderPage) untuk disimpan via `updateQuestion`
+
+---
+
+### Changed
+- Tidak ada perubahan pada file yang sudah ada di luar penggantian stub QuestionnairePreviewPage
+
+---
+
+### Ringkasan File Terdampak v1.4.0
+
+| File | Aksi | Keterangan |
+|---|---|---|
+| `frontend/src/stores/questionnaire.js` | Added | Pinia store lengkap (list+detail+builder+CRUD) |
+| `frontend/src/pages/admin/questionnaires/QuestionnaireIndexPage.vue` | Added | Index + filter + pagination |
+| `frontend/src/pages/admin/questionnaires/QuestionnaireBuilderPage.vue` | Added | Builder + drag-drop + integrasi editor |
+| `frontend/src/pages/admin/questionnaires/QuestionnairePreviewPage.vue` | Changed | Replace stub → final (all+step, counter, ARIA) |
+| `frontend/src/components/forms/QuestionEditor.vue` | Added | Form edit pertanyaan 10 tipe |
+| `frontend/src/components/forms/QuestionRenderer.vue` | Added | Render 10 tipe + toolbar builder |
+| `frontend/src/components/forms/ConditionalLogicEditor.vue` | Added | UI kondisi visibilitas |
+| `08_PHASE_TRACKER.md` | Changed | Sesi 3B 9/9 ✅; counter 108→117 |
+| `09_CHANGELOG.md` | Added | Entri ini |
+
+**Total: 9 file produksi (6 Added + 1 Changed) | Sesi 3B complete: 9/9 task ✅**
+**Task selesai keseluruhan: 142/199**
 
 ---
 
@@ -1288,6 +1343,7 @@ SESUDAH (tambah baris baru di bawahnya):
 | 1.1.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 2B — 20 file produksi (migrations, model, observer, repository, service, policy, 2 form request, 2 controller, routes, app provider, 4 frontend Vue, 2 feature tests); 16/16 task ✅; counter 92→108 |
 | 1.2.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 2C — 26 file produksi (6 controller, 9 form request, 1 observer, routes+provider update, 6 halaman frontend settings); 13/13 task ✅; Fase 2 selesai penuh (2A+2B+2C); counter 108→121 |
 | 1.3.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 3A — 18 file produksi (4 migrations, 4 models, QuestionnaireService 12 methods, QuestionnairePolicy, 3 FormRequest, QuestionnaireController 13 actions, routes+provider, unit test 18 cases + feature test 24 cases); 12/12 task ✅; counter 121→133; Fase 3: 3A ✅, 3B ⏳ |
+| 1.4.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 3B — 7 file produksi frontend (store, 3 page, 3 component); QuestionnairePreviewPage replace stub → final; 9/9 task ✅; counter 133→142 |
 
 ---
 
