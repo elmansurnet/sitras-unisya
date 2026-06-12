@@ -13,35 +13,38 @@ class EmployerObserver
             action: 'create',
             module: 'Employer',
             modelId: $employer->id,
+            modelType: Employer::class,
             oldValues: null,
             newValues: $employer->only([
-                'company_name', 'contact_name', 'contact_email',
-                'industry_sector_id', 'company_size',
-            ]),
-            modelType: Employer::class,
+                'company_name', 'company_type', 'industry_sector',
+                'address_city', 'address_province', 'survey_status',
+            ])
         );
     }
 
     public function updated(Employer $employer): void
     {
-        if ($employer->isDirty()) {
-            // Jangan log perubahan survey_token (sensitif)
-            $dirty   = collect($employer->getDirty())->except(['survey_token'])->all();
-            $original = collect($employer->getOriginal())->except(['survey_token'])->all();
-
-            if (empty($dirty)) {
-                return;
-            }
-
-            AuditLog::record(
-                action: 'update',
-                module: 'Employer',
-                modelId: $employer->id,
-                oldValues: $original,
-                newValues: $dirty,
-                modelType: Employer::class,
-            );
+        if (! $employer->isDirty()) {
+            return;
         }
+
+        // Jangan catat perubahan survey_token ke audit log (sensitive)
+        $dirty = collect($employer->getDirty())
+            ->except(['survey_token', 'survey_token_expires_at', 'survey_token_used_at', 'updated_at'])
+            ->toArray();
+
+        if (empty($dirty)) {
+            return;
+        }
+
+        AuditLog::record(
+            action: 'update',
+            module: 'Employer',
+            modelId: $employer->id,
+            modelType: Employer::class,
+            oldValues: array_intersect_key($employer->getOriginal(), $dirty),
+            newValues: $dirty
+        );
     }
 
     public function deleted(Employer $employer): void
@@ -50,33 +53,9 @@ class EmployerObserver
             action: 'delete',
             module: 'Employer',
             modelId: $employer->id,
-            oldValues: $employer->only(['company_name', 'contact_email']),
-            newValues: null,
             modelType: Employer::class,
-        );
-    }
-
-    public function restored(Employer $employer): void
-    {
-        AuditLog::record(
-            action: 'restore',
-            module: 'Employer',
-            modelId: $employer->id,
-            oldValues: null,
-            newValues: $employer->only(['company_name', 'contact_email']),
-            modelType: Employer::class,
-        );
-    }
-
-    public function forceDeleted(Employer $employer): void
-    {
-        AuditLog::record(
-            action: 'force_delete',
-            module: 'Employer',
-            modelId: $employer->id,
-            oldValues: $employer->only(['company_name', 'contact_email']),
-            newValues: null,
-            modelType: Employer::class,
+            oldValues: $employer->only(['company_name', 'company_type', 'survey_status']),
+            newValues: null
         );
     }
 }
