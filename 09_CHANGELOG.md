@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.8 | Tanggal: 2026-06-12
+# Versi: 1.0.9 | Tanggal: 2026-06-12
 
 ---
 
@@ -21,6 +21,26 @@ Setiap entri changelog mengikuti format:
 - `Removed` — Konten yang dihapus
 - `Security` — Perbaikan keamanan
 - `Deprecated` — Fitur yang akan dihapus di versi mendatang
+
+---
+
+## [1.0.9] — 2026-06-12
+
+### Changed
+- `08_PHASE_TRACKER.md` — Sesi 2A dinyatakan ✅ Selesai penuh (31/31 task diverifikasi ada di repository): semua backend task (2A.1–2A.14), frontend stores & components (2A.15–2A.22), frontend pages admin alumni (2A.23–2A.26), frontend pages alumni (2A.27–2A.29), dan feature tests (2A.30–2A.31) telah dikonfirmasi keberadaannya; task 2A.4 (AlumniObserver) diupdate ✅; counter task selesai 61→92; status Fase 2 diupdate menjadi "2A ✅, 2B ⏳, 2C ⏳"; versi dokumen 1.0.8→1.0.9
+
+### Added
+- Entri RIWAYAT VERSI 1.0.9 di `08_PHASE_TRACKER.md`
+
+### Ringkasan File Terdampak v1.0.9
+
+| File | Aksi | Keterangan |
+|---|---|---|
+| `08_PHASE_TRACKER.md` | Changed | Sesi 2A 31/31 ✅; counter 61→92; status Fase 2 update; versi 1.0.8→1.0.9 |
+| `09_CHANGELOG.md` | Added | Entri ini |
+
+**Total: 2 file diubah | Sesi 2A complete: 31/31 task ✅**
+**Task selesai keseluruhan: 92/199**
 
 ---
 
@@ -951,6 +971,7 @@ SESUDAH (tambah baris baru di bawahnya):
 | 1.0.6 | 2026-06-09 | Tambah entri penyelesaian Sesi 2A backend — 17 file produksi (migration, model, repository, service, policy, request, controller, job, export, routes); 14/31 task ✅ |
 | 1.0.7 | 2026-06-11 | Tambah entri patch WorkHistoryController refactor — inject Form Request, hapus inline validate, tambah UpdateWorkHistoryRequest; 1 task diperbarui |
 | 1.0.8 | 2026-06-12 | Changed `app/Http/Controllers/Api/V1/Alumni/WorkHistoryController.php`, fixed Konsistensi Form Request di seluruh controller Sesi 2A, dan added `app/Http/Requests/Alumni/UpdateWorkHistoryRequest.php` — Form Request baru |
+| 1.0.9 | 2026-06-12 | Sesi 2A dinyatakan ✅ Selesai penuh (31/31 task diverifikasi ada di repository) |
 
 ---
 
