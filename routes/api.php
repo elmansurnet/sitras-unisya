@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Admin\AlumniController;
-use App\Http\Controllers\Api\V1\Alumni\ProfileController;
+use App\Http\Controllers\Api\V1\Admin\EmployerController as AdminEmployerController;
+use App\Http\Controllers\Api\V1\Alumni\ProfileController as AlumniProfileController;
 use App\Http\Controllers\Api\V1\Alumni\WorkHistoryController;
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\OtpController;
+use App\Http\Controllers\Api\V1\Employer\ProfileController as EmployerProfileController;
 use App\Http\Controllers\Api\V1\Public\PublicController;
 use Illuminate\Support\Facades\Route;
 
@@ -61,7 +63,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware(['auth:sanctum', 'App\Http\Middleware\EnsureAccountActive'])
             ->group(function () {
                 Route::post('logout', [AuthController::class, 'logout'])->name('logout');
-                Route::get('me',     [AuthController::class, 'me'])->name('me');
+                Route::get('me',      [AuthController::class, 'me'])->name('me');
             });
     });
 
@@ -85,16 +87,29 @@ Route::prefix('v1')->group(function () {
             Route::get('template', [AlumniController::class, 'importTemplate'])->name('template');
             Route::post('import',  [AlumniController::class, 'import'])->name('import');
 
-            Route::get('/',                               [AlumniController::class, 'index'])->name('index');
-            Route::post('/',                              [AlumniController::class, 'store'])->name('store');
-            Route::get('/{alumni}',                       [AlumniController::class, 'show'])->name('show');
-            Route::put('/{alumni}',                       [AlumniController::class, 'update'])->name('update');
-            Route::delete('/{alumni}',                    [AlumniController::class, 'destroy'])->name('destroy');
-            Route::post('/{alumni}/invite',               [AlumniController::class, 'sendInvitation'])->name('invite');
-            Route::get('/{alumni}/work-histories',        [WorkHistoryController::class, 'indexForAdmin'])->name('work-histories.index');
+            Route::get('/',                            [AlumniController::class, 'index'])->name('index');
+            Route::post('/',                           [AlumniController::class, 'store'])->name('store');
+            Route::get('/{alumni}',                    [AlumniController::class, 'show'])->name('show');
+            Route::put('/{alumni}',                    [AlumniController::class, 'update'])->name('update');
+            Route::delete('/{alumni}',                 [AlumniController::class, 'destroy'])->name('destroy');
+            Route::post('/{alumni}/invite',            [AlumniController::class, 'sendInvitation'])->name('invite');
+            Route::get('/{alumni}/work-histories',     [WorkHistoryController::class, 'indexForAdmin'])->name('work-histories.index');
         });
 
-        // Controller-controller admin lain akan didaftarkan di sesi 2B–5A
+        // --- Employer Management (2B.10) ---
+        // Urutan: route spesifik (send-survey-token, regenerate-token) SEBELUM {employer}
+        Route::prefix('employers')->name('employers.')->group(function () {
+            Route::get('/',    [AdminEmployerController::class, 'index'])->name('index');
+            Route::post('/',   [AdminEmployerController::class, 'store'])->name('store');
+
+            Route::get('/{employer}',                          [AdminEmployerController::class, 'show'])->name('show');
+            Route::put('/{employer}',                          [AdminEmployerController::class, 'update'])->name('update');
+            Route::delete('/{employer}',                       [AdminEmployerController::class, 'destroy'])->name('destroy');
+            Route::post('/{employer}/send-survey-token',       [AdminEmployerController::class, 'sendSurveyToken'])->name('send-survey-token');
+            Route::post('/{employer}/regenerate-token',        [AdminEmployerController::class, 'regenerateToken'])->name('regenerate-token');
+        });
+
+        // Controller-controller admin lain akan didaftarkan di sesi 3A–5A
     });
 
     // =========================================================================
@@ -108,24 +123,21 @@ Route::prefix('v1')->group(function () {
     ])->prefix('alumni')->name('api.v1.alumni.')->group(function () {
 
         // Profil alumni (2A.13)
-        Route::get('profile',        [ProfileController::class, 'show'])->name('profile.show');
-        Route::put('profile',        [ProfileController::class, 'update'])->name('profile.update');
-        Route::post('profile/photo', [ProfileController::class, 'uploadPhoto'])->name('profile.photo');
+        Route::get('profile',        [AlumniProfileController::class, 'show'])->name('profile.show');
+        Route::put('profile',        [AlumniProfileController::class, 'update'])->name('profile.update');
+        Route::post('profile/photo', [AlumniProfileController::class, 'uploadPhoto'])->name('profile.photo');
 
         // Riwayat pekerjaan (2A.13)
         Route::prefix('work-histories')->name('work-histories.')->group(function () {
-            // Alumni butuh model Alumni untuk inject di controller → resolve dari user_id
-            // Gunakan route dengan {alumni} yang diisi dari middleware (lihat ProfileController)
-            // Sederhananya: ambil alumni dari auth user di controller
-            Route::get('/',               [WorkHistoryController::class, 'index'])->name('index');
-            Route::post('/{alumni}',      [WorkHistoryController::class, 'store'])->name('store');
-            Route::put('/{alumni}/{workHistory}',    [WorkHistoryController::class, 'update'])->name('update');
-            Route::delete('/{alumni}/{workHistory}', [WorkHistoryController::class, 'destroy'])->name('destroy');
+            Route::get('/',                              [WorkHistoryController::class, 'index'])->name('index');
+            Route::post('/{alumni}',                    [WorkHistoryController::class, 'store'])->name('store');
+            Route::put('/{alumni}/{workHistory}',       [WorkHistoryController::class, 'update'])->name('update');
+            Route::delete('/{alumni}/{workHistory}',    [WorkHistoryController::class, 'destroy'])->name('destroy');
         });
     });
 
     // =========================================================================
-    // EMPLOYER — Role: employer
+    // EMPLOYER — Role: employer (2B.10)
     // =========================================================================
     Route::middleware([
         'auth:sanctum',
@@ -133,6 +145,11 @@ Route::prefix('v1')->group(function () {
         'App\Http\Middleware\CheckRole:employer',
         'throttle:api',
     ])->prefix('employer')->name('api.v1.employer.')->group(function () {
-        // Controller employer akan didaftarkan di sesi 2B
+
+        // Profil employer (2B.9)
+        Route::get('profile',  [EmployerProfileController::class, 'show'])->name('profile.show');
+        Route::put('profile',  [EmployerProfileController::class, 'update'])->name('profile.update');
+
+        // Survey employer akan didaftarkan di sesi 4A
     });
 });
