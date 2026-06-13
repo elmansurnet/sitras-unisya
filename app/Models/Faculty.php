@@ -21,6 +21,10 @@ class Faculty extends Model
         ];
     }
 
+    // -----------------------------------------------------------------
+    // RELATIONS
+    // -----------------------------------------------------------------
+
     public function studyPrograms(): HasMany
     {
         return $this->hasMany(StudyProgram::class);

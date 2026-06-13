@@ -8,19 +8,19 @@ class SalaryRange extends Model
 {
     protected $fillable = [
         'label',
-        'min_salary',
-        'max_salary',
-        'sort_order',
+        'min_value',
+        'max_value',
+        'order_number',
         'is_active',
     ];
 
     protected function casts(): array
     {
         return [
-            'min_salary' => 'integer',
-            'max_salary' => 'integer',
-            'sort_order' => 'integer',
-            'is_active'  => 'boolean',
+            'min_value'    => 'integer',
+            'max_value'    => 'integer',
+            'order_number' => 'integer',
+            'is_active'    => 'boolean',
         ];
     }
 }
