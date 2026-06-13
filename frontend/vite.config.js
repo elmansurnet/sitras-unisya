@@ -48,10 +48,27 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['vue', 'vue-router', 'pinia'],
-          charts: ['apexcharts', 'vue3-apexcharts'],
-          maps: ['leaflet'],
+        /**
+         * manualChunks HARUS Function di Vite 8 (Rolldown).
+         * Object literal tidak didukung dan menyebabkan warning + build failure.
+         * Strategi: vendor (vue ecosystem) | charts (apexcharts) | maps (leaflet)
+         */
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('apexcharts') || id.includes('vue3-apexcharts')) {
+              return 'charts'
+            }
+            if (id.includes('leaflet')) {
+              return 'maps'
+            }
+            if (
+              id.includes('/vue/') ||
+              id.includes('/vue-router/') ||
+              id.includes('/pinia/')
+            ) {
+              return 'vendor'
+            }
+          }
         },
       },
     },
