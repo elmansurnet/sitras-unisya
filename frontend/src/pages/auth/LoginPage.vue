@@ -11,7 +11,7 @@ import { useToast } from '@/composables/useToast'
 
 const router    = useRouter()
 const authStore = useAuthStore()
-const toast     = useToast()
+const { toast } = useToast()
 
 const form = reactive({
   email:    '',

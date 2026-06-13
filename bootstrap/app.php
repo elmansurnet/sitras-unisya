@@ -7,8 +7,8 @@ use App\Http\Middleware\ValidateEmployerToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -94,7 +94,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // =====================================================================
         // CUSTOM JSON ERROR FORMAT untuk API
         // =====================================================================
-        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, Request $request): ?Response {
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, Request $request): ?JsonResponse {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'success' => false,
@@ -105,7 +105,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return null;
         });
 
-        $exceptions->render(function (\Illuminate\Auth\Access\AuthorizationException $e, Request $request): ?Response {
+        $exceptions->render(function (\Illuminate\Auth\Access\AuthorizationException $e, Request $request): ?JsonResponse {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'success' => false,
@@ -116,7 +116,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return null;
         });
 
-        $exceptions->render(function (\Illuminate\Database\Eloquent\ModelNotFoundException $e, Request $request): ?Response {
+        $exceptions->render(function (\Illuminate\Database\Eloquent\ModelNotFoundException $e, Request $request): ?JsonResponse {
             if ($request->is('api/*') || $request->expectsJson()) {
                 $model = class_basename($e->getModel());
                 return response()->json([
@@ -128,7 +128,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return null;
         });
 
-        $exceptions->render(function (\Illuminate\Validation\ValidationException $e, Request $request): ?Response {
+        $exceptions->render(function (\Illuminate\Validation\ValidationException $e, Request $request): ?JsonResponse {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'success' => false,
@@ -140,7 +140,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return null;
         });
 
-        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, Request $request): ?Response {
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, Request $request): ?JsonResponse {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'success' => false,
@@ -151,7 +151,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return null;
         });
 
-        $exceptions->render(function (\Throwable $e, Request $request): ?Response {
+        $exceptions->render(function (\Throwable $e, Request $request): ?JsonResponse {
             if ($request->is('api/*') || $request->expectsJson()) {
                 $statusCode = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
                 $message    = app()->isProduction()
