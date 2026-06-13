@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md 
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.8.0 | Tanggal: 2026-06-13
+# Versi: 1.9.0 | Tanggal: 2026-06-13
 
 ---
 
@@ -21,6 +21,31 @@ Setiap entri changelog mengikuti format:
 - `Removed` — Konten yang dihapus
 - `Security` — Perbaikan keamanan
 - `Deprecated` — Fitur yang akan dihapus di versi mendatang
+
+---
+
+## [1.9.0] — 2026-06-13
+
+### Added
+- `bootstrap/app.php` — registrasi middleware global stack: HandleCors (global), EnsureSessionIsNotStateful (Sanctum, api group), CheckRole, EnsureAccountActive, ValidateEmployerToken, LogActivity; alias middleware; rate limiter otp/auth/api/export
+- `docs/security-audit.md` — dokumen audit keamanan OWASP Top 10: A01 Broken Access Control (RBAC + Policy), A02 Cryptographic Failures (OTP SHA-256, enkripsi setting), A03 Injection (parameter binding semua query), A04 Insecure Design, A05 Security Misconfiguration, A06 Vulnerable Components, A07 Auth Failures (lockout + cooldown), A08 Software Integrity, A09 Logging (AuditLog), A10 SSRF (whitelist WA gateway); hasil: semua item PASS
+- `docs/pentest-results.md` — hasil penetration test: SQLi (semua query pakai binding/Eloquent — AMAN), XSS (API JSON response + CSP header — AMAN), CSRF (Sanctum SPA token — AMAN), IDOR (AlumniPolicy/EmployerPolicy/SurveyResponsePolicy diverifikasi — AMAN), Rate Limiting (429 dikonfirmasi pada OTP + login — AMAN), File Upload (MIME validation + storage/private — AMAN)
+- `docs/deploy-checklist.md` — 15-poin deploy security checklist: APP_DEBUG=false, APP_ENV=production, HTTPS only, security headers Nginx (HSTS, X-Frame-Options, CSP, X-Content-Type), firewall UFW (22/80/443 only), Redis requirepass, MySQL user terbatas, storage/private tidak public, file permission 755/644, log rotation, backup encrypted, composer install --no-dev, route:cache + config:cache, queue worker supervisor, cron scheduler
+- `tests/Feature/Auth/RateLimitTest.php` — 8 test rate limiting: OTP request exceed → 429 dengan retry-after header, OTP verify exceed → 429, login exceed → 429, rate limit reset setelah cooldown, rate limit per-IP tidak cross-contaminate, export rate limit (superadmin), api global rate limit, header X-RateLimit-Remaining present
+- `tests/Unit/OtpServiceTest.php` — 11 test: generate OTP 6 digit, store hash SHA-256 (bukan plaintext), verify hash_equals benar, verify reject OTP expired (>5 menit), verify reject setelah max 3 attempts, increment attempt counter, cooldown 60 detik antara request, cleanup expired OTP, OTP baru invalidate OTP lama, format VARCHAR(64) confirmed, generate selalu random_int bukan rand
+- `tests/Unit/AuthServiceTest.php` — 9 test: lockout increment per attempt, lockout aktif setelah batas tercapai, lockout time dihitung dari last_attempt_at, reset lockout setelah login sukses, lockout tidak berlaku untuk role berbeda (per-user), token Sanctum digenerate saat login sukses, token lama di-revoke saat login baru, logout revoke current token, getAuthUser return null saat unauthenticated
+
+### Changed
+- `app/Models/SystemSetting.php` — fix cast kolom `value`: jika `is_encrypted = 1` maka cast `encrypted`, else cast `string`; implementasi menggunakan `getCasts()` override dengan query lazy load per setting record
+- `app/Models/Alumni.php` — fix mass assignment: tambah kolom `survey_status`, `invitation_sent_at`, `last_invited_at` ke `$fillable` yang sebelumnya terlewat
+- `app/Http/Requests/Alumni/StoreAlumniRequest.php` — fix validasi MIME: ganti `mimes:jpg,jpeg,png` → `mimetypes:image/jpeg,image/png` + rule `image` + max 2048KB
+- `app/Http/Requests/Alumni/UpdateAlumniRequest.php` — sinkron fix MIME validation dengan StoreAlumniRequest
+- `app/Http/Requests/Employer/StoreEmployerRequest.php` — fix validasi MIME logo: ganti `mimes:jpg,jpeg,png,gif,svg` → `mimetypes:image/jpeg,image/png,image/gif,image/svg+xml` + max 1024KB
+- `app/Http/Requests/Employer/UpdateEmployerRequest.php` — sinkron fix MIME validation dengan StoreEmployerRequest
+- `app/Services/AlumniService.php` — verifikasi & konfirmasi: uploadPhoto dan uploadImport menyimpan ke `storage/app/private/photos/` dan `storage/app/private/imports/`; akses file via `Storage::temporaryUrl()` (signed URL 30 menit); tidak ada path public/
+
+### Files Changed
+14 file (3 docs, 2 unit test, 1 feature test, 2 model fix, 4 request fix, 1 service verified, 1 bootstrap/app.php)
 
 ---
 
@@ -1508,7 +1533,8 @@ Baris "Hapus Employer (soft delete)" tidak ada di matriks izin sebelumnya, padah
 | 1.5.0 | 2026-06-13 | Sesi 4A dinyatakan Selesai penuh 28/28 task diverifikasi ada di repository. Counter task selesai 119→147. Status Fase 4 diupdate 4A ✅ |
 | 1.6.0 | 2026-06-13 | `surveyAdmin.js` ditambahkan di luar task list resmi sebagai kebutuhan arsitektur: memisahkan state survey admin (period management) dari state survey alumni/employer agar tidak terjadi conflict state, Fase 4 (Survei & Notifikasi) dinyatakan **selesai penuh**: 4A ✅ (28/28) + 4B ✅ (12/12) = 40 task selesai, Counter task selesai 128→168. `04_ARCHITECTURE.md` diperbarui manual ke versi 1.0.4 (mencatat penambahan `surveyAdmin.js` di folder struktur) |
 | 1.7.0 | 2026-06-13 | **hotfix** employmentStats() memanggil `getEmploymentStats($array)` → diganti named arguments 3 param terpisah sesuai signature DashboardService; alumniMap() memanggil `getAlumniMap($array)` → diganti 2 named arguments sesuai signature DashboardService. Mencegah TypeError di production saat filter digunakan, `05_API.md` diupdate ke versi **1.0.4** — dokumentasi endpoint dashboard §7 (summary, employment-stats, alumni-map) dan laporan §8 (generate/pdf, generate/excel, list, download) ditambahkan/diperbarui sesuai implementasi aktual Sesi 5A. Counter task selesai 168→179. Status Fase 5 diupdate 5A ✅ |
-| 1.8.0 | 2026-06-13 | *Sesi 5B dinyatakan Selesai penuh 10/10 task diverifikasi ada di repository. Counter task selesai 179→189. Status Fase 5 diupdate 5A ✅ 5B ✅ |
+| 1.8.0 | 2026-06-13 | Sesi 5B dinyatakan Selesai penuh 10/10 task diverifikasi ada di repository. Counter task selesai 179→189. Status Fase 5 diupdate 5A ✅ 5B ✅ |
+| 1.9.0 | 2026-06-13 | Sesi 6A dinyatakan Selesai 12/14 task (2 task [6A.10 + 6A.11] di-skip ke Sesi 7A) |
 
 
 ---

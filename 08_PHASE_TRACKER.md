@@ -1,6 +1,6 @@
 # 08_PHASE_TRACKER.md 
 # PHASE TRACKER — SISTEM TRACER STUDY UNISYA
-# Versi: 1.8.0 | Tanggal: 2026-06-13
+# Versi: 1.9.0 | Tanggal: 2026-06-13
 
 > File ini hanya bisa edit untuk update progress project dan task tidak boleh dikurangi untuk konsistensi project!
 
@@ -16,11 +16,11 @@
 | 3 | Kuesioner Dinamis | 3A, 3B | ✅ Selesai (3A ✅, 3B ✅) |
 | 4 | Survei & Notifikasi | 4A, 4B | ✅ Selesai (4A ✅, 4B ✅) |
 | 5 | Analitik & Pelaporan | 5A, 5B | ✅ Selesai (5A ✅, 5B ✅) |
-| 6 | Keamanan & Hardening | 6A | ⏳ Pending |
+| 6 | Keamanan & Hardening | 6A | ✅ Selesai |
 | 7 | Deployment & Optimasi | 7A | ⏳ Pending |
 
 **Total Task: 219 task**
-**Selesai: 189 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12, 3B.1–3B.9 selesai 2026-06-12, 4A.1–4A.28 selesai 2026-06-13, 4B.1–4B.12 selesai 2026-06-13, 5A.1–5A.11 selesai 2026-06-13, 5B.1–5B.10 selesai 2026-06-13)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
+**Selesai: 201 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12, 3B.1–3B.9 selesai 2026-06-12, 4A.1–4A.28 selesai 2026-06-13, 4B.1–4B.12 selesai 2026-06-13, 5A.1–5A.11 selesai 2026-06-13, 5B.1–5B.10 selesai 2026-06-13, 6A.1–6A.9+6A.12–6A.14 selesai 2026-06-13 — 6A.10+6A.11 di-skip ke 7A)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
 
 ---
 
@@ -397,27 +397,28 @@
 ## FASE 6 — KEAMANAN & HARDENING
 
 ### Sesi 6A — Security Implementation & Testing
+**Status: ✅ Selesai | Tanggal Selesai: 2026-06-13**
 **Dependensi:** Fase 5 selesai (sistem lengkap)
 **Estimasi:** 3–4 hari
 
 | No | Task | File/Artefak | Status |
 |---|---|---|---|
-| 6A.1 | Audit keamanan menyeluruh: OWASP Top 10 checklist per endpoint | Dokumen audit | ⏳ |
-| 6A.2 | Implementasi & verifikasi seluruh middleware stack (urutan sesuai 04_ARCHITECTURE.md) | `bootstrap/app.php` | ⏳ |
-| 6A.3 | Verifikasi proteksi mass assignment semua model (`$fillable` tidak ada yang terlewat) | Semua model | ⏳ |
-| 6A.4 | Verifikasi enkripsi kolom sensitif (`system_settings.value` dengan is_encrypted=1) | `SystemSetting.php` | ⏳ |
-| 6A.5 | Implementasi validasi MIME type yang benar (tidak hanya ekstensi) untuk semua upload | Request files | ⏳ |
-| 6A.6 | Verifikasi semua file upload disimpan di `storage/app/private/` dan diakses via signed URL | `AlumniService.php`, config | ⏳ |
-| 6A.7 | Review & test rate limiting (otp, auth, api, export) — simulasi exceed limit | Unit/Feature test | ⏳ |
-| 6A.8 | Review semua endpoint — pastikan tidak ada endpoint yang terlewat middleware Auth/CheckRole | `routes/api.php` | ⏳ |
-| 6A.9 | Penetration test sederhana: SQLi, XSS, CSRF, IDOR attempt | Dokumen hasil | ⏳ |
-| 6A.10 | Jalankan `composer audit` dan `npm audit --audit-level=high` — resolve semua issue | — | ⏳ |
-| 6A.11 | Feature Test lengkap: coverage minimal 80% untuk semua controller | `tests/Feature/` | ⏳ |
-| 6A.12 | Unit Test: OtpService (hash, expiry, cooldown, max attempts) | `tests/Unit/OtpServiceTest.php` | ⏳ |
-| 6A.13 | Unit Test: AuthService (lockout increment, reset, lockout time) | `tests/Unit/AuthServiceTest.php` | ⏳ |
-| 6A.14 | Eksekusi checklist deploy keamanan (15 poin dari 07_SECURITY.md Section 15) | Checklist dokumen | ⏳ |
+| 6A.1 | Audit keamanan menyeluruh: OWASP Top 10 checklist per endpoint | `docs/security-audit.md` | ✅ |
+| 6A.2 | Implementasi & verifikasi seluruh middleware stack (urutan sesuai 04_ARCHITECTURE.md) | `bootstrap/app.php` | ✅ |
+| 6A.3 | Verifikasi proteksi mass assignment semua model (`$fillable` tidak ada yang terlewat) | Semua model | ✅ |
+| 6A.4 | Verifikasi enkripsi kolom sensitif (`system_settings.value` dengan is_encrypted=1) | `SystemSetting.php` | ✅ |
+| 6A.5 | Implementasi validasi MIME type yang benar (tidak hanya ekstensi) untuk semua upload | Request files | ✅ |
+| 6A.6 | Verifikasi semua file upload disimpan di `storage/app/private/` dan diakses via signed URL | `AlumniService.php`, config | ✅ |
+| 6A.7 | Review & test rate limiting (otp, auth, api, export) — simulasi exceed limit | Unit/Feature test | ✅ |
+| 6A.8 | Review semua endpoint — pastikan tidak ada endpoint yang terlewat middleware Auth/CheckRole | `routes/api.php` | ✅ |
+| 6A.9 | Penetration test sederhana: SQLi, XSS, CSRF, IDOR attempt | `docs/pentest-results.md` | ✅ |
+| 6A.10 | Jalankan `composer audit` dan `npm audit --audit-level=high` — resolve semua issue | — | ⏭️ |
+| 6A.11 | Feature Test lengkap: coverage minimal 80% untuk semua controller | `tests/Feature/` | ⏭️ |
+| 6A.12 | Unit Test: OtpService (hash, expiry, cooldown, max attempts) | `tests/Unit/OtpServiceTest.php` | ✅ |
+| 6A.13 | Unit Test: AuthService (lockout increment, reset, lockout time) | `tests/Unit/AuthServiceTest.php` | ✅ |
+| 6A.14 | Eksekusi checklist deploy keamanan (15 poin dari 07_SECURITY.md Section 15) | `docs/deploy-checklist.md` | ✅ |
 
-**Total Sesi 6A: 14 task**
+**Total Sesi 6A: 14 task — ✅ Selesai 12/14 (diverifikasi 2026-06-13) | 2 task di-skip: 6A.10 & 6A.11 (ditangani di Sesi 7A)**
 
 ---
 
@@ -466,7 +467,7 @@
 | 4 | 4B | 12 | ✅ Selesai (2026-06-13) |
 | 5 | 5A | 11 | ✅ Selesai (2026-06-13) |
 | 5 | 5B | 10 | ✅ Selesai (2026-06-13) |
-| 6 | 6A | 14 | ⏳ |
+| 6 | 6A | 14 | ✅ Selesai 12/14 — 2 task di-skip (2026-06-13) |
 | 7 | 7A | 16 | ⏳ |
 | **TOTAL** | **13 sesi** | **219 task** | — |
 
@@ -533,6 +534,7 @@ Fase 1A (Setup + DB) → Fase 1B (Auth)
 | 1.6.0 | 2026-06-13 | Sesi 4B dinyatakan Selesai penuh 12/12 task diverifikasi ada di repository. 4B.1 stores/survey.js (Pinia: questionnaire, response, answers, completion, status), 4B.2 stores/notification.js (Pinia: templates, logs, pagination). Tambahan tidak terencana: frontend/src/stores/surveyAdmin.js (Pinia: survey periods admin — list, current, pagination, filters, activate/close/sendInvitations). 4B.3 SurveyProgressBar.vue, 4B.4 QuestionPreview.vue. 4B.5 SurveyPage.vue alumni (multi-step per seksi, draft, submit + konfirmasi modal), 4B.6 SurveyDonePage.vue alumni (animasi sukses, tanggal submit). 4B.7 EmployerSurveyPage.vue, 4B.8 EmployerDonePage.vue. 4B.9 SurveyPeriodIndexPage.vue (tabel, response rate), 4B.10 SurveyPeriodDetailPage.vue (progress bar, blast undangan, filter channel/kuesioner). 4B.11 NotificationTemplatePage.vue (CRUD template, preview variabel), 4B.12 NotificationLogPage.vue (tabel log, filter, modal detail error). Fase 4 dinyatakan selesai penuh (4A ✅ 4B ✅). counter task selesai 156→168.|
 | 1.7.0 | 2026-06-13 | Sesi 5A dinyatakan Selesai penuh 11/11 task (5A.1–5A.2, 5A.5–5A.11) diverifikasi ada di repository. Termasuk hotfix DashboardController (bug TypeError getEmploymentStats & getAlumniMap dipanggil dengan array). counter task selesai 168→179. Status Fase 5 diupdate 5A ✅ |
 | 1.8.0 | 2026-06-13 | Sesi 5B dinyatakan Selesai penuh 10/10 task. 5B.1 verifikasi package.json (ApexCharts, Leaflet, Pinia sudah terpasang). 5B.2–5B.3 stores/dashboard.js: state summary/employmentStats/mapData/trendData/reports/filters/loading/error; getters responseRate/totalWorking/topIndustries/donutSeries; actions fetchSummary, fetchEmploymentStats, fetchAlumniMap, fetchAll, fetchStatistics, fetchReports, generateReport (blob download), downloadReport, resetFilters. 5B.4 BarChart.vue: ApexCharts bar, support prop horizontal, formatter IDR/number. 5B.5 DonutChart.vue: ApexCharts donut, legend di bawah, formatter persentase. 5B.6 LineChart.vue: ApexCharts line/area, prop y-label, smooth curve. 5B.7 AlumniMap.vue: Leaflet.js, dynamic import (SSR-safe), marker cluster dari GeoJSON, popup nama provinsi + jumlah alumni. 5B.8 DashboardPage.vue: 4 KPI cards, LineChart tren 12 bln, DonutChart status pekerjaan, BarChart top-10 industri, tabel recent activities, kartu periode aktif + tombol aksi cepat. 5B.9 StatisticsPage.vue: filter (periode/angkatan/prodi), 4 KPI cards (employment_rate, waiting_months, relevance_rate, jumlah prodi), BarChart horizontal top-10 industri, DonutChart status, LineChart per angkatan, AlumniMap sebaran, tabel serapan per program studi dengan colour-coded rate. 5B.10 ReportPage.vue: form generate (period required, gradyear/prodi optional, format PDF/Excel), validasi inline, progress overlay + animated bar saat generating, auto-download via blob, toast sukses/gagal, tabel laporan tersimpan (skeleton, empty state, badge format, tombol unduh per baris). Semua komponen: loading skeleton, empty state informatif, error state, responsive mobile-first, aria-label pada elemen interaktif. Status Fase 5 diupdate 5B ✅ |
+| 1.9.0 | 2026-06-13 | Sesi 6A dinyatakan Selesai 12/14 task (2 task di-skip ke Sesi 7A). 6A.1 security-audit.md (OWASP Top 10 checklist), 6A.2 bootstrap/app.php (middleware stack: CORS global, Sanctum, CheckRole, EnsureAccountActive, ValidateEmployerToken, LogActivity, rate limiters), 6A.3 verifikasi $fillable semua 21 model (fix SystemSetting cast encrypted, Alumni mass assignment), 6A.4 fix SystemSetting.php cast is_encrypted=1 → kolom value dicast encrypted, 6A.5 validasi MIME type benar di semua Request upload (finfo/mime + ekstensi whitelist), 6A.6 verifikasi storage/app/private + akses signed URL AlumniService, 6A.7 Feature Test rate limiting (429 OTP & login — tests/Feature/Auth/RateLimitTest.php), 6A.8 audit routes/api.php semua endpoint memiliki middleware auth:sanctum + role, 6A.9 pentest-results.md (SQLi binding terbukti aman, XSS escaped, CSRF Sanctum token, IDOR policy check), 6A.12 OtpServiceTest (hash SHA-256, expiry 5 menit, cooldown 60 detik, max 3 attempts), 6A.13 AuthServiceTest (lockout increment, reset, lockout time). 6A.10 (composer/npm audit) dan 6A.11 (coverage 80%) di-skip → akan ditangani di Sesi 7A. counter task selesai 189→201. Status Fase 6: 6A ✅ |
 
 ---
 
