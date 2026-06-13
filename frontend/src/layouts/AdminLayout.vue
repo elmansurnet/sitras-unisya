@@ -1,10 +1,5 @@
 <template>
   <div class="min-h-screen bg-gray-50 flex">
-    <!-- ====================================================================
-         SIDEBAR
-         - Desktop (>= lg): fixed 240px, selalu tampil
-         - Mobile (< lg)  : drawer dengan overlay, toggle via hamburger
-    ===================================================================== -->
     <!-- Overlay mobile -->
     <Transition name="fade">
       <div
@@ -41,36 +36,38 @@
 
         <!-- Data Alumni -->
         <SidebarGroup label="Data Alumni" icon="users">
-          <SidebarItem :to="{ name: 'admin.alumni.index' }"     label="Daftar Alumni" />
-          <SidebarItem :to="{ name: 'admin.alumni.import' }"    label="Import Alumni" />
+          <SidebarItem :to="{ name: 'admin.alumni.index' }"  label="Daftar Alumni" />
+          <SidebarItem :to="{ name: 'admin.alumni.import' }" label="Import Alumni" />
         </SidebarGroup>
 
         <!-- Employer -->
         <SidebarGroup label="Employer" icon="briefcase">
-          <SidebarItem :to="{ name: 'admin.employer.index' }"   label="Daftar Employer" />
+          <SidebarItem :to="{ name: 'admin.employer.index' }" label="Daftar Employer" />
         </SidebarGroup>
 
         <!-- Survei -->
         <SidebarGroup label="Survei" icon="clipboard-list">
-          <SidebarItem :to="{ name: 'admin.survey.periods' }"       label="Periode Survei" />
-          <SidebarItem :to="{ name: 'admin.survey.questionnaires' }" label="Kuesioner" />
-          <SidebarItem :to="{ name: 'admin.survey.invitations' }"   label="Undangan Massal" />
+          <SidebarItem :to="{ name: 'admin.survey-periods.index' }"   label="Periode Survei" />
+          <SidebarItem :to="{ name: 'admin.questionnaires.index' }"   label="Kuesioner" />
         </SidebarGroup>
 
         <!-- Laporan -->
         <SidebarItem :to="{ name: 'admin.reports' }" icon="bar-chart-2" label="Laporan" />
 
         <!-- Notifikasi -->
-        <SidebarItem :to="{ name: 'admin.notifications' }" icon="bell" label="Notifikasi" />
+        <SidebarGroup label="Notifikasi" icon="bell">
+          <SidebarItem :to="{ name: 'admin.notifications.templates' }" label="Template" />
+          <SidebarItem :to="{ name: 'admin.notifications.logs' }"      label="Log Kirim" />
+        </SidebarGroup>
 
         <!-- Superadmin only -->
         <template v-if="authStore.isSuperadmin">
           <div class="pt-3 pb-1 px-2">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Sistem</p>
           </div>
-          <SidebarItem :to="{ name: 'admin.users' }"    icon="user-cog"  label="Kelola Admin" />
-          <SidebarItem :to="{ name: 'admin.settings' }" icon="settings"  label="Pengaturan" />
-          <SidebarItem :to="{ name: 'admin.audit' }"    icon="shield"    label="Audit Log" />
+          <SidebarItem :to="{ name: 'admin.users' }"      icon="user-cog" label="Kelola Admin" />
+          <SidebarItem :to="{ name: 'admin.settings' }"   icon="settings" label="Pengaturan" />
+          <SidebarItem :to="{ name: 'admin.audit-logs' }" icon="shield"   label="Audit Log" />
         </template>
       </nav>
 
@@ -97,9 +94,7 @@
       </div>
     </aside>
 
-    <!-- ====================================================================
-         MAIN CONTENT
-    ===================================================================== -->
+    <!-- MAIN CONTENT -->
     <div class="flex-1 flex flex-col min-w-0 lg:ml-60">
       <!-- Topbar -->
       <header class="sticky top-0 z-10 bg-white border-b border-gray-200 h-14 flex items-center px-4 gap-4">
@@ -184,14 +179,15 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import SidebarItem  from '@/components/sidebar/SidebarItem.vue'
+import SidebarGroup from '@/components/sidebar/SidebarGroup.vue'
 
-const authStore   = useAuthStore()
-const route       = useRoute()
-const sidebarOpen = ref(false)
+const authStore    = useAuthStore()
+const route        = useRoute()
+const sidebarOpen  = ref(false)
 const dropdownOpen = ref(false)
 const avatarRef    = ref(null)
 
-// Breadcrumb dari route meta
 const breadcrumbs = computed(() => route.meta?.breadcrumbs ?? [
   { label: route.meta?.title ?? 'Halaman' },
 ])
@@ -201,7 +197,6 @@ async function handleLogout() {
   await authStore.logout()
 }
 
-// Tutup dropdown jika klik di luar
 function onClickOutside(e) {
   if (avatarRef.value && !avatarRef.value.contains(e.target)) {
     dropdownOpen.value = false
