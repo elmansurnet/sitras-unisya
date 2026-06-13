@@ -29,7 +29,7 @@ const props = defineProps({
   showLegend: { type: Boolean, default: true },
 })
 
-// ─── Palette SITRAS ─────────────────────────────────────────────────────────
+// ─── Palette SITRAS ─────────────────────────────────────────────────────────────
 const SITRAS_DONUT_COLORS = [
   '#0d9488', // teal-600  bekerja
   '#14b8a6', // teal-500  wirausaha
@@ -61,33 +61,34 @@ const chartOptions = computed(() => ({
     enabled: false,
   },
   plotOptions: {
-    pie: {\n      donut: {
+    pie: {
+      donut: {
         size: '68%',
         labels: {
           show: props.showTotal,
           total: {
-            show:      props.showTotal,
+            show:       props.showTotal,
             showAlways: true,
-            label:     'Total',
-            fontSize:  '13px',
+            label:      'Total',
+            fontSize:   '13px',
             fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
             fontWeight: 600,
-            color:     '#64748b',
-            formatter: () => total.value.toLocaleString('id-ID'),
+            color:      '#64748b',
+            formatter:  () => total.value.toLocaleString('id-ID'),
           },
           value: {
-            fontSize:  '22px',
+            fontSize:   '22px',
             fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
             fontWeight: 700,
-            color:     '#1e293b',
-            formatter: (val) => Number(val).toLocaleString('id-ID'),
+            color:      '#1e293b',
+            formatter:  (val) => Number(val).toLocaleString('id-ID'),
           },
           name: {
-            fontSize:  '13px',
+            fontSize:   '13px',
             fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
             fontWeight: 500,
-            color:     '#64748b',
-            offsetY:   4,
+            color:      '#64748b',
+            offsetY:    4,
           },
         },
       },
@@ -155,7 +156,7 @@ const chartOptions = computed(() => ({
 }))
 
 const isEmpty = computed(() =>
-  !props.series?.length || props.series.every(v => !v)
+  !props.series?.length || props.series.every((v) => !v)
 )
 </script>
 

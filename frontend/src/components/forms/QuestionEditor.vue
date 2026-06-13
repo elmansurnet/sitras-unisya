@@ -194,43 +194,29 @@
 </template>
 
 <script setup>
-import { reactive, computed, watch, ref } from 'vue'
+import { reactive, computed, watch } from 'vue'
+import { QUESTION_TYPES } from '@/constants/questionTypes'
 
-// ─── Constants ──────────────────────────────────────────────────────────────────
+const OPTION_TYPES       = ['radio', 'checkbox', 'select']
+const PLACEHOLDER_TYPES  = ['text', 'textarea', 'number', 'email', 'date']
+const LENGTH_TYPES       = ['text', 'textarea']
 
-export const QUESTION_TYPES = [
-  { value: 'text',        label: 'Teks Singkat' },
-  { value: 'textarea',    label: 'Teks Panjang' },
-  { value: 'radio',       label: 'Pilihan Ganda (Radio)' },
-  { value: 'checkbox',    label: 'Pilihan Banyak (Checkbox)' },
-  { value: 'select',      label: 'Dropdown' },
-  { value: 'scale',       label: 'Skala Numerik' },
-  { value: 'date',        label: 'Tanggal' },
-  { value: 'number',      label: 'Angka' },
-  { value: 'email',       label: 'Email' },
-  { value: 'file',        label: 'Upload File' },
-]
-
-const OPTION_TYPES = ['radio', 'checkbox', 'select']
-const PLACEHOLDER_TYPES = ['text', 'textarea', 'number', 'email', 'date']
-const LENGTH_TYPES = ['text', 'textarea']
-
-// ─── Props & Emits ───────────────────────────────────────────────────────────
+// ─── Props & Emits ───────────────────────────────────────────────────
 
 const props = defineProps({
   /** Question object untuk mode edit; null/undefined = mode tambah baru */
-  question: { type: Object, default: null },
+  question:     { type: Object,          default: null },
   /** ID seksi tempat pertanyaan ini berada (wajib saat isNew) */
-  sectionId: { type: [Number, String], required: true },
+  sectionId:    { type: [Number, String], required: true },
   /** Urutan default saat tambah baru */
-  defaultOrder: { type: Number, default: 1 },
+  defaultOrder: { type: Number,          default: 1 },
   /** Flag loading dari store (dipakai di luar untuk disable tombol builder) */
-  saving: { type: Boolean, default: false },
+  saving:       { type: Boolean,         default: false },
 })
 
 const emit = defineEmits(['save', 'cancel', 'delete'])
 
-// ─── State form ─────────────────────────────────────────────────────────────────
+// ─── State form ───────────────────────────────────────────────────────────────────
 
 function buildForm(q) {
   const settings = q?.settings ?? {}
@@ -241,23 +227,23 @@ function buildForm(q) {
     is_required:     q?.is_required     ?? false,
     order:           q?.order           ?? props.defaultOrder,
     options:         Array.isArray(q?.options) && q.options.length ? [...q.options] : ['', ''],
-    placeholder:     settings.placeholder  ?? '',
-    min_length:      settings.min_length   ?? null,
-    max_length:      settings.max_length   ?? null,
-    scale_min:       settings.scale_min    ?? 1,
-    scale_max:       settings.scale_max    ?? 5,
-    scale_min_label: settings.scale_min_label ?? '',
-    scale_max_label: settings.scale_max_label ?? '',
+    placeholder:     settings.placeholder      ?? '',
+    min_length:      settings.min_length       ?? null,
+    max_length:      settings.max_length       ?? null,
+    scale_min:       settings.scale_min        ?? 1,
+    scale_max:       settings.scale_max        ?? 5,
+    scale_min_label: settings.scale_min_label  ?? '',
+    scale_max_label: settings.scale_max_label  ?? '',
   }
 }
 
-const form = reactive(buildForm(props.question))
+const form   = reactive(buildForm(props.question))
 const errors = reactive({})
 
-const isNew = computed(() => !props.question?.id)
-const hasOptions = computed(() => OPTION_TYPES.includes(form.type))
+const isNew          = computed(() => !props.question?.id)
+const hasOptions     = computed(() => OPTION_TYPES.includes(form.type))
 const hasPlaceholder = computed(() => PLACEHOLDER_TYPES.includes(form.type))
-const hasLength = computed(() => LENGTH_TYPES.includes(form.type))
+const hasLength      = computed(() => LENGTH_TYPES.includes(form.type))
 
 // Reset options ke ['',''] ketika beralih tipe ke option-based
 watch(() => form.type, (newType, oldType) => {
@@ -266,7 +252,7 @@ watch(() => form.type, (newType, oldType) => {
   }
 })
 
-// ─── Options helpers ───────────────────────────────────────────────────────────
+// ─── Options helpers ─────────────────────────────────────────────────────────────
 
 function addOption() {
   form.options.push('')
@@ -276,10 +262,10 @@ function removeOption(idx) {
   if (form.options.length > 2) form.options.splice(idx, 1)
 }
 
-// ─── Validation ────────────────────────────────────────────────────────────────
+// ─── Validation ──────────────────────────────────────────────────────────────────────
 
 function validate() {
-  Object.keys(errors).forEach(k => delete errors[k])
+  Object.keys(errors).forEach((k) => delete errors[k])
   let valid = true
 
   if (!form.question_text.trim()) {
@@ -287,7 +273,7 @@ function validate() {
     valid = false
   }
   if (hasOptions.value) {
-    const filled = form.options.filter(o => o.trim())
+    const filled = form.options.filter((o) => o.trim())
     if (filled.length < 2) {
       errors.options = 'Minimal 2 pilihan jawaban harus diisi.'
       valid = false
@@ -296,7 +282,7 @@ function validate() {
   return valid
 }
 
-// ─── Save ──────────────────────────────────────────────────────────────────────────
+// ─── Save ───────────────────────────────────────────────────────────────────────────────
 
 function handleSave() {
   if (!validate()) return
@@ -308,11 +294,11 @@ function handleSave() {
     help_text:     form.help_text.trim() || null,
     is_required:   form.is_required,
     order:         form.order,
-    options:       hasOptions.value ? form.options.filter(o => o.trim()) : null,
+    options:       hasOptions.value ? form.options.filter((o) => o.trim()) : null,
     settings: {
       ...(hasPlaceholder.value && form.placeholder ? { placeholder: form.placeholder } : {}),
-      ...(hasLength.value && form.min_length ? { min_length: form.min_length } : {}),
-      ...(hasLength.value && form.max_length ? { max_length: form.max_length } : {}),
+      ...(hasLength.value && form.min_length       ? { min_length: form.min_length }   : {}),
+      ...(hasLength.value && form.max_length       ? { max_length: form.max_length }   : {}),
       ...(form.type === 'scale' ? {
         scale_min:       form.scale_min,
         scale_max:       form.scale_max,
