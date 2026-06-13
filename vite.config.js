@@ -37,16 +37,21 @@ export default defineConfig({
         transformer: 'postcss',
     },
     server: {
-        host: '0.0.0.0',
+        /**
+         * Gunakan 127.0.0.1 (bukan 0.0.0.0) agar Vite dev server
+         * bisa diakses langsung dari browser di Windows/Laragon.
+         * 0.0.0.0 = bind semua interface tapi tidak resolve di browser Windows.
+         */
+        host: '127.0.0.1',
         port: 5173,
         proxy: {
             '/api': {
-                target: process.env.APP_URL || 'http://localhost:8000',
+                target: process.env.APP_URL || 'http://sitras-unisya.test',
                 changeOrigin: true,
                 secure: false,
             },
             '/sanctum': {
-                target: process.env.APP_URL || 'http://localhost:8000',
+                target: process.env.APP_URL || 'http://sitras-unisya.test',
                 changeOrigin: true,
                 secure: false,
             },
