@@ -1,6 +1,6 @@
 # 05_API.md
 # SPESIFIKASI REST API — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.3 | Tanggal: 2026-06-09
+# Versi: 1.0.4 | Tanggal: 2026-06-13
 
 ---
 
@@ -1075,7 +1075,7 @@ Auth: Bearer Token (superadmin, admin)
 
 ### 6.7 Kirim Undangan Massal
 ```
-POST /api/v1/admin/survey-periods/{id}/send-invitations
+POST /api/v1/admin/survey-periods/{id}/blast
 Auth: Bearer Token (superadmin, admin)
 ```
 
@@ -2075,6 +2075,7 @@ GET /api/v1/public/salary-ranges
 | 1.0.1 | 2026-06-06 | Tambah Section 9 (Notifikasi: CRUD template + log); fix gpa string→number; tambah DELETE employer (4.5); tambah employer save-draft (12.3); tambah send-invitation per alumni (3.9); tambah archive kuesioner (5.6); CRUD seksi kuesioner (5.7-5.9); update/hapus pertanyaan (5.11-5.12); tambah period detail+update (6.2,6.4); tambah close period (6.6); tambah report download (8.4); tambah toggle-active user (10.6); tambah catatan desain survey_periods; lengkapi summary table (Section 14 — 73 endpoint) |
 | 1.0.2 | 2026-06-08 | Update contoh GET/PUT settings (Section 10.1): key `wa_gateway_url` → gateway UNISYA, tambah `wa_api_key` dan `wa_sender` sebagai key terpisah yang bisa dikonfigurasi via menu Setting; ganti contoh `wa_gateway_token` → `wa_api_key` di PUT request body |
 | 1.0.3 | 2026-06-09 | Tambah catatan implementasi Laravel pada Section 5.13 (endpoint reorder pertanyaan): route `/questions/reorder` wajib didaftarkan sebelum route resource `questions/{id}` untuk menghindari konflik routing (INC-04) |
+| 1.0.4 | 2026-06-13 | Fix §6.7: rename endpoint send-invitations → blast agar konsisten dengan implementasi SurveyPeriodController::sendBlast() dan routes/api.php|
 
 ---
 
