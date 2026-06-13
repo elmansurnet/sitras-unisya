@@ -3,6 +3,9 @@
  * Sesuai 04_ARCHITECTURE.md §4.1
  */
 
+// CSS harus diimport PERTAMA agar Tailwind ter-bundle oleh Vite
+import './style.css'
+
 import { createApp }  from 'vue'
 import { createPinia } from 'pinia'
 import App            from './App.vue'

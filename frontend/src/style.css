@@ -1,0 +1,8 @@
+/**
+ * style.css — Global stylesheet entry point
+ * Harus di-import pertama di main.js agar Tailwind ter-bundle
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

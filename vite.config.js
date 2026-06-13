@@ -31,16 +31,19 @@ export default defineConfig({
         /**
          * Paksa transformer ke 'postcss' agar @apply di <style scoped>
          * diproses Tailwind/PostCSS terlebih dahulu sebelum minifikasi.
-         * Tanpa ini, lightningcss minifier tidak mengenal @apply dan
-         * membuang warning 'Unknown at rule: @apply'.
          */
         transformer: 'postcss',
+        /**
+         * Arahkan PostCSS ke folder frontend/ tempat tailwind.config.js
+         * dan postcss.config.js berada. Tanpa ini, Vite mencari config
+         * di root project dan tidak menemukan Tailwind.
+         */
+        postcss: resolve(__dirname, 'frontend'),
     },
     server: {
         /**
          * Gunakan 127.0.0.1 (bukan 0.0.0.0) agar Vite dev server
          * bisa diakses langsung dari browser di Windows/Laragon.
-         * 0.0.0.0 = bind semua interface tapi tidak resolve di browser Windows.
          */
         host: '127.0.0.1',
         port: 5173,
