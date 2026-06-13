@@ -27,6 +27,15 @@ export default defineConfig({
             '@': resolve(__dirname, 'frontend/src'),
         },
     },
+    css: {
+        /**
+         * Paksa transformer ke 'postcss' agar @apply di <style scoped>
+         * diproses Tailwind/PostCSS terlebih dahulu sebelum minifikasi.
+         * Tanpa ini, lightningcss minifier tidak mengenal @apply dan
+         * membuang warning 'Unknown at rule: @apply'.
+         */
+        transformer: 'postcss',
+    },
     server: {
         host: '0.0.0.0',
         port: 5173,
@@ -52,8 +61,7 @@ export default defineConfig({
             output: {
                 /**
                  * manualChunks HARUS Function di Vite 8 (Rolldown).
-                 * Object literal tidak didukung — menyebabkan warning
-                 * "Expected Function but received Object".
+                 * Object literal tidak didukung.
                  */
                 manualChunks(id) {
                     if (id.includes('node_modules')) {
