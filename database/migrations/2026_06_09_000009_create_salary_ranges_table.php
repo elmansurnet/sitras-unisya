@@ -15,9 +15,9 @@ return new class extends Migration
         Schema::create('salary_ranges', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->string('label', 100);
-            $table->unsignedInteger('min_salary')->nullable();
-            $table->unsignedInteger('max_salary')->nullable();
-            $table->unsignedTinyInteger('sort_order')->default(0);
+            $table->unsignedInteger('min_value')->nullable();
+            $table->unsignedInteger('max_value')->nullable();
+            $table->unsignedTinyInteger('order_number')->default(0);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });

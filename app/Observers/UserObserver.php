@@ -12,8 +12,8 @@ class UserObserver
         AuditLog::record(
             module: 'user',
             action: 'created',
-            targetType: User::class,
-            targetId: $user->id,
+            modelType: User::class,
+            modelId: $user->id,
             newValues: $this->sanitize($user->toArray())
         );
     }
@@ -23,8 +23,8 @@ class UserObserver
         AuditLog::record(
             module: 'user',
             action: 'updated',
-            targetType: User::class,
-            targetId: $user->id,
+            modelType: User::class,
+            modelId: $user->id,
             oldValues: $this->sanitize($user->getOriginal()),
             newValues: $this->sanitize($user->getChanges())
         );
@@ -35,8 +35,8 @@ class UserObserver
         AuditLog::record(
             module: 'user',
             action: 'deleted',
-            targetType: User::class,
-            targetId: $user->id,
+            modelType: User::class,
+            modelId: $user->id,
             oldValues: $this->sanitize($user->toArray())
         );
     }
