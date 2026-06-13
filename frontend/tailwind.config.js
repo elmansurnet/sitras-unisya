@@ -1,13 +1,9 @@
 /**
  * tailwind.config.js — Konfigurasi TailwindCSS untuk frontend SPA
  * Sesuai 04_ARCHITECTURE.md §2 & 06_UI_UX.md design tokens
- *
- * PENTING: Gunakan path absolut via fileURLToPath agar content path
- * resolve dengan benar saat Vite berjalan dari root project, bukan
- * dari folder frontend/.
  */
 import { fileURLToPath } from 'url'
-import { dirname, resolve } from 'path'
+import { dirname, join } from 'path'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname  = dirname(__filename)
@@ -15,8 +11,8 @@ const __dirname  = dirname(__filename)
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    resolve(__dirname, 'index.html'),
-    resolve(__dirname, 'src/**/*.{vue,js,ts,jsx,tsx}'),
+    join(__dirname, 'index.html'),
+    join(__dirname, 'src/**/*.{vue,js,ts,jsx,tsx}'),
   ],
   theme: {
     extend: {
@@ -89,8 +85,6 @@ export default {
       },
       screens: {
         xs: '475px',
-        // default breakpoints: sm=640, md=768, lg=1024, xl=1280, 2xl=1536
-        // lg (1024px) adalah breakpoint sidebar permanen sesuai 06_UI_UX.md
       },
       transitionDuration: {
         DEFAULT: '200ms',
