@@ -7,6 +7,8 @@ use App\Jobs\SendEmailNotification;
 use App\Models\AuditLog;
 use App\Models\Employer;
 use App\Repositories\Contracts\EmployerRepositoryInterface;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -30,7 +32,51 @@ class EmployerService
 
     public function delete(Employer $employer): void
     {
+        // Hapus logo dari private storage sebelum delete
+        if ($employer->logo_path && Storage::disk('private')->exists($employer->logo_path)) {
+            Storage::disk('private')->delete($employer->logo_path);
+        }
         $this->repository->delete($employer);
+    }
+
+    // ─── LOGO ───────────────────────────────────────────────────────────────
+
+    /**
+     * Upload logo perusahaan ke storage/app/private/employer/logos/.
+     * Akses via signed URL — TIDAK boleh di public/.
+     * Max 2MB, MIME: jpg/jpeg/png/webp (divalidasi di StoreEmployerRequest/UpdateEmployerRequest).
+     *
+     * @param  Employer     $employer
+     * @param  UploadedFile $file
+     * @return string        Path relatif di disk 'private'
+     */
+    public function uploadLogo(Employer $employer, UploadedFile $file): string
+    {
+        // Hapus logo lama jika ada
+        if ($employer->logo_path && Storage::disk('private')->exists($employer->logo_path)) {
+            Storage::disk('private')->delete($employer->logo_path);
+        }
+
+        $filename = Str::uuid() . '.' . $file->extension();
+
+        $path = $file->storeAs(
+            'employer/logos',
+            $filename,
+            'private'
+        );
+
+        $employer->update(['logo_path' => $path]);
+
+        AuditLog::record(
+            action   : 'upload_logo',
+            module   : 'employer',
+            modelId  : $employer->id,
+            oldValues: ['logo_path' => $employer->getOriginal('logo_path')],
+            newValues: ['logo_path' => $path],
+            modelType: Employer::class,
+        );
+
+        return $path;
     }
 
     // ─── Token Management ──────────────────────────────────────────────────

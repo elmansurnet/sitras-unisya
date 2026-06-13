@@ -50,6 +50,28 @@ class UpdateAlumniRequest extends FormRequest
             'email'                  => ['sometimes', 'email', 'max:200',
                                          Rule::unique('users', 'email')->ignore($userId)],
             'linkedin_url'           => ['sometimes', 'nullable', 'url', 'max:255'],
+
+            // Foto profil — double-validate: extension + byte-level MIME (07_SECURITY.md §5)
+            'photo'                  => [
+                'sometimes',
+                'nullable',
+                'file',
+                'mimes:jpg,jpeg,png,webp',
+                'mimetypes:image/jpeg,image/png,image/webp',
+                'max:2048',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'photo.mimes'    => 'Foto harus berformat JPG, JPEG, PNG, atau WebP.',
+            'photo.mimetypes'=> 'Tipe file foto tidak valid.',
+            'photo.max'      => 'Ukuran foto maksimal 2 MB.',
         ];
     }
 }

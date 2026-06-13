@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Alumni;
 use App\Models\AuditLog;
+use App\Models\SurveyPeriod;
 use App\Models\User;
 use App\Repositories\AlumniRepository;
 use Illuminate\Http\UploadedFile;
@@ -15,8 +16,9 @@ use Illuminate\Support\Str;
 class AlumniService
 {
     public function __construct(
-        private readonly AlumniRepository   $alumniRepo,
+        private readonly AlumniRepository    $alumniRepo,
         private readonly ImportExportService $importExport,
+        private readonly NotificationService $notificationService,
     ) {}
 
     // ─── CRUD ─────────────────────────────────────────────────────────────────
@@ -24,26 +26,30 @@ class AlumniService
     /**
      * Buat alumni baru beserta user account-nya.
      *
-     * @param  array<string,mixed> $data  Validated data dari StoreAlumniRequest
-     * @param  int                 $actorId  user_id yang melakukan aksi
+     * @param  array<string,mixed> $data      Validated data dari StoreAlumniRequest
+     * @param  int                 $actorId   user_id yang melakukan aksi
      */
     public function create(array $data, int $actorId): Alumni
     {
         return DB::transaction(function () use ($data, $actorId) {
-            // 1. Buat akun user
             $user = User::create([
-                'name'     => $data['full_name'],
-                'email'    => $data['email'],
-                'password' => Hash::make($data['password'] ?? Str::random(16)),
-                'role'     => 'alumni',
+                'name'      => $data['full_name'],
+                'email'     => $data['email'],
+                'password'  => Hash::make($data['password'] ?? Str::random(16)),
+                'role'      => 'alumni',
                 'is_active' => true,
             ]);
 
-            // 2. Buat record alumni (observer AlumniObserver::created akan log audit)
             $alumni = Alumni::create(array_merge(
-                collect($data)->except(['email', 'password'])->toArray(),
+                collect($data)->except(['email', 'password', 'photo'])->toArray(),
                 ['user_id' => $user->id, 'is_active' => true]
             ));
+
+            // Upload foto jika disertakan saat create
+            if (isset($data['photo']) && $data['photo'] instanceof UploadedFile) {
+                $this->uploadPhoto($alumni, $data['photo']);
+                $alumni->refresh();
+            }
 
             return $alumni->load(['user', 'studyProgram.faculty', 'graduationYear']);
         });
@@ -57,13 +63,16 @@ class AlumniService
     public function update(Alumni $alumni, array $data, int $actorId): Alumni
     {
         return DB::transaction(function () use ($alumni, $data, $actorId) {
-            // Update email di tabel users jika berubah
             if (isset($data['email']) && $data['email'] !== $alumni->user?->email) {
                 $alumni->user?->update(['email' => $data['email']]);
             }
 
-            // Observer akan tangkap old/new values untuk audit log
-            $alumni->update(collect($data)->except(['email', 'password'])->toArray());
+            // Upload foto jika disertakan saat update
+            if (isset($data['photo']) && $data['photo'] instanceof UploadedFile) {
+                $this->uploadPhoto($alumni, $data['photo']);
+            }
+
+            $alumni->update(collect($data)->except(['email', 'password', 'photo'])->toArray());
 
             return $alumni->fresh(['user', 'studyProgram.faculty', 'graduationYear']);
         });
@@ -75,6 +84,10 @@ class AlumniService
     public function delete(Alumni $alumni, int $actorId): void
     {
         DB::transaction(function () use ($alumni, $actorId) {
+            // Hapus foto dari private storage sebelum delete
+            if ($alumni->photo_path && Storage::disk('private')->exists($alumni->photo_path)) {
+                Storage::disk('private')->delete($alumni->photo_path);
+            }
             $alumni->delete();
             $alumni->user?->delete();
         });
@@ -83,20 +96,28 @@ class AlumniService
     // ─── FOTO ─────────────────────────────────────────────────────────────────
 
     /**
-     * Upload foto profil alumni.
-     * Disimpan di storage/app/private/alumni/photos/ — akses via signed URL.
-     * Max 2MB, mime: jpg/jpeg/png/webp.
+     * Upload foto profil alumni ke storage/app/private/alumni/photos/.
+     * Akses via signed URL — TIDAK boleh di public/.
+     * Max 2MB, MIME: jpg/jpeg/png/webp (divalidasi di StoreAlumniRequest/UpdateAlumniRequest).
+     *
+     * @param  Alumni       $alumni
+     * @param  UploadedFile $file
+     * @return string        Path relatif di disk 'private'
      */
     public function uploadPhoto(Alumni $alumni, UploadedFile $file): string
     {
         // Hapus foto lama jika ada
-        if ($alumni->photo_path && Storage::exists($alumni->photo_path)) {
-            Storage::delete($alumni->photo_path);
+        if ($alumni->photo_path && Storage::disk('private')->exists($alumni->photo_path)) {
+            Storage::disk('private')->delete($alumni->photo_path);
         }
 
-        $path = $file->store(
+        $filename = Str::uuid() . '.' . $file->extension();
+
+        // storeAs() adalah cara benar menyimpan dengan nama custom di disk tertentu
+        $path = $file->storeAs(
             'alumni/photos',
-            ['disk' => 'private', 'filename' => Str::uuid() . '.' . $file->extension()]
+            $filename,
+            'private'
         );
 
         $alumni->update(['photo_path' => $path]);
@@ -105,7 +126,7 @@ class AlumniService
             action   : 'upload_photo',
             module   : 'alumni',
             modelId  : $alumni->id,
-            oldValues: ['photo_path' => null],
+            oldValues: ['photo_path' => $alumni->getOriginal('photo_path')],
             newValues: ['photo_path' => $path],
             modelType: Alumni::class,
         );
@@ -117,7 +138,6 @@ class AlumniService
 
     /**
      * Import alumni dari file Excel.
-     * Return ringkasan: berhasil, gagal, errors.
      *
      * @return array{success: int, failed: int, errors: array<int, string>}
      */
@@ -172,8 +192,7 @@ class AlumniService
     }
 
     /**
-     * Export data alumni ke Excel.
-     * Dispatch job ke queue untuk file besar.
+     * Export data alumni ke Excel via queue job.
      *
      * @param  array<string,mixed> $filters
      */
@@ -203,19 +222,34 @@ class AlumniService
     // ─── UNDANGAN SURVEI ──────────────────────────────────────────────────────
 
     /**
-     * Kirim ulang undangan survei ke alumni.
-     * Job dikirim ke queue 'high' agar prioritas tinggi.
+     * Kirim undangan survei ke alumni.
+     * Dispatch via NotificationService → queue 'notifications'.
+     *
+     * @param  Alumni $alumni
+     * @param  int    $surveyPeriodId  ID dari survey_periods
+     * @param  int    $actorId
      */
     public function sendInvitation(Alumni $alumni, int $surveyPeriodId, int $actorId): void
     {
-        // Akan diimplementasi penuh di sesi 4A setelah SurveyPeriod model tersedia
-        // Placeholder dispatch:
+        $surveyPeriod = SurveyPeriod::findOrFail($surveyPeriodId);
+
+        // Dispatch notifikasi ke queue melalui NotificationService
+        $this->notificationService->sendToAlumni(
+            alumni       : $alumni,
+            surveyPeriod : $surveyPeriod,
+            templateEvent: 'survey_invitation',
+        );
+
         AuditLog::record(
             action   : 'send_invitation',
             module   : 'alumni',
             modelId  : $alumni->id,
             oldValues: null,
-            newValues: ['survey_period_id' => $surveyPeriodId, 'actor_id' => $actorId],
+            newValues: [
+                'survey_period_id' => $surveyPeriodId,
+                'survey_name'      => $surveyPeriod->name,
+                'actor_id'         => $actorId,
+            ],
             modelType: Alumni::class,
         );
     }

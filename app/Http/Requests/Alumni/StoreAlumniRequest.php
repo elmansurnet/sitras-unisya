@@ -47,6 +47,15 @@ class StoreAlumniRequest extends FormRequest
             'phone'                  => ['nullable', 'string', 'max:20'],
             'email'                  => ['required', 'email', 'max:200', 'unique:users,email'],
             'linkedin_url'           => ['nullable', 'url', 'max:255'],
+
+            // Foto profil — double-validate: extension + byte-level MIME (07_SECURITY.md §5)
+            'photo'                  => [
+                'nullable',
+                'file',
+                'mimes:jpg,jpeg,png,webp',
+                'mimetypes:image/jpeg,image/png,image/webp',
+                'max:2048',
+            ],
         ];
     }
 
@@ -56,13 +65,16 @@ class StoreAlumniRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'nim.unique'         => 'NIM sudah terdaftar.',
-            'nik.unique'         => 'NIK sudah terdaftar.',
-            'nik.size'           => 'NIK harus 16 digit.',
-            'email.unique'       => 'Email sudah digunakan.',
-            'gpa.between'        => 'IPK harus antara 0 dan 4.',
-            'study_program_id.exists' => 'Program studi tidak ditemukan.',
-            'graduation_year_id.exists' => 'Angkatan tidak ditemukan.',
+            'nim.unique'               => 'NIM sudah terdaftar.',
+            'nik.unique'               => 'NIK sudah terdaftar.',
+            'nik.size'                 => 'NIK harus 16 digit.',
+            'email.unique'             => 'Email sudah digunakan.',
+            'gpa.between'              => 'IPK harus antara 0 dan 4.',
+            'study_program_id.exists'  => 'Program studi tidak ditemukan.',
+            'graduation_year_id.exists'=> 'Angkatan tidak ditemukan.',
+            'photo.mimes'              => 'Foto harus berformat JPG, JPEG, PNG, atau WebP.',
+            'photo.mimetypes'          => 'Tipe file foto tidak valid.',
+            'photo.max'                => 'Ukuran foto maksimal 2 MB.',
         ];
     }
 }

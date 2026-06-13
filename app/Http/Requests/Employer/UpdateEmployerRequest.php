@@ -30,6 +30,25 @@ class UpdateEmployerRequest extends FormRequest
             'contact_person_email'    => ['nullable', 'email', 'max:255'],
             'contact_person_phone'    => ['nullable', 'string', 'max:20'],
             'notes'                   => ['nullable', 'string'],
+
+            // Logo perusahaan — double-validate: extension + byte-level MIME (07_SECURITY.md §5)
+            'logo'                    => [
+                'sometimes',
+                'nullable',
+                'file',
+                'mimes:jpg,jpeg,png,webp',
+                'mimetypes:image/jpeg,image/png,image/webp',
+                'max:2048',
+            ],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'logo.mimes'    => 'Logo harus berformat JPG, JPEG, PNG, atau WebP.',
+            'logo.mimetypes'=> 'Tipe file logo tidak valid.',
+            'logo.max'      => 'Ukuran logo maksimal 2 MB.',
         ];
     }
 }

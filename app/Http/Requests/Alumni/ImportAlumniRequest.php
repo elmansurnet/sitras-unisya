@@ -20,8 +20,11 @@ class ImportAlumniRequest extends FormRequest
             'file'               => [
                 'required',
                 'file',
-                // Hanya xlsx dan csv; max 10 MB sesuai 05_API.md §3.6
+                // Extension check (layer 1)
                 'mimes:xlsx,csv',
+                // Byte-level MIME check (layer 2 — cegah bypass via rename, 07_SECURITY.md §5)
+                'mimetypes:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain,application/csv',
+                // Max 10 MB sesuai 05_API.md §3.6
                 'max:10240',
             ],
             // Override prodi & angkatan opsional — jika diisi, wajib valid
@@ -36,8 +39,10 @@ class ImportAlumniRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'file.mimes' => 'File harus berformat .xlsx atau .csv.',
-            'file.max'   => 'Ukuran file maksimal 10 MB.',
+            'file.required'  => 'File import wajib diunggah.',
+            'file.mimes'     => 'File harus berformat .xlsx atau .csv.',
+            'file.mimetypes' => 'Tipe file tidak valid. Hanya .xlsx dan .csv yang diizinkan.',
+            'file.max'       => 'Ukuran file maksimal 10 MB.',
         ];
     }
 }
