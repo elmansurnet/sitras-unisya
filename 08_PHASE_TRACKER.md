@@ -364,7 +364,7 @@
 | 5A.6 | View Blade: `resources/views/reports/employer-report.blade.php` (template PDF laporan employer) | Blade file | ✅ |
 | 5A.7 | Controller: `Admin/DashboardController` (summary, employmentStats, alumniMap) | `DashboardController.php` | ✅ |
 | 5A.8 | Controller: `Admin/ReportController` (generatePdf, generateExcel, index, download) | `ReportController.php` | ✅ |
-| 5A.9 | Routes: `/api/v1/admin/dashboard/*`, `/api/v1/admin/reports/*` | `routes/api.php` | ⏳ |
+| 5A.9 | Routes: `/api/v1/admin/dashboard/*`, `/api/v1/admin/reports/*` | `routes/api.php` | ✅ |
 | 5A.10 | Scheduler Command: `GenerateMonthlyReport` (auto-generate laporan bulanan, tanggal 1 jam 07:00) | `GenerateMonthlyReport.php` | ✅ |
 | 5A.11 | Feature Test: dashboard summary + stats (data sesuai filter periode/prodi/angkatan) | `tests/Feature/Admin/DashboardTest.php` | ✅ |
 
