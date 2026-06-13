@@ -2,11 +2,13 @@
 
 use App\Http\Controllers\Api\V1\Admin\AlumniController;
 use App\Http\Controllers\Api\V1\Admin\AuditLogController;
+use App\Http\Controllers\Api\V1\Admin\DashboardController;
 use App\Http\Controllers\Api\V1\Admin\EmployerController as AdminEmployerController;
 use App\Http\Controllers\Api\V1\Admin\FacultyController;
 use App\Http\Controllers\Api\V1\Admin\GraduationYearController;
 use App\Http\Controllers\Api\V1\Admin\NotificationController;
 use App\Http\Controllers\Api\V1\Admin\QuestionnaireController;
+use App\Http\Controllers\Api\V1\Admin\ReportController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\StudyProgramController;
 use App\Http\Controllers\Api\V1\Admin\SurveyPeriodController;
@@ -178,6 +180,27 @@ Route::prefix('v1')->group(function () {
                 Route::get('/{log}',         [NotificationController::class, 'showLog'])->name('show');
                 Route::post('/{log}/retry',  [NotificationController::class, 'retryLog'])->name('retry');
             });
+        });
+
+        // --- Dashboard & Statistik (5A.9 — 05_API.md §7) ---
+        // Urutan PENTING: semua route ini static, tidak ada route parameter.
+        Route::prefix('dashboard')->name('dashboard.')->group(function () {
+            Route::get('summary',          [DashboardController::class, 'summary'])->name('summary');
+            Route::get('employment-stats', [DashboardController::class, 'employmentStats'])->name('employment-stats');
+            Route::get('alumni-map',       [DashboardController::class, 'alumniMap'])->name('alumni-map');
+        });
+
+        // --- Laporan (5A.9 — 05_API.md §8) ---
+        // Urutan PENTING: static routes (generate/pdf, generate/excel) SEBELUM route parameter {report}
+        // Rate limit khusus untuk generate (5 req / 5 menit) sesuai 05_API.md §1.5
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::middleware('throttle:reports')->group(function () {
+                Route::post('generate/pdf',   [ReportController::class, 'generatePdf'])->name('generate.pdf');
+                Route::post('generate/excel', [ReportController::class, 'generateExcel'])->name('generate.excel');
+            });
+
+            Route::get('/',               [ReportController::class, 'index'])->name('index');
+            Route::get('/{report}/download', [ReportController::class, 'download'])->name('download');
         });
 
         // --- Faculty Management (2C.1) ---
