@@ -20,7 +20,7 @@
 | 7 | Deployment & Optimasi | 7A | ⏳ Pending |
 
 **Total Task: 219 task**
-**Selesai: 170 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12, 3B.1–3B.9 selesai 2026-06-12, 4A.1–4A.28 selesai 2026-06-13, 4B.1–4B.12 selesai 2026-06-13)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
+**Selesai: 168 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12, 3B.1–3B.9 selesai 2026-06-12, 4A.1–4A.28 selesai 2026-06-13, 4B.1–4B.12 selesai 2026-06-13)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
 
 ---
 
