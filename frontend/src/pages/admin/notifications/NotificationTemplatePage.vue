@@ -480,7 +480,7 @@ function eventLabel(event) {
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">
                     Daftar Variabel
-                    <span class="text-xs text-gray-400 ml-1">(format: <code>{{'{{'}}nama{{'}}'}}</code>: deskripsi, satu per baris)</span>
+                    <span class="text-xs text-gray-400 ml-1">(format: <code>&#123;&#123;nama&#125;&#125;</code>: deskripsi, satu per baris)</span>
                   </label>
                   <textarea
                     v-model="form.variables"
