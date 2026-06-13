@@ -2,8 +2,8 @@ import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
 import { resolve } from 'path';
-import tailwindcss from 'tailwindcss';        // ← tambah
-import autoprefixer from 'autoprefixer';      // ← tambah
+import tailwindcss from 'tailwindcss';
+import autoprefixer from 'autoprefixer';
 
 export default defineConfig({
     plugins: [
@@ -33,18 +33,12 @@ export default defineConfig({
         transformer: 'postcss',
         postcss: {
             plugins: [
-                (await import('tailwindcss')).default({
-                    config: resolve(__dirname, 'frontend/tailwind.config.js'),
-                }),
-                (await import('autoprefixer')).default(),
+                tailwindcss({ config: resolve(__dirname, 'frontend/tailwind.config.js') }),
+                autoprefixer(),
             ],
         },
     },
     server: {
-        /**
-         * Gunakan 127.0.0.1 (bukan 0.0.0.0) agar Vite dev server
-         * bisa diakses langsung dari browser di Windows/Laragon.
-         */
         host: '127.0.0.1',
         port: 5173,
         proxy: {
@@ -67,10 +61,6 @@ export default defineConfig({
         sourcemap: false,
         rollupOptions: {
             output: {
-                /**
-                 * manualChunks HARUS Function di Vite 8 (Rolldown).
-                 * Object literal tidak didukung.
-                 */
                 manualChunks(id) {
                     if (id.includes('node_modules')) {
                         if (id.includes('apexcharts') || id.includes('vue3-apexcharts')) {
