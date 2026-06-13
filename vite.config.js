@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
 import { resolve } from 'path';
+import tailwindcss from 'tailwindcss';        // ← tambah
+import autoprefixer from 'autoprefixer';      // ← tambah
 
 export default defineConfig({
     plugins: [
@@ -28,17 +30,15 @@ export default defineConfig({
         },
     },
     css: {
-        /**
-         * Paksa transformer ke 'postcss' agar @apply di <style scoped>
-         * diproses Tailwind/PostCSS terlebih dahulu sebelum minifikasi.
-         */
         transformer: 'postcss',
-        /**
-         * Arahkan PostCSS ke folder frontend/ tempat tailwind.config.js
-         * dan postcss.config.js berada. Tanpa ini, Vite mencari config
-         * di root project dan tidak menemukan Tailwind.
-         */
-        postcss: resolve(__dirname, 'frontend'),
+        postcss: {
+            plugins: [
+                (await import('tailwindcss')).default({
+                    config: resolve(__dirname, 'frontend/tailwind.config.js'),
+                }),
+                (await import('autoprefixer')).default(),
+            ],
+        },
     },
     server: {
         /**
