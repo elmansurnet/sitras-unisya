@@ -51,8 +51,11 @@ class DashboardController extends Controller
             'study_program_id'    => ['nullable', 'integer', 'exists:study_programs,id'],
         ]);
 
-        $filters = $request->only(['period_id', 'graduation_year_id', 'study_program_id']);
-        $data    = $this->dashboardService->getEmploymentStats($filters);
+        $data = $this->dashboardService->getEmploymentStats(
+            periodId:         $request->integer('period_id')          ?: null,
+            graduationYearId: $request->integer('graduation_year_id') ?: null,
+            studyProgramId:   $request->integer('study_program_id')   ?: null,
+        );
 
         return response()->json([
             'success' => true,
@@ -74,8 +77,10 @@ class DashboardController extends Controller
             'study_program_id'   => ['nullable', 'integer', 'exists:study_programs,id'],
         ]);
 
-        $filters = $request->only(['graduation_year_id', 'study_program_id']);
-        $data    = $this->dashboardService->getAlumniMap($filters);
+        $data = $this->dashboardService->getAlumniMap(
+            graduationYearId: $request->integer('graduation_year_id') ?: null,
+            studyProgramId:   $request->integer('study_program_id')   ?: null,
+        );
 
         return response()->json([
             'success' => true,
