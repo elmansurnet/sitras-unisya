@@ -1,402 +1,292 @@
-# Deploy Checklist — SITRAS UNISYA Production
-
-**Versi:** 1.0.0  
-**Tanggal:** 2026-06-13  
-**Referensi:** 07_SECURITY.md §15, 04_ARCHITECTURE.md  
-
-> Checklist ini WAJIB diselesaikan 100% sebelum aplikasi go-live ke production.
-> Setiap item harus diverifikasi dan ditandai oleh engineer yang bertanggung jawab.
+# DEPLOY CHECKLIST — SISTEM TRACER STUDY UNISYA
+# Versi: 1.0.0 | Tanggal: 2026-06-13
 
 ---
 
-## A. PRE-DEPLOY — CODE & DEPENDENCY
+## PANDUAN PENGGUNAAN
 
-- [ ] `composer audit` → 0 vulnerability
-- [ ] `npm audit --audit-level=high` (di `frontend/`) → 0 high/critical
-- [ ] `php artisan test` → semua test hijau (Unit + Feature)
-- [ ] Tidak ada `dd()`, `dump()`, `var_dump()`, `echo` debug di kode production
-- [ ] Tidak ada TODO atau placeholder code di file yang akan di-deploy
+Checklist ini wajib diselesaikan **100%** sebelum deployment ke production.
+Beri tanda `[x]` pada setiap item yang sudah diverifikasi.
+Item bertanda 🔴 adalah **BLOCKER** — deployment tidak boleh dilanjutkan jika belum selesai.
+
+---
+
+## FASE 1 — PRE-DEPLOY: KODE & DEPENDENCY
+
+### 1.1 Security Audit
+- [ ] 🔴 `composer audit` → **0 vulnerabilities**
+- [ ] 🔴 `npm audit --audit-level=high` → **0 high/critical vulnerabilities**
+- [ ] 🔴 CSP header tidak menyertakan `unsafe-eval` di production build
+- [ ] Review `docs/security-audit.md` — semua item medium sudah dimitigasi atau diterima dengan justifikasi
+
+### 1.2 Environment & Configuration
+- [ ] 🔴 `.env` production sudah dibuat berdasarkan `.env.example`
+- [ ] 🔴 `APP_ENV=production`
+- [ ] 🔴 `APP_DEBUG=false`
+- [ ] 🔴 `APP_KEY` sudah di-generate (`php artisan key:generate`)
+- [ ] 🔴 `TELESCOPE_ENABLED=false`
+- [ ] `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` sudah diisi
+- [ ] `REDIS_PASSWORD` sudah diisi (bukan default tanpa auth)
+- [ ] `WHATSAPP_API_KEY` dan `WHATSAPP_SENDER` sudah diisi
+- [ ] `SANCTUM_STATEFUL_DOMAINS` dan `FRONTEND_URL` sesuai domain production
+- [ ] `MAIL_*` sudah dikonfigurasi dan ditest kirim email
+- [ ] `EMPLOYER_TOKEN_EXPIRY_DAYS=30` dikonfirmasi
+- [ ] File `.env` ada di `.gitignore` dan **tidak pernah di-commit**
+
+### 1.3 Kode & Build
+- [ ] 🔴 Semua test lulus: `php artisan test` → 0 failures, 0 errors
+- [ ] 🔴 Frontend build production: `npm run build` di folder `frontend/`
+- [ ] Tidak ada `dd()`, `dump()`, `var_dump()`, `console.log()` di kode production
+- [ ] Tidak ada `// TODO` atau placeholder code yang tersisa
+- [ ] `composer install --no-dev --optimize-autoloader` (tanpa dev dependencies)
 - [ ] `composer.lock` dan `package-lock.json` di-commit ke Git
-- [ ] `.env` ada di `.gitignore` dan tidak pernah di-commit
-- [ ] Review `composer.json` — tidak ada package `dev` yang ter-include di production
-  ```bash
-  composer install --no-dev --optimize-autoloader
-  ```
-- [ ] Frontend Vue 3 build production:
-  ```bash
-  cd frontend && npm run build
-  ```
-  Output di `public/build/` — verifikasi tidak ada source map yang terekspos
 
 ---
 
-## B. SERVER SETUP — Ubuntu 22.04
+## FASE 2 — SERVER: INFRASTRUKTUR
 
-### B.1 Software Versions
-- [ ] PHP 8.3 + PHP-FPM 8.3 terinstall
+### 2.1 OS & Software Versions
+- [ ] Ubuntu 22.04 LTS (bukan 20.04 atau yang lebih lama)
+- [ ] PHP 8.3 (bukan 8.1 atau 8.2)
+- [ ] PHP-FPM 8.3 terinstall dan berjalan
 - [ ] Nginx 1.24+ terinstall
-- [ ] MySQL 8.0+ terinstall
-- [ ] Redis 7.x terinstall
+- [ ] MySQL 8.0+ terinstall dan berjalan
+- [ ] Redis 7.x terinstall dan berjalan
 - [ ] Node.js 20.x terinstall (untuk build frontend)
-- [ ] Supervisor terinstall (untuk queue worker)
+- [ ] Supervisor terinstall
 
-### B.2 PHP Hardening
-- [ ] `expose_php = Off` di `/etc/php/8.3/fpm/php.ini`
-- [ ] `display_errors = Off`
-- [ ] `log_errors = On`
-- [ ] `error_log = /var/log/php/error.log`
-- [ ] `upload_max_filesize = 12M`
-- [ ] `post_max_size = 12M`
-- [ ] `max_execution_time = 60`
+### 2.2 PHP-FPM Configuration
+- [ ] Pool config `/etc/php/8.3/fpm/pool.d/sitras.conf` sudah dibuat sesuai `04_ARCHITECTURE.md §7`
+- [ ] `expose_php = Off` dikonfirmasi
+- [ ] `display_errors = off` dikonfirmasi
+- [ ] `upload_max_filesize = 10M` dan `post_max_size = 12M`
+- [ ] `memory_limit = 256M`
+- [ ] PHP-FPM restart setelah konfigurasi: `systemctl restart php8.3-fpm`
 
-### B.3 Nginx Hardening
-```nginx
-# Tambahkan di nginx.conf atau server block
-server_tokens off;
-autoindex off;
-```
-- [ ] `server_tokens off;` aktif
-- [ ] `autoindex off;` aktif
-- [ ] Akses ke `.env`, `.git`, `storage/logs` diblokir:
-  ```nginx
-  location ~ /\.env { deny all; }
-  location ~ /\.git { deny all; }
-  location ~ /storage/logs { deny all; }
-  ```
-- [ ] Rate limiting zone dikonfigurasi:
-  ```nginx
-  limit_req_zone $binary_remote_addr zone=otp:10m  rate=5r/m;
-  limit_req_zone $binary_remote_addr zone=auth:10m rate=10r/m;
-  limit_req_zone $binary_remote_addr zone=api:10m  rate=60r/m;
-  ```
-- [ ] Rate limiting aktif di location block API
-- [ ] Security headers terpasang (referensi: 07_SECURITY.md §9):
-  - [ ] `X-Frame-Options: SAMEORIGIN`
-  - [ ] `X-Content-Type-Options: nosniff`
-  - [ ] `X-XSS-Protection: 1; mode=block`
-  - [ ] `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
-  - [ ] `Content-Security-Policy` (lihat 07_SECURITY.md §9)
-  - [ ] `Referrer-Policy: strict-origin-when-cross-origin`
-  - [ ] `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+### 2.3 MySQL Database
+- [ ] 🔴 Database `sitras_unisya` sudah dibuat
+- [ ] 🔴 User MySQL `sitras_user` sudah dibuat dengan password kuat
+- [ ] 🔴 User MySQL hanya punya hak: `SELECT, INSERT, UPDATE, DELETE` (bukan `SUPER`, `FILE`, `PROCESS`)
+- [ ] Verifikasi hak user: `SHOW GRANTS FOR 'sitras_user'@'localhost';`
+- [ ] MySQL bind-address = `127.0.0.1` (tidak listen ke luar)
+- [ ] MySQL root password sudah diubah dari default
 
-### B.4 MySQL Hardening
-- [ ] Database user `sitras_user` dibuat dengan hak minimal:
-  ```sql
-  GRANT SELECT, INSERT, UPDATE, DELETE ON sitras_db.* TO 'sitras_user'@'localhost';
-  -- Tidak ada: DROP, CREATE, ALTER, SUPER, FILE, PROCESS
-  ```
-- [ ] Password MySQL user kuat (min 20 karakter, random)
-- [ ] Root MySQL tidak bisa login dari luar localhost
-- [ ] Backup otomatis dikonfigurasi (harian, dienkripsi GPG)
+### 2.4 Redis
+- [ ] 🔴 Redis dilindungi dengan password (`requirepass` di `redis.conf`)
+- [ ] Redis bind ke `127.0.0.1` (tidak listen ke luar)
+- [ ] Verifikasi koneksi: `redis-cli -a {password} ping` → PONG
 
-### B.5 Redis Hardening
-- [ ] Redis `requirepass` dikonfigurasi dengan password kuat
-- [ ] Redis hanya listen di `127.0.0.1` (tidak di 0.0.0.0)
-- [ ] Redis tidak bisa diakses dari luar server
-
-### B.6 Firewall (UFW)
-- [ ] Hanya port berikut yang ALLOW:
-  ```bash
-  ufw allow 22/tcp    # SSH
-  ufw allow 80/tcp    # HTTP (redirect ke HTTPS)
-  ufw allow 443/tcp   # HTTPS
-  ufw default deny incoming
-  ufw enable
-  ```
-- [ ] Port 3306 (MySQL), 6379 (Redis) TIDAK exposed ke publik
-
-### B.7 SSH Hardening
-- [ ] SSH key-based authentication aktif
-- [ ] Password authentication dinonaktifkan:
-  ```
-  # /etc/ssh/sshd_config
-  PasswordAuthentication no
-  PermitRootLogin no
-  ```
-- [ ] SSH port menggunakan port non-default (opsional tapi direkomendasikan)
-
----
-
-## C. KONFIGURASI APLIKASI (.env)
-
-```dotenv
-# Wajib
-APP_NAME="SITRAS UNISYA"
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=https://tracer.unisya.ac.id
-FRONTEND_URL=https://tracer.unisya.ac.id
-
-# Database
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=sitras_db
-DB_USERNAME=sitras_user
-DB_PASSWORD={strong_random_password}
-
-# Redis
-REDIS_HOST=127.0.0.1
-REDIS_PASSWORD={strong_random_password}
-REDIS_PORT=6379
-
-# Queue
-QUEUE_CONNECTION=redis
-
-# Session
-SESSION_DRIVER=redis
-SESSION_LIFETIME=120
-
-# Cache
-CACHE_STORE=redis
-
-# Sanctum
-SANCTUM_STATEFUL_DOMAINS=tracer.unisya.ac.id
-SANCTUM_TOKEN_EXPIRATION=1440
-
-# OTP
-OTP_EXPIRY_MINUTES=5
-OTP_MAX_ATTEMPTS=3
-OTP_RESEND_COOLDOWN_SECONDS=60
-
-# Login Lockout
-LOGIN_MAX_ATTEMPTS=5
-LOGIN_LOCKOUT_MINUTES=15
-
-# WA Gateway UNISYA
-WA_GATEWAY_URL=https://wacenter.unisya.ac.id/send-message
-WA_API_KEY={dari_system_settings_terenkripsi}
-WA_SENDER={dari_system_settings_terenkripsi}
-
-# SMTP
-MAIL_MAILER=smtp
-MAIL_HOST={smtp_host}
-MAIL_PORT=587
-MAIL_USERNAME={smtp_user}
-MAIL_PASSWORD={smtp_password}
-MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=tracer@unisya.ac.id
-MAIL_FROM_NAME="SITRAS UNISYA"
-
-# Telescope (nonaktif di production)
-TELESCOPE_ENABLED=false
-```
-
-- [ ] `APP_DEBUG=false` ✅
-- [ ] `APP_ENV=production` ✅
-- [ ] `TELESCOPE_ENABLED=false` ✅
-- [ ] `APP_KEY` sudah di-generate: `php artisan key:generate`
-- [ ] `SANCTUM_TOKEN_EXPIRATION=1440` (24 jam)
-- [ ] Semua password/key menggunakan nilai random yang kuat
-- [ ] `.env` file permission: `chmod 600 .env`
-
----
-
-## D. DEPLOYMENT STEPS
+### 2.5 Firewall (UFW)
+- [ ] 🔴 UFW aktif: `ufw status`
+- [ ] 🔴 Hanya port 80 (HTTP), 443 (HTTPS), 22 (SSH) yang terbuka
+- [ ] Port 3306 (MySQL) dan 6379 (Redis) **TIDAK** terbuka ke luar
+- [ ] Port 8000 (Laravel dev server) **TIDAK** terbuka ke luar
 
 ```bash
-# 1. Clone / pull repository
-git clone https://github.com/elmansurnet/sitras-unisya.git /var/www/sitras
-cd /var/www/sitras
-
-# 2. Install dependencies (tanpa dev)
-composer install --no-dev --optimize-autoloader
-
-# 3. Copy dan konfigurasi .env
-cp .env.example .env
-# Edit .env dengan nilai production
-php artisan key:generate
-
-# 4. Optimisasi Laravel
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-php artisan event:cache
-
-# 5. Migrasi database
-php artisan migrate --force
-
-# 6. Seeder data awal
-php artisan db:seed --force
-
-# 7. Storage symlink (opsional jika diperlukan untuk signed URL)
-php artisan storage:link
-
-# 8. Build frontend
-cd frontend && npm ci && npm run build && cd ..
-
-# 9. Permission
-chown -R www-data:www-data /var/www/sitras/storage
-chmod -R 775 /var/www/sitras/storage
-chown -R www-data:www-data /var/www/sitras/bootstrap/cache
-chmod -R 775 /var/www/sitras/bootstrap/cache
+# Verifikasi:
+ufw status verbose
+# Expected:
+# 22/tcp    ALLOW
+# 80/tcp    ALLOW
+# 443       ALLOW
 ```
 
-- [ ] Semua langkah di atas dijalankan tanpa error
+### 2.6 SSH Security
+- [ ] SSH menggunakan key-based authentication
+- [ ] `PasswordAuthentication no` di `/etc/ssh/sshd_config`
+- [ ] Root login dinonaktifkan (`PermitRootLogin no`)
+- [ ] SSH port default 22 (atau ubah ke port non-standar untuk keamanan tambahan)
 
 ---
 
-## E. QUEUE WORKER (Supervisor)
+## FASE 3 — APLIKASI: LARAVEL
 
-```ini
-; /etc/supervisor/conf.d/sitras-worker.conf
+### 3.1 Direktori & Permissions
+- [ ] 🔴 Aplikasi di `/var/www/sitras-unisya/`
+- [ ] 🔴 `storage/` writable: `chown -R www-data:www-data storage/ bootstrap/cache/`
+- [ ] 🔴 `chmod -R 755 storage/ bootstrap/cache/`
+- [ ] `storage/app/private/` sudah ada (bukan di public)
+- [ ] `storage/app/reports/` sudah ada
+- [ ] Document root Nginx mengarah ke `/var/www/sitras-unisya/public`
 
-[program:sitras-worker-default]
-command=php /var/www/sitras/artisan queue:work redis --queue=default --sleep=3 --tries=3 --max-time=3600
-autorestart=true
-stopasgroup=true
-killasgroup=true
-user=www-data
-stdout_logfile=/var/log/supervisor/sitras-worker-default.log
-stderr_logfile=/var/log/supervisor/sitras-worker-default-error.log
-
-[program:sitras-worker-high]
-command=php /var/www/sitras/artisan queue:work redis --queue=high --sleep=3 --tries=3 --max-time=3600
-autorestart=true
-stopasgroup=true
-killasgroup=true
-user=www-data
-stdout_logfile=/var/log/supervisor/sitras-worker-high.log
-stderr_logfile=/var/log/supervisor/sitras-worker-high-error.log
-
-[program:sitras-worker-low]
-command=php /var/www/sitras/artisan queue:work redis --queue=low --sleep=10 --tries=3 --max-time=3600
-autorestart=true
-stopasgroup=true
-killasgroup=true
-user=www-data
-stdout_logfile=/var/log/supervisor/sitras-worker-low.log
-stderr_logfile=/var/log/supervisor/sitras-worker-low-error.log
-```
-
+### 3.2 Artisan Commands
 ```bash
-supervisorctl reread
-supervisorctl update
-supervisorctl start sitras-worker-default sitras-worker-high sitras-worker-low
+# Jalankan secara berurutan:
+- [ ] php artisan config:cache
+- [ ] php artisan route:cache
+- [ ] php artisan view:cache
+- [ ] php artisan event:cache
+- [ ] php artisan migrate --force
+- [ ] php artisan db:seed --force       # Seeder awal saja (superadmin, master data)
+- [ ] php artisan storage:link          # Jika ada symlink public storage (hanya untuk file non-private)
 ```
 
-- [ ] Supervisor queue worker `sitras-worker-default` berjalan
-- [ ] Supervisor queue worker `sitras-worker-high` berjalan  
-- [ ] Supervisor queue worker `sitras-worker-low` berjalan
-- [ ] `supervisorctl status` menampilkan `RUNNING` untuk semua worker
+### 3.3 Queue Worker (Supervisor)
+- [ ] 🔴 Config Supervisor sudah dibuat sesuai `04_ARCHITECTURE.md §5.3`
+- [ ] 🔴 Worker `sitras-worker-default` berjalan (2 processes, queue: high,default)
+- [ ] 🔴 Worker `sitras-worker-low` berjalan (1 process, queue: low)
+- [ ] Verifikasi: `supervisorctl status`
+- [ ] Supervisor autostart: `systemctl enable supervisor`
 
----
-
-## F. SCHEDULER (Cron)
-
+### 3.4 Scheduler (Cron)
+- [ ] 🔴 Crontab untuk `www-data` sudah dikonfigurasi:
 ```bash
-# Tambahkan ke crontab www-data
-crontab -u www-data -e
-
-# Tambahkan baris:
-* * * * * cd /var/www/sitras && php artisan schedule:run >> /dev/null 2>&1
+* * * * * cd /var/www/sitras-unisya && php artisan schedule:run >> /dev/null 2>&1
 ```
+- [ ] Verifikasi: `crontab -u www-data -l`
+- [ ] Test scheduler: `php artisan schedule:list` menampilkan semua jadwal
 
-- [ ] Cron scheduler aktif: `crontab -u www-data -l` menampilkan entry
-- [ ] Verifikasi jadwal: `php artisan schedule:list`:
-  - [ ] `survey:close-expired` → dailyAt('00:05') timezone Asia/Makassar
-  - [ ] `survey:send-reminders` → dailyAt('08:00') timezone Asia/Makassar
-  - [ ] `otp:cleanup` → everyThirtyMinutes
-
----
-
-## G. HTTPS & SSL/TLS
-
-- [ ] Sertifikat SSL Let's Encrypt aktif:
-  ```bash
-  certbot --nginx -d tracer.unisya.ac.id
-  ```
-- [ ] Auto-renewal dikonfigurasi (`certbot renew --dry-run` berhasil)
-- [ ] HTTP → HTTPS redirect aktif di Nginx
-- [ ] TLS 1.2 minimum (TLS 1.3 diutamakan):
-  ```nginx
-  ssl_protocols TLSv1.2 TLSv1.3;
-  ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:...
-  ```
-- [ ] HSTS header aktif: `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
-
----
-
-## H. POST-DEPLOY VERIFICATION
-
-### H.1 Fungsional
-- [ ] Login admin berhasil via browser
-- [ ] OTP request + verify berhasil (test dengan nomor WA aktif)
-- [ ] Upload foto alumni berhasil, akses via signed URL (bukan direct URL)
-- [ ] Queue job terkirim: `php artisan queue:monitor`
-- [ ] Scheduler berjalan: cek log `storage/logs/scheduler-*.log`
-
-### H.2 Security Verification
-- [ ] [securityheaders.com](https://securityheaders.com) → Grade A minimal (B acceptable)
-- [ ] `APP_DEBUG=false` diverifikasi: akses URL tidak ada yang menampilkan stack trace
-- [ ] `.env` tidak bisa diakses: `curl https://tracer.unisya.ac.id/.env` → 404
-- [ ] `storage/logs` tidak bisa diakses via URL
-- [ ] Rate limiting bekerja: 6 request OTP dalam 1 menit → HTTP 429
-- [ ] File foto alumni tidak bisa diakses tanpa signed URL
-
-### H.3 Performance
-- [ ] Response time endpoint utama < 500ms (tanpa cache cold)
-- [ ] Redis cache berfungsi (config cache, route cache)
-- [ ] `php artisan config:clear && php artisan config:cache` tanpa error
-
----
-
-## I. LOG ROTATION
-
-```bash
-# /etc/logrotate.d/sitras
-/var/www/sitras/storage/logs/*.log {
+### 3.5 Log Rotation
+- [ ] Config logrotate sudah dibuat di `/etc/logrotate.d/sitras`:
+```
+/var/www/sitras-unisya/storage/logs/*.log {
     daily
     missingok
     rotate 30
     compress
     delaycompress
     notifempty
-    create 0640 www-data www-data
-    sharedscripts
-    postrotate
-        php /var/www/sitras/artisan queue:restart
-    endscript
+    create 640 www-data www-data
 }
 ```
 
-- [ ] Logrotate dikonfigurasi untuk `storage/logs/*.log`
-- [ ] Rotasi 30 hari dengan kompresi
-
 ---
 
-## J. ROLLBACK PLAN
+## FASE 4 — NGINX & SSL
 
-Jika terjadi masalah kritis setelah deploy:
+### 4.1 Nginx Configuration
+- [ ] 🔴 Config Nginx sudah dibuat sesuai `04_ARCHITECTURE.md §6`
+- [ ] 🔴 Rate limiting zones aktif (otp, auth, api)
+- [ ] 🔴 Security headers terpasang (X-Frame-Options, X-XSS-Protection, X-Content-Type-Options, HSTS, CSP, Referrer-Policy, Permissions-Policy)
+- [ ] 🔴 CSP tidak menyertakan `unsafe-eval` di production
+- [ ] Blokir akses ke `.env`, `.git`, `storage/logs`, `bootstrap/cache`, `vendor`
+- [ ] `autoindex off` aktif
+- [ ] `fastcgi_hide_header X-Powered-By` aktif
+- [ ] Gzip compression aktif
+- [ ] SPA fallback (`try_files $uri $uri/ /index.php?$query_string`) aktif
+- [ ] Config test: `nginx -t` → `syntax is ok, test is successful`
+- [ ] Reload: `systemctl reload nginx`
 
+### 4.2 SSL / TLS
+- [ ] 🔴 Sertifikat SSL valid (Let's Encrypt atau institutional cert)
+- [ ] 🔴 HTTPS aktif dan redirect HTTP → HTTPS berfungsi
+- [ ] 🔴 HSTS header aktif (`max-age=31536000; includeSubDomains; preload`)
+- [ ] TLS 1.2 minimum dikonfigurasi
+- [ ] TLS 1.3 diutamakan
+- [ ] Verifikasi SSL: `curl -I https://tracer.unisya.ac.id` → 200 OK, HSTS header ada
+- [ ] Test SSL grade: https://www.ssllabs.com/ssltest/ → minimal grade A
+
+### 4.3 Security Headers Verification
+- [ ] Test via securityheaders.com → minimal grade A
+- [ ] Verifikasi CSP tidak ada `unsafe-eval`:
 ```bash
-# 1. Identifikasi commit sebelumnya
-git log --oneline -5
-
-# 2. Rollback kode
-git reset --hard {previous_commit_sha}
-composer install --no-dev --optimize-autoloader
-php artisan config:cache
-php artisan route:cache
-
-# 3. Rollback migrasi (jika ada migrasi baru)
-php artisan migrate:rollback
-
-# 4. Restart queue workers
-supervisorctl restart sitras-worker-default sitras-worker-high sitras-worker-low
-
-# 5. Clear cache
-php artisan cache:clear
-php artisan config:clear
-php artisan route:clear
+curl -I https://tracer.unisya.ac.id | grep -i content-security-policy
+```
+- [ ] Verifikasi tidak ada `X-Powered-By` header:
+```bash
+curl -I https://tracer.unisya.ac.id | grep -i x-powered-by
+# Expected: (kosong — tidak ada header tersebut)
 ```
 
-- [ ] Rollback plan disosialisasikan ke seluruh tim
-- [ ] Backup database terbaru tersedia sebelum deploy
+---
+
+## FASE 5 — FUNGSIONAL: SMOKE TEST
+
+### 5.1 API Health Check
+```bash
+# Public endpoint (tidak butuh auth)
+curl https://tracer.unisya.ac.id/api/v1/public/info
+# Expected: 200 OK dengan info sistem
+
+# Endpoint tanpa token (harus 401)
+curl https://tracer.unisya.ac.id/api/v1/admin/alumni
+# Expected: 401 Unauthenticated
+```
+
+### 5.2 Authentication Flow
+- [ ] Login via email/password berhasil → token diterima
+- [ ] Request OTP berhasil → OTP terkirim via WA/Email
+- [ ] Verifikasi OTP berhasil → token diterima
+- [ ] Token tidak valid → 401
+- [ ] Login dengan kredensial salah 5x → 423 (akun terkunci)
+
+### 5.3 RBAC Smoke Test
+- [ ] Alumni tidak bisa akses endpoint admin → 403
+- [ ] Admin tidak bisa hapus permanen → 403
+- [ ] Superadmin bisa akses audit log → 200
+- [ ] Employer token valid → akses survei berhasil
+- [ ] Employer token expired → 401
+
+### 5.4 File Upload Test
+- [ ] Upload foto alumni (JPEG ≤2MB) → berhasil, signed URL bisa diakses
+- [ ] Upload foto dengan tipe tidak diizinkan (PDF) → 422
+- [ ] Upload melebihi batas ukuran → 422
+
+### 5.5 Notification Test
+- [ ] Kirim WA test ke nomor development → pesan terkirim
+- [ ] Kirim Email test → email diterima
+- [ ] Log notifikasi muncul di `notification_logs`
+
+### 5.6 Queue Test
+- [ ] Dispatch test job: `php artisan tinker → ProcessSurveyBlast::dispatch(...)`
+- [ ] Verifikasi job diproses: `php artisan queue:monitor`
+- [ ] Tidak ada failed jobs: `php artisan queue:failed`
 
 ---
 
-## TANDA TANGAN VERIFIKASI
+## FASE 6 — BACKUP & MONITORING
+
+### 6.1 Database Backup
+- [ ] 🔴 Backup otomatis dikonfigurasi (minimal harian)
+- [ ] Backup dienkripsi dengan GPG sebelum disimpan
+- [ ] Test restore backup berhasil di environment terpisah
+- [ ] Backup disimpan di lokasi berbeda dari server production (offsite/S3)
+
+```bash
+# Script backup MySQL yang direkomendasikan:
+mysqldump -u sitras_user -p sitras_unisya | gzip | gpg --encrypt -r backup@unisya.ac.id > backup_$(date +%Y%m%d).sql.gz.gpg
+```
+
+### 6.2 Monitoring
+- [ ] Uptime monitoring dikonfigurasi (Uptime Robot atau sejenisnya)
+- [ ] Disk space alert dikonfigurasi (alert jika >80%)
+- [ ] Memory alert dikonfigurasi
+- [ ] Cron health check: supervisor cron monitor (opsional)
+
+---
+
+## FASE 7 — SIGN-OFF
+
+### Verifikasi Akhir
+
+```bash
+# Jalankan seluruh test suite terakhir kali
+php artisan test
+# Expected: All tests passed
+
+# Verifikasi tidak ada diagnostic output
+curl -s https://tracer.unisya.ac.id/api/v1/public/info | python3 -m json.tool
+```
+
+### Checklist Ringkasan Final
+
+| # | Item | Status |
+|---|---|---|
+| 1 | 0 vulnerability dari `composer audit` + `npm audit` | ☐ |
+| 2 | `APP_DEBUG=false`, `APP_ENV=production` | ☐ |
+| 3 | Semua test PHPUnit lulus | ☐ |
+| 4 | HTTPS aktif + HSTS + grade SSL A | ☐ |
+| 5 | Security headers verified (securityheaders.com ≥ A) | ☐ |
+| 6 | CSP tanpa `unsafe-eval` di production | ☐ |
+| 7 | Queue worker berjalan (Supervisor) | ☐ |
+| 8 | Cron scheduler aktif | ☐ |
+| 9 | Backup harian dikonfigurasi | ☐ |
+| 10 | Firewall: hanya port 22, 80, 443 | ☐ |
+| 11 | MySQL user hanya SELECT/INSERT/UPDATE/DELETE | ☐ |
+| 12 | Redis dilindungi password | ☐ |
+| 13 | Smoke test semua fitur utama ✅ | ☐ |
+
+### Sign-Off
 
 | Peran | Nama | Tanggal | Tanda Tangan |
 |---|---|---|---|
@@ -406,4 +296,39 @@ php artisan route:clear
 
 ---
 
-*Checklist ini dihasilkan dari 07_SECURITY.md v1.0.3 dan pengalaman Sesi 6A. Update dokumen ini setiap kali ada perubahan infrastruktur.*
+## ROLLBACK PLAN
+
+Jika terjadi masalah kritis setelah deploy:
+
+```bash
+# 1. Rollback kode ke commit sebelumnya
+git revert HEAD --no-edit
+git push origin main
+
+# 2. Rollback database (jika ada migration baru)
+php artisan migrate:rollback --step=1
+
+# 3. Clear cache
+php artisan cache:clear
+php artisan config:clear
+php artisan route:clear
+
+# 4. Restart services
+systemctl restart php8.3-fpm
+systemctl reload nginx
+supervisorctl restart all
+```
+
+**Estimasi waktu rollback:** < 5 menit jika tidak ada perubahan schema database.
+
+---
+
+## RIWAYAT VERSI
+
+| Versi | Tanggal | Perubahan |
+|---|---|---|
+| 1.0.0 | 2026-06-13 | Dokumen awal — dibuat pada Sesi 6A |
+
+---
+
+*Dokumen ini wajib diperbarui setiap kali ada perubahan konfigurasi infrastruktur atau prosedur deployment.*
