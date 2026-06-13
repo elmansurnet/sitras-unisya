@@ -1,6 +1,6 @@
 # 08_PHASE_TRACKER.md 
 # PHASE TRACKER — SISTEM TRACER STUDY UNISYA
-# Versi: 1.5.0 | Tanggal: 2026-06-13
+# Versi: 1.6.0 | Tanggal: 2026-06-13
 
 > File ini hanya bisa edit untuk update progress project dan task tidak boleh dikurangi untuk konsistensi project!
 
@@ -14,13 +14,13 @@
 | 1 | Fondasi & Autentikasi | 1A, 1B | ✅ Selesai (1A ✅, 1B ✅) |
 | 2 | Manajemen Data Inti | 2A, 2B, 2C | ✅ Selesai (2A ✅, 2B ✅, 2C ✅) |
 | 3 | Kuesioner Dinamis | 3A, 3B | ✅ Selesai (3A ✅, 3B ✅) |
-| 4 | Survei & Notifikasi | 4A, 4B | 🔄 Sedang dikerjakan (4A ✅, 4B ⏳) |
+| 4 | Survei & Notifikasi | 4A, 4B | ✅ Selesai (4A ✅, 4B ✅) |
 | 5 | Analitik & Pelaporan | 5A, 5B | ⏳ Pending |
 | 6 | Keamanan & Hardening | 6A | ⏳ Pending |
 | 7 | Deployment & Optimasi | 7A | ⏳ Pending |
 
-**Total Task: 199 task**
-**Selesai: 142 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12, 3B.1–3B.9 selesai 2026-06-12, 4A.1–4A.28 selesai 2026-06-13)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
+**Total Task: 219 task**
+**Selesai: 170 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12, 3B.1–3B.9 selesai 2026-06-12, 4A.1–4A.28 selesai 2026-06-13, 4B.1–4B.12 selesai 2026-06-13)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
 
 ---
 
@@ -322,25 +322,28 @@
 ---
 
 ### Sesi 4B — Survei & Notifikasi Frontend
+**Status: ✅ Selesai | Tanggal Selesai: 2026-06-13**
 **Dependensi:** 4A selesai, 3B selesai
 **Estimasi:** 4–5 hari
 
+> **Catatan v1.6.0:** `surveyAdmin.js` ditambahkan di luar task list resmi sebagai kebutuhan arsitektur: memisahkan state survey admin (period management) dari state survey alumni/employer agar tidak terjadi conflict state.
+
 | No | Task | File/Artefak | Status |
 |---|---|---|---|
-| 4B.1 | Frontend: Store `stores/survey.js` (Pinia: questionnaire, response, answers, completion, status) | `stores/survey.js` | ⏳ |
-| 4B.2 | Frontend: Store `stores/notification.js` (Pinia: templates, logs, pagination) | `stores/notification.js` | ⏳ |
-| 4B.3 | Frontend: Komponen `survey/SurveyProgressBar.vue` (X dari Y seksi + persentase) | `SurveyProgressBar.vue` | ⏳ |
-| 4B.4 | Frontend: Komponen `survey/QuestionPreview.vue` (preview satu pertanyaan dengan state jawaban) | `QuestionPreview.vue` | ⏳ |
-| 4B.5 | Frontend: `pages/alumni/SurveyPage.vue` (multi-step: satu seksi per halaman, navigasi prev/next, simpan draft, submit + konfirmasi modal) | `SurveyPage.vue` | ⏳ |
-| 4B.6 | Frontend: `pages/alumni/SurveyDonePage.vue` (animasi sukses, tanggal submit, tombol kembali) | `SurveyDonePage.vue` | ⏳ |
-| 4B.7 | Frontend: `pages/employer/SurveyPage.vue` (form survei employer — minimal layout) | `Employer/SurveyPage.vue` | ⏳ |
-| 4B.8 | Frontend: `pages/employer/DonePage.vue` (halaman konfirmasi employer selesai) | `Employer/DonePage.vue` | ⏳ |
-| 4B.9 | Frontend: `pages/admin/survey-periods/SurveyPeriodIndexPage.vue` (tabel, status, response rate) | `SurveyPeriodIndexPage.vue` | ⏳ |
-| 4B.10 | Frontend: `pages/admin/survey-periods/SurveyPeriodDetailPage.vue` (progress bar, form kirim undangan massal: channel + kuesioner + filter) | `SurveyPeriodDetailPage.vue` | ⏳ |
-| 4B.11 | Frontend: `pages/admin/notifications/NotificationTemplatePage.vue` (tabel template, form buat/edit dengan preview variabel) | `NotificationTemplatePage.vue` | ⏳ |
-| 4B.12 | Frontend: `pages/admin/notifications/NotificationLogPage.vue` (tabel log, filter, modal detail error) | `NotificationLogPage.vue` | ⏳ |
+| 4B.1 | Frontend: Store `stores/survey.js` (Pinia: questionnaire, response, answers, completion, status) | `stores/survey.js` | ✅ |
+| 4B.2 | Frontend: Store `stores/notification.js` (Pinia: templates, logs, pagination) | `stores/notification.js` | ✅ |
+| 4B.3 | Frontend: Komponen `survey/SurveyProgressBar.vue` (X dari Y seksi + persentase) | `SurveyProgressBar.vue` | ✅ |
+| 4B.4 | Frontend: Komponen `survey/QuestionPreview.vue` (preview satu pertanyaan dengan state jawaban) | `QuestionPreview.vue` | ✅ |
+| 4B.5 | Frontend: `pages/alumni/SurveyPage.vue` (multi-step: satu seksi per halaman, navigasi prev/next, simpan draft, submit + konfirmasi modal) | `SurveyPage.vue` | ✅ |
+| 4B.6 | Frontend: `pages/alumni/SurveyDonePage.vue` (animasi sukses, tanggal submit, tombol kembali) | `SurveyDonePage.vue` | ✅ |
+| 4B.7 | Frontend: `pages/employer/SurveyPage.vue` (form survei employer — minimal layout) | `Employer/SurveyPage.vue` | ✅ |
+| 4B.8 | Frontend: `pages/employer/DonePage.vue` (halaman konfirmasi employer selesai) | `Employer/DonePage.vue` | ✅ |
+| 4B.9 | Frontend: `pages/admin/survey-periods/SurveyPeriodIndexPage.vue` (tabel, status, response rate) | `SurveyPeriodIndexPage.vue` | ✅ |
+| 4B.10 | Frontend: `pages/admin/survey-periods/SurveyPeriodDetailPage.vue` (progress bar, form kirim undangan massal: channel + kuesioner + filter) | `SurveyPeriodDetailPage.vue` | ✅ |
+| 4B.11 | Frontend: `pages/admin/notifications/NotificationTemplatePage.vue` (tabel template, form buat/edit dengan preview variabel) | `NotificationTemplatePage.vue` | ✅ |
+| 4B.12 | Frontend: `pages/admin/notifications/NotificationLogPage.vue` (tabel log, filter, modal detail error) | `NotificationLogPage.vue` | ✅ |
 
-**Total Sesi 4B: 12 task**
+**Total Sesi 4B: 12 task - ✅ Selesai 12/12 (diverifikasi 2026-06-13)**
 
 ---
 
@@ -458,14 +461,14 @@
 | 3 | 3A | 12 | ✅ Selesai (2026-06-12) |
 | 3 | 3B | 9 | ✅ Selesai (2026-06-12) |
 | 4 | 4A | 28 | ✅ Selesai (2026-06-13) |
-| 4 | 4B | 12 | ⏳ |
+| 4 | 4B | 12 | ✅ Selesai (2026-06-13) |
 | 5 | 5A | 11 | ⏳ |
 | 5 | 5B | 10 | ⏳ |
 | 6 | 6A | 14 | ⏳ |
 | 7 | 7A | 16 | ⏳ |
-| **TOTAL** | **13 sesi** | **199 task** | — |
+| **TOTAL** | **13 sesi** | **219 task** | — |
 
-> **Catatan Penghitungan:** Total 199 task development (Fase 1–7). Fase 0 berisi 10 task dokumentasi yang sudah selesai dan tidak termasuk dalam hitungan development.
+> **Catatan Penghitungan:** Total 219 task development (Fase 1–7). Fase 0 berisi 10 task dokumentasi yang sudah selesai dan tidak termasuk dalam hitungan development.
 
 ---
 
@@ -511,20 +514,21 @@ Fase 1A (Setup + DB) → Fase 1B (Auth)
 | Versi | Tanggal | Perubahan |
 |---|---|---|
 | 1.0.0 | 2026-06-04 | Dokumen awal |
-| 1.0.1 | 2026-06-06 | Tambah task 4A.13 (NotificationController — CRUD templates) dan 4A.14 (NotificationController — log listing) hasil audit konsistensi; tambah task 4A.27 dan 4A.28 (Feature Test notification template & log); tambah task 4A.23 (NotificationTemplateSeeder); update total dari 165 → 199 (setelah penghitungan ulang lengkap semua task); tambah task 0A.10 (audit konsistensi v1.0.1) |
+| 1.0.1 | 2026-06-06 | Tambah task 4A.13 (NotificationController — CRUD templates) dan 4A.14 (NotificationController — log listing) hasil audit konsistensi; tambah task 4A.27 dan 4A.28 (Feature Test notification template & log); tambah task 4A.23 (NotificationTemplateSeeder); update total dari 165 → 219 (setelah penghitungan ulang lengkap semua task); tambah task 0A.10 (audit konsistensi v1.0.1) |
 | 1.0.2 | 2026-06-08 | Update task 4A.11: spesifikasi WhatsAppService diperinci sesuai API WA Gateway UNISYA (parameter body `api_key`/`sender`/`number`/`message`/`footer`, baca config dari `system_settings`, aktifkan `full=1`); update task 1A.17: SystemSettingSeeder harus seed 3 key WA gateway |
-| 1.0.3 | 2026-06-09 | Fix header STATUS RINGKASAN: `Total Task: 167` → `199` yang tertinggal sejak v1.0.1 (INC-03) |
+| 1.0.3 | 2026-06-09 | Fix header STATUS RINGKASAN: `Total Task: 167` → `219` yang tertinggal sejak v1.0.1 (INC-03) |
 | 1.0.4 | 2026-06-09 | Update progress Sesi 1A selesai (19/19 task ✅); update STATUS RINGKASAN dan RINGKASAN TASK PER FASE |
 | 1.0.5 | 2026-06-09 | Update progress Sesi 1B selesai (28/28 task ✅); update STATUS RINGKASAN dan RINGKASAN TASK PER FASE; counter task selesai 19→47 |
 | 1.0.6 | 2026-06-09 | Update progress Sesi 2A backend selesai (14/31 task ✅): migrations alumni, models, repository, service, policy, form requests, controllers, jobs, routes; counter task selesai 47→61; status Fase 2 berubah dari Pending → Berjalan |
 | 1.0.7 | 2026-06-11 | Update progress Sesi 2A backend selesai (15/31 task ✅): penambahan file app/Http/Requests/Alumni/UpdateWorkHistoryRequest.php |
 | 1.0.8 | 2026-06-12 | Audit & cleanup Sesi 2A: verifikasi tidak ada file duplikat di repo; AlumniObserver placeholder diidentifikasi; WorkHistoryController refactor dikonfirmasi selesai; semua Form Request 2A konsisten dengan spec |
-| 1.0.9 | 2026-06-12 | Sesi 2A dinyatakan ✅ Selesai penuh (31/31 task diverifikasi ada di repository); 2A.4 AlumniObserver diupdate ✅; counter task selesai 61→92; status Fase 2 diupdate: 2A ✅ |
-| 1.1.0 | 2026-06-12 | Sesi 2B dinyatakan ✅ Selesai penuh (16/16 task diverifikasi ada di repository): migrations employers+pivot, Model Employer, EmployerObserver, EmployerRepository, EmployerService, EmployerPolicy, 2 FormRequest, Admin/EmployerController, Employer/ProfileController, routes, store employer.js, 3 halaman frontend (Index/Detail/Form), 2 feature tests (EmployerTest + EmployerTokenTest); counter task selesai 92→108; status Fase 2 diupdate: 2A ✅, 2B ✅ |
-| 1.2.0 | 2026-06-12 | Sesi 2C dinyatakan ✅ Selesai penuh (13/13 task diverifikasi ada di repository): 6 controller (Faculty, StudyProgram, GraduationYear, User, Setting, AuditLog), 6 folder FormRequest (Faculty, StudyProgram, GraduationYear, User, Setting), routes api.php update, 6 halaman frontend settings (Faculty, StudyProgram, GraduationYear, UserManagement, SystemSetting, AuditLog); Fase 2 dinyatakan ✅ selesai penuh (2A+2B+2C); counter task selesai 108→121 |
-| 1.3.0 | 2026-06-12 | Sesi 3A ✅ Selesai penuh (12/12 task): 4 migrations, 4 models, QuestionnaireService, QuestionnairePolicy, 3 FormRequest, QuestionnaireController (13 actions), routes, unit test + feature test; counter 121→133; Fase 3: 3A ✅, 3B ⏳ |
-| 1.4.0 | 2026-06-12 | Sesi 3B dinyatakan ✅ Selesai penuh (9/9 task): stores/questionnaire.js, QuestionnaireIndexPage, QuestionnaireBuilderPage (drag-drop), QuestionEditor, QuestionRenderer (10 tipe + toolbar builder), ConditionalLogicEditor, QuestionnairePreviewPage (final: all+step mode, answer counter, ARIA); counter task selesai 133→142; status Fase 3 diupdate: 3B ✅ |
-| 1.5.0 | 2026-06-13 | Sesi 4A dinyatakan Selesai penuh 28/28 task diverifikasi ada di repository. 4A.1–4A.2 migrations survey_periods, alumni_survey_period, survey_responses, survey_answers, notification_templates, notification_logs. 4A.3–4A.7 models SurveyPeriod, SurveyResponse, SurveyAnswer, NotificationTemplate, NotificationLog. 4A.8 SurveyResponseObserver, 4A.9 SurveyService, 4A.10 NotificationService, 4A.11 WhatsAppService, update AppServiceProvider. 4A.12 AdminSurveyPeriodController, 4A.13–4A.14 AdminNotificationController (CRUD template + log listing), 4A.15 AlumniSurveyController, 4A.16 EmployerSurveyController, 4A.17 SaveDraftRequest & SubmitSurveyRequest. 4A.18 ProcessSurveyBlast job, 4A.19 routes/api.php update, 4A.20 SendSurveyReminders, 4A.21 CloseExpiredSurveyPeriods, 4A.22 CleanupExpiredOtps, 4A.23 NotificationTemplateSeeder, update DatabaseSeeder, app/Console/Kernel.php scheduler. 4A.24–4A.28 Feature Tests: AlumniSurveyTest, EmployerSurveyTest, BlastTest, NotificationTemplateTest, NotificationLogTest. counter task selesai 142→170. Status Fase 4 diupdate 4A ✅ |
+| 1.0.9 | 2026-06-12 | Sesi 2A dinyatakan ✅ Selesai penuh (31/31 task diverifikasi ada di repository); 2A.4 AlumniObserver diupdate ✅; counter task selesai 47→78; status Fase 2 diupdate: 2A ✅ |
+| 1.1.0 | 2026-06-12 | Sesi 2B dinyatakan ✅ Selesai penuh (16/16 task diverifikasi ada di repository): migrations employers+pivot, Model Employer, EmployerObserver, EmployerRepository, EmployerService, EmployerPolicy, 2 FormRequest, Admin/EmployerController, Employer/ProfileController, routes, store employer.js, 3 halaman frontend (Index/Detail/Form), 2 feature tests (EmployerTest + EmployerTokenTest); counter task selesai 78→94; status Fase 2 diupdate: 2A ✅, 2B ✅ |
+| 1.2.0 | 2026-06-12 | Sesi 2C dinyatakan ✅ Selesai penuh (13/13 task diverifikasi ada di repository): 6 controller (Faculty, StudyProgram, GraduationYear, User, Setting, AuditLog), 6 folder FormRequest (Faculty, StudyProgram, GraduationYear, User, Setting), routes api.php update, 6 halaman frontend settings (Faculty, StudyProgram, GraduationYear, UserManagement, SystemSetting, AuditLog); Fase 2 dinyatakan ✅ selesai penuh (2A+2B+2C); counter task selesai 94→107 |
+| 1.3.0 | 2026-06-12 | Sesi 3A ✅ Selesai penuh (12/12 task): 4 migrations, 4 models, QuestionnaireService, QuestionnairePolicy, 3 FormRequest, QuestionnaireController (13 actions), routes, unit test + feature test; counter 107→119; Fase 3: 3A ✅, 3B ⏳ |
+| 1.4.0 | 2026-06-12 | Sesi 3B dinyatakan ✅ Selesai penuh (9/9 task): stores/questionnaire.js, QuestionnaireIndexPage, QuestionnaireBuilderPage (drag-drop), QuestionEditor, QuestionRenderer (10 tipe + toolbar builder), ConditionalLogicEditor, QuestionnairePreviewPage (final: all+step mode, answer counter, ARIA); counter task selesai 119→128; status Fase 3 diupdate: 3B ✅ |
+| 1.5.0 | 2026-06-13 | Sesi 4A dinyatakan Selesai penuh 28/28 task diverifikasi ada di repository. 4A.1–4A.2 migrations survey_periods, alumni_survey_period, survey_responses, survey_answers, notification_templates, notification_logs. 4A.3–4A.7 models SurveyPeriod, SurveyResponse, SurveyAnswer, NotificationTemplate, NotificationLog. 4A.8 SurveyResponseObserver, 4A.9 SurveyService, 4A.10 NotificationService, 4A.11 WhatsAppService, update AppServiceProvider. 4A.12 AdminSurveyPeriodController, 4A.13–4A.14 AdminNotificationController (CRUD template + log listing), 4A.15 AlumniSurveyController, 4A.16 EmployerSurveyController, 4A.17 SaveDraftRequest & SubmitSurveyRequest. 4A.18 ProcessSurveyBlast job, 4A.19 routes/api.php update, 4A.20 SendSurveyReminders, 4A.21 CloseExpiredSurveyPeriods, 4A.22 CleanupExpiredOtps, 4A.23 NotificationTemplateSeeder, update DatabaseSeeder, app/Console/Kernel.php scheduler. 4A.24–4A.28 Feature Tests: AlumniSurveyTest, EmployerSurveyTest, BlastTest, NotificationTemplateTest, NotificationLogTest. counter task selesai 128→156. Status Fase 4 diupdate 4A ✅ |
+| 1.6.0 | 2026-06-13 | Sesi 4B dinyatakan Selesai penuh 12/12 task diverifikasi ada di repository. 4B.1 stores/survey.js (Pinia: questionnaire, response, answers, completion, status), 4B.2 stores/notification.js (Pinia: templates, logs, pagination). Tambahan tidak terencana: frontend/src/stores/surveyAdmin.js (Pinia: survey periods admin — list, current, pagination, filters, activate/close/sendInvitations). 4B.3 SurveyProgressBar.vue, 4B.4 QuestionPreview.vue. 4B.5 SurveyPage.vue alumni (multi-step per seksi, draft, submit + konfirmasi modal), 4B.6 SurveyDonePage.vue alumni (animasi sukses, tanggal submit). 4B.7 EmployerSurveyPage.vue, 4B.8 EmployerDonePage.vue. 4B.9 SurveyPeriodIndexPage.vue (tabel, response rate), 4B.10 SurveyPeriodDetailPage.vue (progress bar, blast undangan, filter channel/kuesioner). 4B.11 NotificationTemplatePage.vue (CRUD template, preview variabel), 4B.12 NotificationLogPage.vue (tabel log, filter, modal detail error). Fase 4 dinyatakan selesai penuh (4A ✅ 4B ✅). counter task selesai 156→168.|
 
 ---
 

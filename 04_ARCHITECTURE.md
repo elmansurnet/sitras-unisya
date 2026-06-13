@@ -1,6 +1,6 @@
 # 04_ARCHITECTURE.md
 # ARSITEKTUR SISTEM — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.3 | Tanggal: 2026-06-09
+# Versi: 1.0.4 | Tanggal: 2026-06-13
 
 ---
 
@@ -350,7 +350,8 @@ sitras-unisya/
 │   │   │   ├── questionnaire.js
 │   │   │   ├── survey.js
 │   │   │   ├── dashboard.js
-│   │   │   └── notification.js
+│   │   │   ├── notification.js
+│   │   │   └── surveyAdmin.js      ← File baru (ditambahkan pada versi dokumen 1.0.4)
 │   │   ├── services/
 │   │   │   └── api.js      ← Axios instance + interceptors
 │   │   └── main.js
@@ -870,6 +871,7 @@ TELESCOPE_ENABLED=false
 | 1.0.1 | 2026-06-06 | Align CSP header dengan 07_SECURITY.md; tambah GraduationYearSeeder & GraduationYearController di struktur; tambah `Public/PublicController.php`; pisah queue worker high/low; tambah OTP cleanup command; perjelas storage path (`private/`); tambah EMPLOYER_TOKEN_EXPIRY_DAYS di .env |
 | 1.0.2 | 2026-06-08 | Update .env: WHATSAPP_API_TOKEN → WHATSAPP_API_KEY; update WHATSAPP_GATEWAY_URL ke endpoint gateway UNISYA (wacenter.unisya.ac.id); update komentar config/whatsapp.php |
 | 1.0.3 | 2026-06-09 | Fix diagram arsitektur: label WA Gateway `(Fonnte/Wablas)` → `(wacenter.unisya.ac.id)` yang terlewat dari audit v1.0.2 (INC-02); lengkapi folder structure pages frontend — tambah semua nama file .vue yang terdefinisi di Phase Tracker & UI/UX spec (INC-07) |
+| 1.0.4 | 2026-06-13 | mencatat penambahan `surveyAdmin.js` di folder struktur. memisahkan state survey admin (period management) dari state survey alumni/employer agar tidak terjadi conflict state |
 
 ---
 
