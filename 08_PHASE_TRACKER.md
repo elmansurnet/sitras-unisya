@@ -1,6 +1,6 @@
 # 08_PHASE_TRACKER.md 
 # PHASE TRACKER — SISTEM TRACER STUDY UNISYA
-# Versi: 1.7.0 | Tanggal: 2026-06-13
+# Versi: 1.8.0 | Tanggal: 2026-06-13
 
 > File ini hanya bisa edit untuk update progress project dan task tidak boleh dikurangi untuk konsistensi project!
 
@@ -15,12 +15,12 @@
 | 2 | Manajemen Data Inti | 2A, 2B, 2C | ✅ Selesai (2A ✅, 2B ✅, 2C ✅) |
 | 3 | Kuesioner Dinamis | 3A, 3B | ✅ Selesai (3A ✅, 3B ✅) |
 | 4 | Survei & Notifikasi | 4A, 4B | ✅ Selesai (4A ✅, 4B ✅) |
-| 5 | Analitik & Pelaporan | 5A, 5B | 🔄 Sedang dikerjakan (5A ✅, 5B ⏳) |
+| 5 | Analitik & Pelaporan | 5A, 5B | ✅ Selesai (5A ✅, 5B ✅) |
 | 6 | Keamanan & Hardening | 6A | ⏳ Pending |
 | 7 | Deployment & Optimasi | 7A | ⏳ Pending |
 
 **Total Task: 219 task**
-**Selesai: 179 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12, 3B.1–3B.9 selesai 2026-06-12, 4A.1–4A.28 selesai 2026-06-13, 4B.1–4B.12 selesai 2026-06-13, 5A.1–5A.11 selesai 2026-06-13)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
+**Selesai: 189 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12, 3B.1–3B.9 selesai 2026-06-12, 4A.1–4A.28 selesai 2026-06-13, 4B.1–4B.12 selesai 2026-06-13, 5A.1–5A.11 selesai 2026-06-13, 5B.1–5B.10 selesai 2026-06-13)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
 
 ---
 
@@ -373,23 +373,24 @@
 ---
 
 ### Sesi 5B — Analitik & Pelaporan Frontend
+**Status: ✅ Selesai | Tanggal Selesai: 2026-06-13**
 **Dependensi:** 5A selesai
 **Estimasi:** 3–4 hari
 
 | No | Task | File/Artefak | Status |
 |---|---|---|---|
-| 5B.1 | Install: `apexcharts` + `vue3-apexcharts` | `package.json` | ⏳ |
-| 5B.2 | Install: `leaflet` | `package.json` | ⏳ |
-| 5B.3 | Frontend: Store `stores/dashboard.js` (Pinia: summary, stats, mapData) | `stores/dashboard.js` | ⏳ |
-| 5B.4 | Frontend: Komponen `charts/BarChart.vue` (wrapper ApexCharts — top industri) | `BarChart.vue` | ⏳ |
-| 5B.5 | Frontend: Komponen `charts/DonutChart.vue` (wrapper ApexCharts — distribusi status pekerjaan) | `DonutChart.vue` | ⏳ |
-| 5B.6 | Frontend: Komponen `charts/LineChart.vue` (wrapper ApexCharts — tren respons bulanan) | `LineChart.vue` | ⏳ |
-| 5B.7 | Frontend: Komponen `charts/AlumniMap.vue` (Leaflet.js — peta Indonesia dengan marker per kota/provinsi) | `AlumniMap.vue` | ⏳ |
-| 5B.8 | Frontend: `pages/admin/DashboardPage.vue` (4 KPI card, 3 chart, tabel aktivitas, kartu periode aktif) | `DashboardPage.vue` | ⏳ |
-| 5B.9 | Frontend: `pages/admin/dashboard/StatisticsPage.vue` (statistik ketenagakerjaan detail — semua chart + peta) | `StatisticsPage.vue` | ⏳ |
-| 5B.10 | Frontend: `pages/admin/reports/ReportPage.vue` (form generate, loading progress, tabel laporan tersimpan) | `ReportPage.vue` | ⏳ |
+| 5B.1 | Install: `apexcharts` + `vue3-apexcharts` | `package.json` | ✅ |
+| 5B.2 | Install: `leaflet` | `package.json` | ✅ |
+| 5B.3 | Frontend: Store `stores/dashboard.js` (Pinia: summary, stats, mapData) | `stores/dashboard.js` | ✅ |
+| 5B.4 | Frontend: Komponen `charts/BarChart.vue` (wrapper ApexCharts — top industri) | `BarChart.vue` | ✅ |
+| 5B.5 | Frontend: Komponen `charts/DonutChart.vue` (wrapper ApexCharts — distribusi status pekerjaan) | `DonutChart.vue` | ✅ |
+| 5B.6 | Frontend: Komponen `charts/LineChart.vue` (wrapper ApexCharts — tren respons bulanan) | `LineChart.vue` | ✅ |
+| 5B.7 | Frontend: Komponen `charts/AlumniMap.vue` (Leaflet.js — peta Indonesia dengan marker per kota/provinsi) | `AlumniMap.vue` | ✅ |
+| 5B.8 | Frontend: `pages/admin/DashboardPage.vue` (4 KPI card, 3 chart, tabel aktivitas, kartu periode aktif) | `DashboardPage.vue` | ✅ |
+| 5B.9 | Frontend: `pages/admin/dashboard/StatisticsPage.vue` (statistik ketenagakerjaan detail — semua chart + peta) | `StatisticsPage.vue` | ✅ |
+| 5B.10 | Frontend: `pages/admin/reports/ReportPage.vue` (form generate, loading progress, tabel laporan tersimpan) | `ReportPage.vue` | ✅ |
 
-**Total Sesi 5B: 10 task**
+**Total Sesi 5B: 10 task - ✅ Selesai 10/10 (diverifikasi 2026-06-13)**
 
 ---
 
@@ -464,7 +465,7 @@
 | 4 | 4A | 28 | ✅ Selesai (2026-06-13) |
 | 4 | 4B | 12 | ✅ Selesai (2026-06-13) |
 | 5 | 5A | 11 | ✅ Selesai (2026-06-13) |
-| 5 | 5B | 10 | ⏳ |
+| 5 | 5B | 10 | ✅ Selesai (2026-06-13) |
 | 6 | 6A | 14 | ⏳ |
 | 7 | 7A | 16 | ⏳ |
 | **TOTAL** | **13 sesi** | **219 task** | — |
@@ -531,6 +532,7 @@ Fase 1A (Setup + DB) → Fase 1B (Auth)
 | 1.5.0 | 2026-06-13 | Sesi 4A dinyatakan Selesai penuh 28/28 task diverifikasi ada di repository. 4A.1–4A.2 migrations survey_periods, alumni_survey_period, survey_responses, survey_answers, notification_templates, notification_logs. 4A.3–4A.7 models SurveyPeriod, SurveyResponse, SurveyAnswer, NotificationTemplate, NotificationLog. 4A.8 SurveyResponseObserver, 4A.9 SurveyService, 4A.10 NotificationService, 4A.11 WhatsAppService, update AppServiceProvider. 4A.12 AdminSurveyPeriodController, 4A.13–4A.14 AdminNotificationController (CRUD template + log listing), 4A.15 AlumniSurveyController, 4A.16 EmployerSurveyController, 4A.17 SaveDraftRequest & SubmitSurveyRequest. 4A.18 ProcessSurveyBlast job, 4A.19 routes/api.php update, 4A.20 SendSurveyReminders, 4A.21 CloseExpiredSurveyPeriods, 4A.22 CleanupExpiredOtps, 4A.23 NotificationTemplateSeeder, update DatabaseSeeder, app/Console/Kernel.php scheduler. 4A.24–4A.28 Feature Tests: AlumniSurveyTest, EmployerSurveyTest, BlastTest, NotificationTemplateTest, NotificationLogTest. counter task selesai 128→156. Status Fase 4 diupdate 4A ✅ |
 | 1.6.0 | 2026-06-13 | Sesi 4B dinyatakan Selesai penuh 12/12 task diverifikasi ada di repository. 4B.1 stores/survey.js (Pinia: questionnaire, response, answers, completion, status), 4B.2 stores/notification.js (Pinia: templates, logs, pagination). Tambahan tidak terencana: frontend/src/stores/surveyAdmin.js (Pinia: survey periods admin — list, current, pagination, filters, activate/close/sendInvitations). 4B.3 SurveyProgressBar.vue, 4B.4 QuestionPreview.vue. 4B.5 SurveyPage.vue alumni (multi-step per seksi, draft, submit + konfirmasi modal), 4B.6 SurveyDonePage.vue alumni (animasi sukses, tanggal submit). 4B.7 EmployerSurveyPage.vue, 4B.8 EmployerDonePage.vue. 4B.9 SurveyPeriodIndexPage.vue (tabel, response rate), 4B.10 SurveyPeriodDetailPage.vue (progress bar, blast undangan, filter channel/kuesioner). 4B.11 NotificationTemplatePage.vue (CRUD template, preview variabel), 4B.12 NotificationLogPage.vue (tabel log, filter, modal detail error). Fase 4 dinyatakan selesai penuh (4A ✅ 4B ✅). counter task selesai 156→168.|
 | 1.7.0 | 2026-06-13 | Sesi 5A dinyatakan Selesai penuh 11/11 task (5A.1–5A.2, 5A.5–5A.11) diverifikasi ada di repository. Termasuk hotfix DashboardController (bug TypeError getEmploymentStats & getAlumniMap dipanggil dengan array). counter task selesai 168→179. Status Fase 5 diupdate 5A ✅ |
+| 1.8.0 | 2026-06-13 | Sesi 5B dinyatakan Selesai penuh 10/10 task. 5B.1 verifikasi package.json (ApexCharts, Leaflet, Pinia sudah terpasang). 5B.2–5B.3 stores/dashboard.js: state summary/employmentStats/mapData/trendData/reports/filters/loading/error; getters responseRate/totalWorking/topIndustries/donutSeries; actions fetchSummary, fetchEmploymentStats, fetchAlumniMap, fetchAll, fetchStatistics, fetchReports, generateReport (blob download), downloadReport, resetFilters. 5B.4 BarChart.vue: ApexCharts bar, support prop horizontal, formatter IDR/number. 5B.5 DonutChart.vue: ApexCharts donut, legend di bawah, formatter persentase. 5B.6 LineChart.vue: ApexCharts line/area, prop y-label, smooth curve. 5B.7 AlumniMap.vue: Leaflet.js, dynamic import (SSR-safe), marker cluster dari GeoJSON, popup nama provinsi + jumlah alumni. 5B.8 DashboardPage.vue: 4 KPI cards, LineChart tren 12 bln, DonutChart status pekerjaan, BarChart top-10 industri, tabel recent activities, kartu periode aktif + tombol aksi cepat. 5B.9 StatisticsPage.vue: filter (periode/angkatan/prodi), 4 KPI cards (employment_rate, waiting_months, relevance_rate, jumlah prodi), BarChart horizontal top-10 industri, DonutChart status, LineChart per angkatan, AlumniMap sebaran, tabel serapan per program studi dengan colour-coded rate. 5B.10 ReportPage.vue: form generate (period required, gradyear/prodi optional, format PDF/Excel), validasi inline, progress overlay + animated bar saat generating, auto-download via blob, toast sukses/gagal, tabel laporan tersimpan (skeleton, empty state, badge format, tombol unduh per baris). Semua komponen: loading skeleton, empty state informatif, error state, responsive mobile-first, aria-label pada elemen interaktif. Status Fase 5 diupdate 5B ✅ |
 
 ---
 

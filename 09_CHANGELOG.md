@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md 
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.7.0 | Tanggal: 2026-06-13
+# Versi: 1.8.0 | Tanggal: 2026-06-13
 
 ---
 
@@ -21,6 +21,68 @@ Setiap entri changelog mengikuti format:
 - `Removed` — Konten yang dihapus
 - `Security` — Perbaikan keamanan
 - `Deprecated` — Fitur yang akan dihapus di versi mendatang
+
+---
+
+## [1.8.0] — 2026-06-13
+
+### Added
+- `frontend/src/stores/dashboard.js` — Pinia store lengkap: state (summary, employmentStats,
+  mapData, trendData, reports, filters, loading, error); getters (responseRate, totalWorking,
+  topIndustries, donutSeries, isAnyLoading); actions fetchSummary (GET /admin/dashboard/summary),
+  fetchEmploymentStats (GET /admin/dashboard/employment-stats), fetchAlumniMap
+  (GET /admin/dashboard/alumni-map), fetchAll, fetchStatistics (bulk fetch dengan filter),
+  fetchReports (GET /admin/reports), generateReport (POST generate-pdf|generate-excel,
+  responseType blob, auto _triggerBlobDownload, refresh reports list), downloadReport
+  (GET /admin/reports/:id/download, blob), resetFilters; helper _buildTrendFromActivities,
+  _buildFilterParams, _triggerBlobDownload
+- `frontend/src/components/charts/BarChart.vue` — wrapper ApexCharts bar chart; prop: series
+  (array), categories (array), height (number, default 300), horizontal (bool); formatter
+  number locale id-ID; warna palette primary teal; responsive config
+- `frontend/src/components/charts/DonutChart.vue` — wrapper ApexCharts donut chart; prop:
+  series (array), labels (array), height (number, default 320); formatter persentase dengan
+  satu desimal; legend di bawah chart; warna palette 4 status pekerjaan
+- `frontend/src/components/charts/LineChart.vue` — wrapper ApexCharts line/area chart; prop:
+  series (array[{name,data}]), categories (array), height (number, default 250), yLabel
+  (string, default kosong); smooth curve, gradient area fill, tooltip shared; responsive config
+- `frontend/src/components/charts/AlumniMap.vue` — komponen peta Leaflet.js; dynamic import
+  (SSR-safe, import() dalam onMounted); prop: markers (array[{province,city,count, coordinates:{lat lng}}]), center (string "[lat,lng]", default Indonesia), zoom (number,
+  default 5); CircleMarker per titik dengan radius proporsional count, popup nama + jumlah
+  alumni, tile layer OpenStreetMap; cleanup map instance saat unmount
+- `frontend/src/pages/admin/DashboardPage.vue` — halaman dashboard utama admin; 4 KPI cards
+  (total alumni, response rate ring, total employer, % bekerja) dengan skeleton loader;
+  LineChart tren respons 12 bulan; DonutChart distribusi status pekerjaan; BarChart top-10
+  industri; tabel 5 aktivitas terbaru dari audit_logs; kartu periode aktif dengan tombol
+  Kirim Undangan & Lihat Progress; fetch via store.fetchAll() on mounted; guard empty state
+  setiap chart
+- `frontend/src/pages/admin/dashboard/StatisticsPage.vue` — halaman statistik ketenagakerjaan
+  detail; filter bar (periode, angkatan, prodi) + tombol Filter/Reset; 4 KPI cards
+  (employment_rate %, average_waiting_months, relevance_rate %, jumlah prodi); BarChart
+  horizontal top-10 industri dari store.topIndustries; DonutChart status pekerjaan dengan
+  guard semua nilai 0; LineChart tingkat serapan per angkatan (by_graduation_year); AlumniMap
+  sebaran domisili; tabel serapan per program studi dengan colour-coded rate (hijau≥70%,
+  kuning≥50%, merah<50%); skeleton loader dan empty state per section independen
+- `frontend/src/pages/admin/reports/ReportPage.vue` — halaman generate dan unduh laporan;
+  form generate: period_id (required, validasi inline), graduation_year_id & study_program_id
+  (opsional), radio format PDF/Excel; tombol Generate disabled + spinner saat loading;
+  progress overlay (banner teal + animated bar, aria-live polite) saat isGenerating; auto-
+  download blob via store.generateReport(); toast sukses (nama file) / gagal (pesan error);
+  tabel laporan tersimpan: skeleton 3 baris, empty state dengan ilustrasi SVG + pesan
+  panduan, badge format merah=PDF/hijau=Excel, kolom ukuran (KB/MB), tanggal format
+  id-ID, tombol Unduh per baris via store.downloadReport()
+
+### Files Changed
+10 file (1 store, 4 chart component, 5 page component)
+
+- `frontend/src/stores/dashboard.js`
+- `frontend/src/components/charts/BarChart.vue`
+- `frontend/src/components/charts/DonutChart.vue`
+- `frontend/src/components/charts/LineChart.vue`
+- `frontend/src/components/charts/AlumniMap.vue`
+- `frontend/src/pages/admin/DashboardPage.vue`
+- `frontend/src/pages/admin/dashboard/StatisticsPage.vue`
+- `frontend/src/pages/admin/reports/ReportPage.vue`
+- *(5B.1: package.json verify only — tidak ada perubahan file)*
 
 ---
 
@@ -1446,6 +1508,7 @@ Baris "Hapus Employer (soft delete)" tidak ada di matriks izin sebelumnya, padah
 | 1.5.0 | 2026-06-13 | Sesi 4A dinyatakan Selesai penuh 28/28 task diverifikasi ada di repository. Counter task selesai 119→147. Status Fase 4 diupdate 4A ✅ |
 | 1.6.0 | 2026-06-13 | `surveyAdmin.js` ditambahkan di luar task list resmi sebagai kebutuhan arsitektur: memisahkan state survey admin (period management) dari state survey alumni/employer agar tidak terjadi conflict state, Fase 4 (Survei & Notifikasi) dinyatakan **selesai penuh**: 4A ✅ (28/28) + 4B ✅ (12/12) = 40 task selesai, Counter task selesai 128→168. `04_ARCHITECTURE.md` diperbarui manual ke versi 1.0.4 (mencatat penambahan `surveyAdmin.js` di folder struktur) |
 | 1.7.0 | 2026-06-13 | **hotfix** employmentStats() memanggil `getEmploymentStats($array)` → diganti named arguments 3 param terpisah sesuai signature DashboardService; alumniMap() memanggil `getAlumniMap($array)` → diganti 2 named arguments sesuai signature DashboardService. Mencegah TypeError di production saat filter digunakan, `05_API.md` diupdate ke versi **1.0.4** — dokumentasi endpoint dashboard §7 (summary, employment-stats, alumni-map) dan laporan §8 (generate/pdf, generate/excel, list, download) ditambahkan/diperbarui sesuai implementasi aktual Sesi 5A. Counter task selesai 168→179. Status Fase 5 diupdate 5A ✅ |
+| 1.8.0 | 2026-06-13 | *Sesi 5B dinyatakan Selesai penuh 10/10 task diverifikasi ada di repository. Counter task selesai 179→189. Status Fase 5 diupdate 5A ✅ 5B ✅ |
 
 
 ---
