@@ -1,6 +1,6 @@
 # 09_CHANGELOG.md 
 # CHANGELOG — SISTEM TRACER STUDY UNISYA
-# Versi: 1.6.0 | Tanggal: 2026-06-13
+# Versi: 1.7.0 | Tanggal: 2026-06-13
 
 ---
 
@@ -21,6 +21,33 @@ Setiap entri changelog mengikuti format:
 - `Removed` — Konten yang dihapus
 - `Security` — Perbaikan keamanan
 - `Deprecated` — Fitur yang akan dihapus di versi mendatang
+
+---
+
+## [1.7.0] — 2026-06-13
+
+### Added
+- `app/Services/DashboardService.php` — getSummary() (total alumni/employer, periode aktif, response rate, employment stats, recent activities), getEmploymentStats() dengan filter periodId/graduationYearId/studyProgramId (employment rate, avg waiting months, relevance rate, by_industry, by_salary_range, by_graduation_year, by_study_program), getAlumniMap() (sebaran per kota/provinsi + koordinat lat/lng), emptyEmploymentStats() helper
+- `app/Services/ReportService.php` — generateAlumniReport(), generateEmployerReport(), getReportList(), getReportDownloadUrl(); integrasi DomPDF + Laravel Excel; simpan ke storage/app/reports/
+- `resources/views/reports/alumni-report.blade.php` — template PDF laporan alumni (data statistik, tabel alumni, ringkasan ketenagakerjaan)
+- `resources/views/reports/employer-report.blade.php` — template PDF laporan employer (profil perusahaan, hasil survei)
+- `app/Http/Controllers/Api/V1/Admin/DashboardController.php` — summary(), employmentStats() (validasi exists filter params), alumniMap() (validasi exists filter params); semua return JsonResponse sesuai 05_API.md §7
+- `app/Http/Controllers/Api/V1/Admin/ReportController.php` — generatePdf(), generateExcel(), index(), download(); throttle:reports middleware; signed URL download
+- `app/Console/Commands/GenerateMonthlyReport.php` — generate laporan bulanan otomatis, scheduled monthly
+- `tests/Feature/Admin/DashboardTest.php` — 15 test: summary (struktur, null period, active period + kalkulasi response_rate, total_alumni count, audit log), employment-stats (struktur, filter valid, filter invalid 422×2), alumni-map (struktur + koordinat, null koordinat aman, filter valid), RBAC 401/403 semua endpoint
+
+### Changed
+- `routes/api.php` — tambah group /admin/dashboard (summary, employment-stats, alumni-map) dan /admin/reports (generate/pdf, generate/excel dengan throttle:reports, index, download)
+- `app/Console/Kernel.php` — tambah jadwal GenerateMonthlyReport monthly pertama setiap bulan 01:00 WITA
+
+### Fixed
+- `app/Http/Controllers/Api/V1/Admin/DashboardController.php` — **hotfix** employmentStats() memanggil `getEmploymentStats($array)` → diganti named arguments 3 param terpisah sesuai signature DashboardService; alumniMap() memanggil `getAlumniMap($array)` → diganti 2 named arguments sesuai signature DashboardService. Mencegah TypeError di production saat filter digunakan.
+
+### Document
+- `05_API.md` diupdate ke versi **1.0.4** — dokumentasi endpoint dashboard §7 (summary, employment-stats, alumni-map) dan laporan §8 (generate/pdf, generate/excel, list, download) ditambahkan/diperbarui sesuai implementasi aktual Sesi 5A
+
+### Files Changed
+11 file (2 service, 2 blade PDF, 2 controller, 1 command, 1 kernel update, 1 routes update, 1 feature test, 1 hotfix controller)
 
 ---
 
@@ -1418,6 +1445,7 @@ Baris "Hapus Employer (soft delete)" tidak ada di matriks izin sebelumnya, padah
 | 1.4.0 | 2026-06-12 | Tambah entri penyelesaian Sesi 3B — 7 file produksi frontend (store, 3 page, 3 component); QuestionnairePreviewPage replace stub → final; 9/9 task ✅; counter 119→128 |
 | 1.5.0 | 2026-06-13 | Sesi 4A dinyatakan Selesai penuh 28/28 task diverifikasi ada di repository. Counter task selesai 119→147. Status Fase 4 diupdate 4A ✅ |
 | 1.6.0 | 2026-06-13 | `surveyAdmin.js` ditambahkan di luar task list resmi sebagai kebutuhan arsitektur: memisahkan state survey admin (period management) dari state survey alumni/employer agar tidak terjadi conflict state, Fase 4 (Survei & Notifikasi) dinyatakan **selesai penuh**: 4A ✅ (28/28) + 4B ✅ (12/12) = 40 task selesai, Counter task selesai 128→168. `04_ARCHITECTURE.md` diperbarui manual ke versi 1.0.4 (mencatat penambahan `surveyAdmin.js` di folder struktur) |
+| 1.7.0 | 2026-06-13 | **hotfix** employmentStats() memanggil `getEmploymentStats($array)` → diganti named arguments 3 param terpisah sesuai signature DashboardService; alumniMap() memanggil `getAlumniMap($array)` → diganti 2 named arguments sesuai signature DashboardService. Mencegah TypeError di production saat filter digunakan, `05_API.md` diupdate ke versi **1.0.4** — dokumentasi endpoint dashboard §7 (summary, employment-stats, alumni-map) dan laporan §8 (generate/pdf, generate/excel, list, download) ditambahkan/diperbarui sesuai implementasi aktual Sesi 5A. Counter task selesai 168→179. Status Fase 5 diupdate 5A ✅ |
 
 
 ---

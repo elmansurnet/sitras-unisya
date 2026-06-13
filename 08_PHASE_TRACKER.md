@@ -1,6 +1,6 @@
 # 08_PHASE_TRACKER.md 
 # PHASE TRACKER — SISTEM TRACER STUDY UNISYA
-# Versi: 1.6.0 | Tanggal: 2026-06-13
+# Versi: 1.7.0 | Tanggal: 2026-06-13
 
 > File ini hanya bisa edit untuk update progress project dan task tidak boleh dikurangi untuk konsistensi project!
 
@@ -15,12 +15,12 @@
 | 2 | Manajemen Data Inti | 2A, 2B, 2C | ✅ Selesai (2A ✅, 2B ✅, 2C ✅) |
 | 3 | Kuesioner Dinamis | 3A, 3B | ✅ Selesai (3A ✅, 3B ✅) |
 | 4 | Survei & Notifikasi | 4A, 4B | ✅ Selesai (4A ✅, 4B ✅) |
-| 5 | Analitik & Pelaporan | 5A, 5B | ⏳ Pending |
+| 5 | Analitik & Pelaporan | 5A, 5B | 🔄 Sedang dikerjakan (5A ✅, 5B ⏳) |
 | 6 | Keamanan & Hardening | 6A | ⏳ Pending |
 | 7 | Deployment & Optimasi | 7A | ⏳ Pending |
 
 **Total Task: 219 task**
-**Selesai: 168 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12, 3B.1–3B.9 selesai 2026-06-12, 4A.1–4A.28 selesai 2026-06-13, 4B.1–4B.12 selesai 2026-06-13)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
+**Selesai: 179 task** *(1A.1–1A.19 selesai 2026-06-09, 1B.1–1B.28 selesai 2026-06-09, 2A.1–2A.31 selesai 2026-06-12, 2B.1–2B.16 selesai 2026-06-12, 2C.1–2C.13 selesai 2026-06-12, 3A.1–3A.12 selesai 2026-06-12, 3B.1–3B.9 selesai 2026-06-12, 4A.1–4A.28 selesai 2026-06-13, 4B.1–4B.12 selesai 2026-06-13, 5A.1–5A.11 selesai 2026-06-13)* *(Fase 0 dokumentasi tidak dihitung sebagai task development)*
 
 ---
 
@@ -350,24 +350,25 @@
 ## FASE 5 — ANALITIK & PELAPORAN
 
 ### Sesi 5A — Analitik & Pelaporan Backend
+**Status: ✅ Selesai | Tanggal Selesai: 2026-06-13**
 **Dependensi:** Fase 4 selesai (data survei tersedia)
 **Estimasi:** 3–4 hari
 
 | No | Task | File/Artefak | Status |
 |---|---|---|---|
-| 5A.1 | Service: `DashboardService` (getSummary, getEmploymentStats, getAlumniMapData, trendData) | `DashboardService.php` | ⏳ |
-| 5A.2 | Service: `ReportService` (generateAlumniReport, generateByProdi, generateByAngkatan — PDF + Excel) | `ReportService.php` | ⏳ |
-| 5A.3 | Install: `barryvdh/laravel-dompdf` (PDF generation) | `composer.json` | ⏳ |
-| 5A.4 | Install: `maatwebsite/excel` (Laravel Excel untuk import/export) | `composer.json` | ⏳ |
-| 5A.5 | View Blade: `resources/views/reports/alumni-report.blade.php` (template PDF laporan alumni) | Blade file | ⏳ |
-| 5A.6 | View Blade: `resources/views/reports/employer-report.blade.php` (template PDF laporan employer) | Blade file | ⏳ |
-| 5A.7 | Controller: `Admin/DashboardController` (summary, employmentStats, alumniMap) | `DashboardController.php` | ⏳ |
-| 5A.8 | Controller: `Admin/ReportController` (generatePdf, generateExcel, index, download) | `ReportController.php` | ⏳ |
+| 5A.1 | Service: `DashboardService` (getSummary, getEmploymentStats, getAlumniMapData, trendData) | `DashboardService.php` | ✅ |
+| 5A.2 | Service: `ReportService` (generateAlumniReport, generateByProdi, generateByAngkatan — PDF + Excel) | `ReportService.php` | ✅ |
+| 5A.3 | Install: `barryvdh/laravel-dompdf` (PDF generation) | `composer.json` | ✅ |
+| 5A.4 | Install: `maatwebsite/excel` (Laravel Excel untuk import/export) | `composer.json` | ✅ |
+| 5A.5 | View Blade: `resources/views/reports/alumni-report.blade.php` (template PDF laporan alumni) | Blade file | ✅ |
+| 5A.6 | View Blade: `resources/views/reports/employer-report.blade.php` (template PDF laporan employer) | Blade file | ✅ |
+| 5A.7 | Controller: `Admin/DashboardController` (summary, employmentStats, alumniMap) | `DashboardController.php` | ✅ |
+| 5A.8 | Controller: `Admin/ReportController` (generatePdf, generateExcel, index, download) | `ReportController.php` | ✅ |
 | 5A.9 | Routes: `/api/v1/admin/dashboard/*`, `/api/v1/admin/reports/*` | `routes/api.php` | ⏳ |
-| 5A.10 | Scheduler Command: `GenerateMonthlyReport` (auto-generate laporan bulanan, tanggal 1 jam 07:00) | `GenerateMonthlyReport.php` | ⏳ |
-| 5A.11 | Feature Test: dashboard summary + stats (data sesuai filter periode/prodi/angkatan) | `tests/Feature/Admin/DashboardTest.php` | ⏳ |
+| 5A.10 | Scheduler Command: `GenerateMonthlyReport` (auto-generate laporan bulanan, tanggal 1 jam 07:00) | `GenerateMonthlyReport.php` | ✅ |
+| 5A.11 | Feature Test: dashboard summary + stats (data sesuai filter periode/prodi/angkatan) | `tests/Feature/Admin/DashboardTest.php` | ✅ |
 
-**Total Sesi 5A: 11 task**
+**Total Sesi 5A: 11 task - ✅ Selesai 11/11 (diverifikasi 2026-06-13)**
 
 ---
 
@@ -462,7 +463,7 @@
 | 3 | 3B | 9 | ✅ Selesai (2026-06-12) |
 | 4 | 4A | 28 | ✅ Selesai (2026-06-13) |
 | 4 | 4B | 12 | ✅ Selesai (2026-06-13) |
-| 5 | 5A | 11 | ⏳ |
+| 5 | 5A | 11 | ✅ Selesai (2026-06-13) |
 | 5 | 5B | 10 | ⏳ |
 | 6 | 6A | 14 | ⏳ |
 | 7 | 7A | 16 | ⏳ |
@@ -529,6 +530,7 @@ Fase 1A (Setup + DB) → Fase 1B (Auth)
 | 1.4.0 | 2026-06-12 | Sesi 3B dinyatakan ✅ Selesai penuh (9/9 task): stores/questionnaire.js, QuestionnaireIndexPage, QuestionnaireBuilderPage (drag-drop), QuestionEditor, QuestionRenderer (10 tipe + toolbar builder), ConditionalLogicEditor, QuestionnairePreviewPage (final: all+step mode, answer counter, ARIA); counter task selesai 119→128; status Fase 3 diupdate: 3B ✅ |
 | 1.5.0 | 2026-06-13 | Sesi 4A dinyatakan Selesai penuh 28/28 task diverifikasi ada di repository. 4A.1–4A.2 migrations survey_periods, alumni_survey_period, survey_responses, survey_answers, notification_templates, notification_logs. 4A.3–4A.7 models SurveyPeriod, SurveyResponse, SurveyAnswer, NotificationTemplate, NotificationLog. 4A.8 SurveyResponseObserver, 4A.9 SurveyService, 4A.10 NotificationService, 4A.11 WhatsAppService, update AppServiceProvider. 4A.12 AdminSurveyPeriodController, 4A.13–4A.14 AdminNotificationController (CRUD template + log listing), 4A.15 AlumniSurveyController, 4A.16 EmployerSurveyController, 4A.17 SaveDraftRequest & SubmitSurveyRequest. 4A.18 ProcessSurveyBlast job, 4A.19 routes/api.php update, 4A.20 SendSurveyReminders, 4A.21 CloseExpiredSurveyPeriods, 4A.22 CleanupExpiredOtps, 4A.23 NotificationTemplateSeeder, update DatabaseSeeder, app/Console/Kernel.php scheduler. 4A.24–4A.28 Feature Tests: AlumniSurveyTest, EmployerSurveyTest, BlastTest, NotificationTemplateTest, NotificationLogTest. counter task selesai 128→156. Status Fase 4 diupdate 4A ✅ |
 | 1.6.0 | 2026-06-13 | Sesi 4B dinyatakan Selesai penuh 12/12 task diverifikasi ada di repository. 4B.1 stores/survey.js (Pinia: questionnaire, response, answers, completion, status), 4B.2 stores/notification.js (Pinia: templates, logs, pagination). Tambahan tidak terencana: frontend/src/stores/surveyAdmin.js (Pinia: survey periods admin — list, current, pagination, filters, activate/close/sendInvitations). 4B.3 SurveyProgressBar.vue, 4B.4 QuestionPreview.vue. 4B.5 SurveyPage.vue alumni (multi-step per seksi, draft, submit + konfirmasi modal), 4B.6 SurveyDonePage.vue alumni (animasi sukses, tanggal submit). 4B.7 EmployerSurveyPage.vue, 4B.8 EmployerDonePage.vue. 4B.9 SurveyPeriodIndexPage.vue (tabel, response rate), 4B.10 SurveyPeriodDetailPage.vue (progress bar, blast undangan, filter channel/kuesioner). 4B.11 NotificationTemplatePage.vue (CRUD template, preview variabel), 4B.12 NotificationLogPage.vue (tabel log, filter, modal detail error). Fase 4 dinyatakan selesai penuh (4A ✅ 4B ✅). counter task selesai 156→168.|
+| 1.7.0 | 2026-06-13 | Sesi 5A dinyatakan Selesai penuh 11/11 task (5A.1–5A.2, 5A.5–5A.11) diverifikasi ada di repository. Termasuk hotfix DashboardController (bug TypeError getEmploymentStats & getAlumniMap dipanggil dengan array). counter task selesai 168→179. Status Fase 5 diupdate 5A ✅ |
 
 ---
 
