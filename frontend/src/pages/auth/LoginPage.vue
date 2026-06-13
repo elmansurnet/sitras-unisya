@@ -26,8 +26,8 @@ async function submit() {
   errors.value  = {}
   loading.value = true
   try {
-    await authStore.login(form.email, form.password)
-    // Navigation guard redirect ke dashboard
+    await authStore.loginAdmin(form.email, form.password)
+    router.push({ name: 'admin.dashboard' })
   } catch (err) {
     const data = err.response?.data
     if (data?.errors) {
