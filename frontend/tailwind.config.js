@@ -2,13 +2,21 @@
  * tailwind.config.js — Konfigurasi TailwindCSS untuk frontend SPA
  * Sesuai 04_ARCHITECTURE.md §2 & 06_UI_UX.md design tokens
  *
- * Content path mencakup semua file Vue di frontend/src/
+ * PENTING: Gunakan path absolut via fileURLToPath agar content path
+ * resolve dengan benar saat Vite berjalan dari root project, bukan
+ * dari folder frontend/.
  */
+import { fileURLToPath } from 'url'
+import { dirname, resolve } from 'path'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname  = dirname(__filename)
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    './index.html',
-    './src/**/*.{vue,js,ts,jsx,tsx}',
+    resolve(__dirname, 'index.html'),
+    resolve(__dirname, 'src/**/*.{vue,js,ts,jsx,tsx}'),
   ],
   theme: {
     extend: {
