@@ -35,7 +35,7 @@ Jika ada item yang tidak bisa dipenuhi, catat alasannya dan eskalasi ke Lead Eng
 
 ### System
 - [ ] Ubuntu 22.04 LTS — semua security patch terbaru sudah diapply: `apt update && apt upgrade`
-- [ ] Timezone server diset ke `Asia/Makassar` (WITA): `timedatectl set-timezone Asia/Makassar`
+- [ ] Timezone server diset ke `Asia/Jakarta` (WIB): `timedatectl set-timezone Asia/Jakarta`
 - [ ] Firewall UFW aktif, hanya port 80, 443, 22 yang terbuka:
   ```bash
   ufw allow 22/tcp
