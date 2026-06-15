@@ -22,6 +22,8 @@ export const useAlumniStore = defineStore('alumni', {
       sort_by: 'created_at',
       sort_dir: 'desc',
     },
+    studyProgramOptions: [],
+    graduationYearOptions: [],
     loading: false,
     loadingDetail: false,
     loadingSubmit: false,
@@ -49,10 +51,35 @@ export const useAlumniStore = defineStore('alumni', {
   },
 
   actions: {
-    /**
-     * Fetch paginated alumni list (admin)
-     * @param {number} page
-     */
+    async fetchMasterData() {
+      try {
+        const [studyProgramsRes, graduationYearsRes] = await Promise.all([
+          api.get('/admin/settings/study-programs', { params: { per_page: 100 } }),
+          api.get('/admin/settings/graduation-years', { params: { per_page: 100 } }),
+        ])
+
+        const studyPrograms = studyProgramsRes.data?.data ?? studyProgramsRes.data ?? []
+        const graduationYears = graduationYearsRes.data?.data ?? graduationYearsRes.data ?? []
+
+        this.studyProgramOptions = Array.isArray(studyPrograms)
+          ? studyPrograms.map((item) => ({
+              value: item.id,
+              label: item.name ?? item.program_name ?? `Prodi #${item.id}`,
+            }))
+          : []
+
+        this.graduationYearOptions = Array.isArray(graduationYears)
+          ? graduationYears.map((item) => ({
+              value: item.id,
+              label: item.year ?? item.label ?? String(item.id),
+            }))
+          : []
+      } catch (err) {
+        this.error = err.response?.data?.message ?? 'Gagal memuat master data alumni.'
+        throw err
+      }
+    },
+
     async fetchList(page = 1) {
       this.loading = true
       this.error = null
@@ -72,10 +99,6 @@ export const useAlumniStore = defineStore('alumni', {
       }
     },
 
-    /**
-     * Fetch single alumni detail (admin)
-     * @param {number} id
-     */
     async fetchDetail(id) {
       this.loadingDetail = true
       this.error = null
@@ -91,10 +114,6 @@ export const useAlumniStore = defineStore('alumni', {
       }
     },
 
-    /**
-     * Create alumni (admin)
-     * @param {object} payload
-     */
     async create(payload) {
       this.loadingSubmit = true
       this.error = null
@@ -109,11 +128,6 @@ export const useAlumniStore = defineStore('alumni', {
       }
     },
 
-    /**
-     * Update alumni (admin)
-     * @param {number} id
-     * @param {object} payload
-     */
     async update(id, payload) {
       this.loadingSubmit = true
       this.error = null
@@ -131,10 +145,6 @@ export const useAlumniStore = defineStore('alumni', {
       }
     },
 
-    /**
-     * Soft-delete alumni (superadmin only)
-     * @param {number} id
-     */
     async remove(id) {
       this.loadingSubmit = true
       this.error = null
@@ -151,16 +161,17 @@ export const useAlumniStore = defineStore('alumni', {
       }
     },
 
-    /**
-     * Import alumni from Excel/CSV (admin)
-     * @param {FormData} formData
-     */
     async importAlumni(formData) {
       this.loadingImport = true
       this.importResult = null
       this.error = null
       try {
-        const { data } = await api.post('/admin/alumni/import', formData, {
+        const payload = formData instanceof FormData ? formData : (() => {
+          const fd = new FormData()
+          fd.append('file', formData)
+          return fd
+        })()
+        const { data } = await api.post('/admin/alumni/import', payload, {
           headers: { 'Content-Type': 'multipart/form-data' },
         })
         this.importResult = data.data
@@ -173,9 +184,6 @@ export const useAlumniStore = defineStore('alumni', {
       }
     },
 
-    /**
-     * Download import template
-     */
     async downloadTemplate() {
       try {
         const response = await api.get('/admin/alumni/import-template', {
@@ -195,9 +203,6 @@ export const useAlumniStore = defineStore('alumni', {
       }
     },
 
-    /**
-     * Export alumni list to Excel
-     */
     async exportAlumni() {
       this.loadingExport = true
       try {
@@ -225,11 +230,6 @@ export const useAlumniStore = defineStore('alumni', {
       }
     },
 
-    /**
-     * Send invitation to alumni (admin)
-     * @param {number} alumniId
-     * @param {object} payload { survey_period_id, questionnaire_id, channel }
-     */
     async sendInvitation(alumniId, payload) {
       this.loadingSubmit = true
       try {
@@ -243,11 +243,6 @@ export const useAlumniStore = defineStore('alumni', {
       }
     },
 
-    // --- Alumni self-service ---
-
-    /**
-     * Fetch own profile (alumni role)
-     */
     async fetchOwnProfile() {
       this.loadingDetail = true
       this.error = null
@@ -263,10 +258,6 @@ export const useAlumniStore = defineStore('alumni', {
       }
     },
 
-    /**
-     * Update own profile (alumni role)
-     * @param {object|FormData} payload
-     */
     async updateOwnProfile(payload) {
       this.loadingSubmit = true
       this.error = null
@@ -284,8 +275,6 @@ export const useAlumniStore = defineStore('alumni', {
         this.loadingSubmit = false
       }
     },
-
-    // --- Helpers ---
 
     setFilter(key, value) {
       this.filters[key] = value
