@@ -51,13 +51,23 @@
           <SidebarItem :to="{ name: 'admin.questionnaires.index' }"   label="Kuesioner" />
         </SidebarGroup>
 
-        <!-- Laporan -->
-        <SidebarItem :to="{ name: 'admin.reports' }" icon="bar-chart-2" label="Laporan" />
+        <!-- Statistik & Laporan -->
+        <SidebarGroup label="Statistik & Laporan" icon="bar-chart-2">
+          <SidebarItem :to="{ name: 'admin.dashboard.statistics' }" icon="trending-up" label="Statistik" />
+          <SidebarItem :to="{ name: 'admin.reports' }"              label="Laporan" />
+        </SidebarGroup>
 
         <!-- Notifikasi -->
         <SidebarGroup label="Notifikasi" icon="bell">
           <SidebarItem :to="{ name: 'admin.notifications.templates' }" label="Template" />
           <SidebarItem :to="{ name: 'admin.notifications.logs' }"      label="Log Kirim" />
+        </SidebarGroup>
+
+        <!-- Master Data (superadmin + admin) -->
+        <SidebarGroup label="Master Data" icon="database">
+          <SidebarItem :to="{ name: 'admin.settings.faculties' }"         label="Fakultas" />
+          <SidebarItem :to="{ name: 'admin.settings.study-programs' }"    label="Program Studi" />
+          <SidebarItem :to="{ name: 'admin.settings.graduation-years' }"  label="Tahun Kelulusan" />
         </SidebarGroup>
 
         <!-- Superadmin only -->

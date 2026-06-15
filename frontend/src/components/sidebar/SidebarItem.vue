@@ -26,7 +26,6 @@ defineProps({
 })
 
 // Semua icon menggunakan h() render function — tidak butuh Vue runtime compiler.
-// Setiap fungsi menerima class dari pemanggil via attrs, atau default 'w-4 h-4'.
 const icons = {
   'grid': () => h('svg', { class: 'w-4 h-4', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '2' }, [
     h('rect', { x: '3', y: '3', width: '7', height: '7' }),
@@ -47,8 +46,17 @@ const icons = {
   'bar-chart-2': () => h('svg', { class: 'w-4 h-4', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '2' }, [
     h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M18 20V10M12 20V4M6 20v-6' }),
   ]),
+  'trending-up': () => h('svg', { class: 'w-4 h-4', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '2' }, [
+    h('polyline', { points: '23 6 13.5 15.5 8.5 10.5 1 18' }),
+    h('polyline', { points: '17 6 23 6 23 12' }),
+  ]),
   'bell': () => h('svg', { class: 'w-4 h-4', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '2' }, [
     h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' }),
+  ]),
+  'database': () => h('svg', { class: 'w-4 h-4', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '2' }, [
+    h('ellipse', { cx: '12', cy: '5', rx: '9', ry: '3' }),
+    h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M21 12c0 1.66-4 3-9 3s-9-1.34-9-3' }),
+    h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5' }),
   ]),
   'user-cog': () => h('svg', { class: 'w-4 h-4', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '2' }, [
     h('circle', { cx: '9', cy: '7', r: '4' }),
