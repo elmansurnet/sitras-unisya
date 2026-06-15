@@ -61,6 +61,8 @@ const SystemSettingPage          = () => import('@/pages/admin/settings/SystemSe
 const FacultyPage                = () => import('@/pages/admin/settings/FacultyPage.vue')
 const StudyProgramPage           = () => import('@/pages/admin/settings/StudyProgramPage.vue')
 const GraduationYearPage         = () => import('@/pages/admin/settings/GraduationYearPage.vue')
+const IndustrySectorPage         = () => import('@/pages/admin/settings/IndustrySectorPage.vue')
+const SalaryRangePage            = () => import('@/pages/admin/settings/SalaryRangePage.vue')
 const UserManagementPage         = () => import('@/pages/admin/settings/UserManagementPage.vue')
 const AuditLogPage               = () => import('@/pages/admin/settings/AuditLogPage.vue')
 
@@ -431,6 +433,32 @@ const routes = [
           breadcrumbs: [
             { label: 'Pengaturan', to: { name: 'admin.settings' } },
             { label: 'Tahun Lulus' },
+          ],
+        },
+      },
+      {
+        path: 'settings/industry-sectors',
+        name: 'admin.settings.industry-sectors',
+        component: IndustrySectorPage,
+        meta: {
+          title: 'Kelola Sektor Industri',
+          roles: ['superadmin'],
+          breadcrumbs: [
+            { label: 'Pengaturan', to: { name: 'admin.settings' } },
+            { label: 'Sektor Industri' },
+          ],
+        },
+      },
+      {
+        path: 'settings/salary-ranges',
+        name: 'admin.settings.salary-ranges',
+        component: SalaryRangePage,
+        meta: {
+          title: 'Kelola Rentang Gaji',
+          roles: ['superadmin'],
+          breadcrumbs: [
+            { label: 'Pengaturan', to: { name: 'admin.settings' } },
+            { label: 'Rentang Gaji' },
           ],
         },
       },

@@ -68,6 +68,8 @@
           <SidebarItem :to="{ name: 'admin.settings.faculties' }"         label="Fakultas" />
           <SidebarItem :to="{ name: 'admin.settings.study-programs' }"    label="Program Studi" />
           <SidebarItem :to="{ name: 'admin.settings.graduation-years' }"  label="Tahun Kelulusan" />
+          <SidebarItem :to="{ name: 'admin.settings.industry-sectors' }"  label="Sektor Industri" />
+          <SidebarItem :to="{ name: 'admin.settings.salary-ranges' }"     label="Rentang Gaji" />
         </SidebarGroup>
 
         <!-- Superadmin only -->
