@@ -1,6 +1,6 @@
 # 04_ARCHITECTURE.md
 # ARSITEKTUR SISTEM — SISTEM TRACER STUDY UNISYA
-# Versi: 1.0.4 | Tanggal: 2026-06-13
+# Versi: 1.0.5 | Tanggal: 2026-06-15
 
 ---
 
@@ -344,14 +344,18 @@ sitras-unisya/
 │   │   ├── router/
 │   │   │   └── index.js
 │   │   ├── stores/
-│   │   │   ├── auth.js
-│   │   │   ├── alumni.js
-│   │   │   ├── employer.js
-│   │   │   ├── questionnaire.js
-│   │   │   ├── survey.js
-│   │   │   ├── dashboard.js
-│   │   │   ├── notification.js
-│   │   │   └── surveyAdmin.js      ← File baru (ditambahkan pada versi dokumen 1.0.4)
+|   │   │   ├── auth.js              # Login, logout, fetchMe, token state
+|   │   │   ├── alumni.js            # Admin: daftar alumni, CRUD, import, export, kirim undangan
+|   │   │   ├── alumniProfile.js     # Alumni self: profil + foto + riwayat kerja
+|   │   │   ├── dashboard.js         # Admin: summary KPI, employment stats, peta alumni, trend
+|   │   │   ├── employer.js          # Admin: daftar employer, CRUD, kirim/regenerate survey token
+|   │   │   ├── masterData.js        # Faculties + StudyPrograms + GraduationYears (admin CRUD + public no-auth)
+|   │   │   ├── notification.js      # Admin: template notifikasi CRUD + log notifikasi dengan filter
+|   │   │   ├── questionnaire.js     # Admin: kuesioner CRUD, sections, questions, reorder, publish, archive
+|   │   │   ├── report.js            # Admin: generate PDF/Excel, download laporan tersimpan
+|   │   │   ├── settings.js          # Admin: system settings + users management + audit logs
+|   │   │   ├── survey.js            # Alumni/Employer: isi survei, saveDraft, submit
+|   │   │   └── surveyAdmin.js       # Admin: periode survei, aktivasi, tutup, kirim undangan massal
 │   │   ├── services/
 │   │   │   └── api.js      ← Axios instance + interceptors
 │   │   └── main.js
@@ -872,6 +876,7 @@ TELESCOPE_ENABLED=false
 | 1.0.2 | 2026-06-08 | Update .env: WHATSAPP_API_TOKEN → WHATSAPP_API_KEY; update WHATSAPP_GATEWAY_URL ke endpoint gateway UNISYA (wacenter.unisya.ac.id); update komentar config/whatsapp.php |
 | 1.0.3 | 2026-06-09 | Fix diagram arsitektur: label WA Gateway `(Fonnte/Wablas)` → `(wacenter.unisya.ac.id)` yang terlewat dari audit v1.0.2 (INC-02); lengkapi folder structure pages frontend — tambah semua nama file .vue yang terdefinisi di Phase Tracker & UI/UX spec (INC-07) |
 | 1.0.4 | 2026-06-13 | mencatat penambahan `surveyAdmin.js` di folder struktur. memisahkan state survey admin (period management) dari state survey alumni/employer agar tidak terjadi conflict state |
+| 1.0.5 | 2026-06-15 | mencatat penambahan file frontend/stores/ `report.js`, `settings.js`, `masterData.js`, `alumniProfile.js` di folder struktur. |
 
 ---
 
