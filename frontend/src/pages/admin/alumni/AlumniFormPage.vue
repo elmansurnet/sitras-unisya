@@ -499,7 +499,8 @@ function fieldError(key) {
         </div>
       </div>
 
-      <!-- Actions -->
+      <!-- FIX: Actions hanya tampil di tab terakhir (kontak) -->
+      <!-- Tombol Batal selalu ada; Simpan hanya di tab kontak agar user tidak submit sebelum isi semua tab -->
       <div class="mt-6 flex justify-end gap-3">
         <button
           type="button"
@@ -508,7 +509,9 @@ function fieldError(key) {
         >
           Batal
         </button>
+        <!-- FIX: v-if sehingga tombol Simpan HANYA muncul di tab kontak (tab terakhir) -->
         <button
+          v-if="activeTab === 'kontak'"
           type="submit"
           class="btn-primary"
           :disabled="saving"
@@ -527,7 +530,7 @@ function fieldError(key) {
 <style scoped>
 .btn-primary   { @apply inline-flex items-center bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
 .btn-secondary { @apply bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors; }
-.card          { @apply bg-white rounded-xl shadow-sm border border-gray-200; }
+.card          { @apply bg-white rounded-xl shadow-xl border border-gray-200; }
 .form-label    { @apply block text-sm font-medium text-gray-700 mb-1.5; }
 .form-input    { @apply w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition-colors; }
 .form-error    { @apply mt-1 text-xs text-red-500; }

@@ -12,6 +12,7 @@ use App\Services\AlumniService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AlumniController extends Controller
@@ -172,17 +173,7 @@ class AlumniController extends Controller
     /**
      * GET /admin/alumni/template
      *
-     * FIX: Sebelumnya return JsonResponse berisi {filename}.
-     * Frontend memanggil dengan responseType:'blob' dan menyimpan response
-     * sebagai .xlsx — yang ternyata isinya JSON teks, bukan binary XLSX.
-     * Excel kemudian error: "file format or file extension is not valid".
-     *
-     * Sekarang return BinaryFileResponse (stream file .xlsx langsung).
-     * Pipeline konsisten:
-     *   GET /admin/alumni/template
-     *   → BinaryFileResponse (binary XLSX, Content-Type: .xlsx)
-     *   → frontend Blob({ type: 'application/vnd.openxmlformats...' })
-     *   → browser download file .xlsx valid, Excel dapat membuka
+     * Return BinaryFileResponse (stream file .xlsx langsung).
      */
     public function importTemplate(Request $request): BinaryFileResponse
     {
@@ -225,6 +216,9 @@ class AlumniController extends Controller
     /**
      * Format alumni detail sesuai response spec 05_API.md §3.2
      *
+     * FIX: address_latitude/address_longitude (bukan latitude/longitude),
+     *      photo (bukan photo_path) — sesuai nama kolom di migration.
+     *
      * @return array<string,mixed>
      */
     private function formatDetail(Alumni $alumni): array
@@ -259,14 +253,16 @@ class AlumniController extends Controller
                 'city'        => $alumni->address_city,
                 'province'    => $alumni->address_province,
                 'postal_code' => $alumni->address_postal_code,
-                'latitude'    => $alumni->latitude,
-                'longitude'   => $alumni->longitude,
+                // FIX: kolom DB adalah address_latitude / address_longitude
+                'latitude'    => $alumni->address_latitude,
+                'longitude'   => $alumni->address_longitude,
             ],
             'phone'                => $alumni->phone,
             'email'                => $alumni->user?->email,
             'linkedin_url'         => $alumni->linkedin_url,
-            'photo_url'            => $alumni->photo_path
-                ? \Illuminate\Support\Facades\Storage::temporaryUrl($alumni->photo_path, now()->addHour())
+            // FIX: kolom DB adalah photo (bukan photo_path)
+            'photo_url'            => $alumni->photo
+                ? Storage::temporaryUrl($alumni->photo, now()->addHour())
                 : null,
             'survey_status'        => $alumni->survey_status,
             'work_histories'       => $alumni->workHistories?->map(fn($wh) => [

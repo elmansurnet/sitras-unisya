@@ -110,4 +110,13 @@ class Alumni extends Model
     {
         return $this->hasMany(SurveyResponse::class);
     }
+
+    /**
+     * Relasi ke riwayat pekerjaan alumni.
+     * Tabel: alumni_work_histories (02_DATABASE.md §2.10)
+     */
+    public function workHistories()
+    {
+        return $this->hasMany(AlumniWorkHistory::class);
+    }
 }
