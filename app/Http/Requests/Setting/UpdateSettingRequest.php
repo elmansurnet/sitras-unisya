@@ -15,14 +15,16 @@ class UpdateSettingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'value'       => ['required'],
+            // 'present' (bukan 'required') agar value string kosong "" diterima.
+            // Beberapa setting sah dikosongkan (mis. wa_sender, footer opsional).
+            'value' => ['present'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'value.required' => 'Nilai pengaturan tidak boleh kosong.',
+            'value.present' => 'Field value harus disertakan dalam request.',
         ];
     }
 }

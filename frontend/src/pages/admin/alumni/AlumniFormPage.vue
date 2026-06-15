@@ -15,14 +15,14 @@ const activeTab = ref('pribadi')
 const saving  = ref(false)
 const errors  = ref({})
 
-// Semua field sesuai $fillable model Alumni
+// Semua field sesuai $fillable model Alumni dan kolom migration
 const form = ref({
-  // Identitas
+  // Identitas — kolom DB: birth_place, birth_date (bukan birthplace/birthdate)
   nik:                 '',
   full_name:           '',
   gender:              '',
-  birthplace:          '',
-  birthdate:           '',
+  birth_place:         '',
+  birth_date:          '',
   // Akademik
   nim:                 '',
   study_program_id:    '',
@@ -58,9 +58,9 @@ const GENDER_OPTIONS = [
 ]
 
 const PREDICATE_OPTIONS = [
-  { value: 'Memuaskan',       label: 'Memuaskan' },
+  { value: 'Memuaskan',        label: 'Memuaskan' },
   { value: 'Sangat Memuaskan', label: 'Sangat Memuaskan' },
-  { value: 'Pujian',          label: 'Pujian (Cum Laude)' },
+  { value: 'Pujian',           label: 'Pujian (Cum Laude)' },
 ]
 
 onMounted(async () => {
@@ -112,12 +112,17 @@ async function handleSubmit() {
   } catch (err) {
     errors.value = err.response?.data?.errors ?? {}
     toast.error(err.response?.data?.message ?? 'Gagal menyimpan data alumni.')
-    // Pindah ke tab pertama yang ada error
+    // Pindah ke tab pertama yang ada error — gunakan nama kolom DB yang benar
     const errKeys = Object.keys(errors.value)
-    if (errKeys.some(k => ['nik','full_name','gender','birthplace','birthdate'].includes(k))) activeTab.value = 'pribadi'
-    else if (errKeys.some(k => ['nim','study_program_id','graduation_year_id','gpa','thesis_title','graduation_predicate'].includes(k))) activeTab.value = 'akademik'
-    else if (errKeys.some(k => k.startsWith('address_'))) activeTab.value = 'alamat'
-    else if (errKeys.some(k => ['phone','email','linkedin_url'].includes(k))) activeTab.value = 'kontak'
+    if (errKeys.some(k => ['nik', 'full_name', 'gender', 'birth_place', 'birth_date'].includes(k))) {
+      activeTab.value = 'pribadi'
+    } else if (errKeys.some(k => ['nim', 'study_program_id', 'graduation_year_id', 'gpa', 'thesis_title', 'graduation_predicate'].includes(k))) {
+      activeTab.value = 'akademik'
+    } else if (errKeys.some(k => k.startsWith('address_'))) {
+      activeTab.value = 'alamat'
+    } else if (errKeys.some(k => ['phone', 'email', 'linkedin_url'].includes(k))) {
+      activeTab.value = 'kontak'
+    }
   } finally {
     saving.value = false
   }
@@ -211,28 +216,28 @@ function fieldError(key) {
             <p v-if="fieldError('gender')" class="form-error">{{ fieldError('gender') }}</p>
           </div>
 
-          <!-- Tempat Lahir -->
+          <!-- Tempat Lahir — kolom DB: birth_place -->
           <div>
             <label class="form-label">Tempat Lahir</label>
             <input
-              v-model="form.birthplace"
+              v-model="form.birth_place"
               class="form-input"
-              :class="{ 'border-red-400': fieldError('birthplace') }"
+              :class="{ 'border-red-400': fieldError('birth_place') }"
               placeholder="Kota/Kabupaten"
             />
-            <p v-if="fieldError('birthplace')" class="form-error">{{ fieldError('birthplace') }}</p>
+            <p v-if="fieldError('birth_place')" class="form-error">{{ fieldError('birth_place') }}</p>
           </div>
 
-          <!-- Tanggal Lahir -->
+          <!-- Tanggal Lahir — kolom DB: birth_date -->
           <div>
             <label class="form-label">Tanggal Lahir</label>
             <input
-              v-model="form.birthdate"
+              v-model="form.birth_date"
               type="date"
               class="form-input"
-              :class="{ 'border-red-400': fieldError('birthdate') }"
+              :class="{ 'border-red-400': fieldError('birth_date') }"
             />
-            <p v-if="fieldError('birthdate')" class="form-error">{{ fieldError('birthdate') }}</p>
+            <p v-if="fieldError('birth_date')" class="form-error">{{ fieldError('birth_date') }}</p>
           </div>
         </div>
       </div>
@@ -520,10 +525,10 @@ function fieldError(key) {
 </template>
 
 <style scoped>
-.btn-primary  { @apply inline-flex items-center bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
+.btn-primary   { @apply inline-flex items-center bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
 .btn-secondary { @apply bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors; }
-.card       { @apply bg-white rounded-xl shadow-sm border border-gray-200; }
-.form-label { @apply block text-sm font-medium text-gray-700 mb-1.5; }
-.form-input { @apply w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition-colors; }
-.form-error { @apply mt-1 text-xs text-red-500; }
+.card          { @apply bg-white rounded-xl shadow-sm border border-gray-200; }
+.form-label    { @apply block text-sm font-medium text-gray-700 mb-1.5; }
+.form-input    { @apply w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition-colors; }
+.form-error    { @apply mt-1 text-xs text-red-500; }
 </style>

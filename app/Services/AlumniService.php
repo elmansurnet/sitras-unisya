@@ -57,6 +57,7 @@ class AlumniService
     public function create(array $data, int $actorId): Alumni
     {
         return DB::transaction(function () use ($data, $actorId) {
+            // is_active milik tabel users, bukan tabel alumni
             $user = User::create([
                 'name'      => $data['full_name'],
                 'email'     => $data['email'],
@@ -67,13 +68,22 @@ class AlumniService
 
             $alumni = Alumni::create(array_merge(
                 collect($data)->except(['email', 'password', 'photo'])->toArray(),
-                ['user_id' => $user->id, 'is_active' => true]
+                ['user_id' => $user->id]
             ));
 
             if (isset($data['photo']) && $data['photo'] instanceof UploadedFile) {
                 $this->uploadPhoto($alumni, $data['photo']);
                 $alumni->refresh();
             }
+
+            AuditLog::record(
+                action   : 'create',
+                module   : 'alumni',
+                modelId  : $alumni->id,
+                oldValues: null,
+                newValues: ['nim' => $alumni->nim, 'full_name' => $alumni->full_name, 'actor_id' => $actorId],
+                modelType: Alumni::class,
+            );
 
             return $alumni->load(['user', 'studyProgram.faculty', 'graduationYear']);
         });
@@ -97,19 +107,39 @@ class AlumniService
 
             $alumni->update(collect($data)->except(['email', 'password', 'photo'])->toArray());
 
+            AuditLog::record(
+                action   : 'update',
+                module   : 'alumni',
+                modelId  : $alumni->id,
+                oldValues: null,
+                newValues: ['actor_id' => $actorId],
+                modelType: Alumni::class,
+            );
+
             return $alumni->fresh(['user', 'studyProgram.faculty', 'graduationYear']);
         });
     }
 
     /**
      * Soft-delete alumni (dan user terkait).
+     * Kolom foto di tabel alumni adalah `photo`, bukan `photo_path`.
      */
     public function delete(Alumni $alumni, int $actorId): void
     {
         DB::transaction(function () use ($alumni, $actorId) {
-            if ($alumni->photo_path && Storage::disk('private')->exists($alumni->photo_path)) {
-                Storage::disk('private')->delete($alumni->photo_path);
+            if ($alumni->photo && Storage::disk('private')->exists($alumni->photo)) {
+                Storage::disk('private')->delete($alumni->photo);
             }
+
+            AuditLog::record(
+                action   : 'delete',
+                module   : 'alumni',
+                modelId  : $alumni->id,
+                oldValues: ['nim' => $alumni->nim, 'full_name' => $alumni->full_name],
+                newValues: ['actor_id' => $actorId],
+                modelType: Alumni::class,
+            );
+
             $alumni->delete();
             $alumni->user?->delete();
         });
@@ -119,24 +149,26 @@ class AlumniService
 
     /**
      * Upload foto profil alumni ke storage/app/private/alumni/photos/.
+     * Kolom di tabel alumni: `photo` (VARCHAR 255).
      */
     public function uploadPhoto(Alumni $alumni, UploadedFile $file): string
     {
-        if ($alumni->photo_path && Storage::disk('private')->exists($alumni->photo_path)) {
-            Storage::disk('private')->delete($alumni->photo_path);
+        // Hapus foto lama jika ada
+        if ($alumni->photo && Storage::disk('private')->exists($alumni->photo)) {
+            Storage::disk('private')->delete($alumni->photo);
         }
 
         $filename = Str::uuid() . '.' . $file->extension();
         $path     = $file->storeAs('alumni/photos', $filename, 'private');
 
-        $alumni->update(['photo_path' => $path]);
+        $alumni->update(['photo' => $path]);
 
         AuditLog::record(
             action   : 'upload_photo',
             module   : 'alumni',
             modelId  : $alumni->id,
-            oldValues: ['photo_path' => $alumni->getOriginal('photo_path')],
-            newValues: ['photo_path' => $path],
+            oldValues: ['photo' => $alumni->getOriginal('photo')],
+            newValues: ['photo' => $path],
             modelType: Alumni::class,
         );
 
@@ -163,6 +195,7 @@ class AlumniService
 
         DB::transaction(function () use ($validRows, $batchId, $actorId, &$successCount) {
             foreach ($validRows as $row) {
+                // is_active milik users, bukan alumni
                 $user = User::create([
                     'name'      => $row['full_name'],
                     'email'     => $row['email'],
@@ -175,7 +208,6 @@ class AlumniService
                     collect($row)->except(['email'])->toArray(),
                     [
                         'user_id'      => $user->id,
-                        'is_active'    => true,
                         'import_batch' => $batchId,
                     ]
                 ));
@@ -202,7 +234,6 @@ class AlumniService
 
     /**
      * Export alumni via queue job (async).
-     * Digunakan untuk proses background (mis. report besar).
      *
      * @param  array<string,mixed> $filters
      */
@@ -224,11 +255,6 @@ class AlumniService
     /**
      * Export alumni secara synchronous dan stream file ke browser.
      *
-     * FIX: Frontend memanggil GET /admin/alumni/export dengan responseType:'blob'.
-     * Method ini menggantikan alur queue — file digenerate langsung dan
-     * dikembalikan sebagai BinaryFileResponse (Excel::download).
-     * MIME type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-     *
      * @param  array<string,mixed> $filters
      */
     public function exportStream(array $filters, int $actorId): BinaryFileResponse
@@ -238,7 +264,6 @@ class AlumniService
         $query = Alumni::with(['studyProgram', 'graduationYear'])
             ->when($filters['study_program_id']   ?? null, fn($q, $v) => $q->where('study_program_id', $v))
             ->when($filters['graduation_year_id'] ?? null, fn($q, $v) => $q->where('graduation_year_id', $v))
-            ->when($filters['survey_status']      ?? null, fn($q, $v) => $q->where('survey_status', $v))
             ->when($filters['gender']             ?? null, fn($q, $v) => $q->where('gender', $v))
             ->orderBy('created_at', 'desc');
 
@@ -254,7 +279,6 @@ class AlumniService
             $a->phone ?? '-',
             $a->address_city ?? '-',
             $a->address_province ?? '-',
-            $a->survey_status,
             $a->created_at?->format('d/m/Y') ?? '-',
         ]);
 
@@ -272,13 +296,6 @@ class AlumniService
 
     /**
      * Generate template Excel untuk import alumni dan stream ke browser.
-     *
-     * FIX: Sebelumnya return string (path relatif di storage).
-     * Controller kemudian return JSON {filename} → frontend simpan JSON
-     * sebagai .xlsx → Excel error "file format not valid".
-     *
-     * Sekarang return BinaryFileResponse sehingga pipeline konsisten:
-     * Controller → BinaryFileResponse → browser download file binary XLSX valid.
      */
     public function generateImportTemplate(): BinaryFileResponse
     {

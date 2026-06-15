@@ -3,7 +3,8 @@ import { ref, computed, onMounted } from 'vue'
 import api from '@/services/api'
 import { useToast } from '@/composables/useToast'
 
-const { showToast } = useToast()
+// useToast() mengekspor { toast } — BUKAN { showToast }
+const { toast } = useToast()
 
 // ─── State ────────────────────────────────────────────────────────────────────
 const settings    = ref([])
@@ -49,7 +50,6 @@ const GROUPS = [
 ]
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
-// Gunakan s.group langsung dari API — tidak ada fallback split yang tidak reliable
 const byGroup = computed(() => {
   const map = {}
   for (const g of GROUPS) map[g.key] = []
@@ -57,7 +57,6 @@ const byGroup = computed(() => {
     if (s.group && map[s.group] !== undefined) {
       map[s.group].push(s)
     }
-    // setting dengan group tidak dikenal atau null → tidak ditampilkan (diabaikan)
   }
   return map
 })
@@ -73,8 +72,17 @@ function displayValue(s) {
   return s.value ?? ''
 }
 
-function isBool(val) {
-  return val === 'true' || val === 'false' || val === true || val === false
+/**
+ * Hanya nilai boolean literal true/false yang dirender sebagai toggle.
+ * String 'true'/'false' di field teks (mis. wa_api_key) TIDAK dianggap boolean
+ * untuk menghindari field teks berubah menjadi toggle.
+ * Deteksi boolean hanya berlaku jika kolom tipe-nya memang boolean (cek key).
+ */
+const BOOL_KEYS = ['otp_enabled', 'maintenance_mode', 'registration_open', 'email_notification']
+
+function isBool(s) {
+  return BOOL_KEYS.includes(s.key) ||
+    s.value === true || s.value === false
 }
 
 // ─── API Calls ────────────────────────────────────────────────────────────────
@@ -84,7 +92,7 @@ async function fetchSettings() {
     const { data } = await api.get('/admin/settings')
     settings.value = data.data
   } catch {
-    showToast('Gagal memuat pengaturan sistem.', 'error')
+    toast.error('Gagal memuat pengaturan sistem.')
   } finally {
     loading.value = false
   }
@@ -98,24 +106,24 @@ async function saveField(setting) {
     const idx = settings.value.findIndex(s => s.key === setting.key)
     if (idx !== -1) settings.value[idx] = data.data
     editingKey.value = null
-    showToast('Pengaturan berhasil disimpan.', 'success')
+    toast.success('Pengaturan berhasil disimpan.')
   } catch (err) {
-    showToast(err.response?.data?.message ?? 'Gagal menyimpan.', 'error')
+    toast.error(err.response?.data?.message ?? 'Gagal menyimpan.')
   } finally {
     savingKey.value = null
   }
 }
 
 async function toggleBool(setting) {
-  const newVal = setting.value === 'true' ? 'false' : 'true'
+  const newVal = setting.value === 'true' || setting.value === true ? 'false' : 'true'
   savingKey.value = setting.key
   try {
     const { data } = await api.put(`/admin/settings/${setting.key}`, { value: newVal })
     const idx = settings.value.findIndex(s => s.key === setting.key)
     if (idx !== -1) settings.value[idx] = data.data
-    showToast('Pengaturan berhasil diperbarui.', 'success')
+    toast.success('Pengaturan berhasil diperbarui.')
   } catch (err) {
-    showToast(err.response?.data?.message ?? 'Gagal menyimpan.', 'error')
+    toast.error(err.response?.data?.message ?? 'Gagal menyimpan.')
   } finally {
     savingKey.value = null
   }
@@ -138,7 +146,7 @@ async function copyValue(setting) {
     copiedKey.value = setting.key
     setTimeout(() => { copiedKey.value = null }, 2000)
   } catch {
-    showToast('Gagal menyalin ke clipboard.', 'error')
+    toast.error('Gagal menyalin ke clipboard.')
   }
 }
 
@@ -208,110 +216,119 @@ onMounted(fetchSettings)
           >
             <!-- Label & description -->
             <div class="min-w-0 flex-1">
-              <p class="text-sm font-medium text-gray-700">
-                {{ s.label ?? s.key }}
-              </p>
+              <p class="text-sm font-medium text-gray-800">{{ s.label ?? s.key }}</p>
               <p v-if="s.description" class="mt-0.5 text-xs text-gray-400">{{ s.description }}</p>
-              <code class="mt-0.5 block text-xs text-gray-400">{{ s.key }}</code>
+              <p class="mt-0.5 font-mono text-xs text-gray-400">{{ s.key }}</p>
             </div>
 
-            <!-- Value area -->
-            <div class="flex flex-shrink-0 items-center gap-2 sm:w-72">
-              <!-- Boolean toggle -->
-              <template v-if="isBool(s.value)">
+            <!-- Value / edit area -->
+            <div class="flex min-w-0 flex-1 flex-col gap-2">
+              <!-- Bool toggle -->
+              <template v-if="isBool(s) && editingKey !== s.key">
                 <button
                   type="button"
+                  :disabled="savingKey === s.key"
                   :class="[
-                    'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2',
-                    s.value === 'true' ? 'bg-teal-600' : 'bg-gray-200',
-                    savingKey === s.key ? 'opacity-50 pointer-events-none' : ''
+                    'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50',
+                    (s.value === 'true' || s.value === true) ? 'bg-teal-600' : 'bg-gray-200'
                   ]"
-                  :aria-checked="s.value === 'true'"
-                  role="switch"
                   @click="toggleBool(s)"
+                  :aria-label="`Toggle ${s.key}`"
                 >
                   <span
                     :class="[
-                      'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-                      s.value === 'true' ? 'translate-x-4' : 'translate-x-0'
+                      'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                      (s.value === 'true' || s.value === true) ? 'translate-x-5' : 'translate-x-0'
                     ]"
                   />
                 </button>
-                <span class="text-xs text-gray-500">{{ s.value === 'true' ? 'Aktif' : 'Nonaktif' }}</span>
               </template>
 
-              <!-- Editable text field -->
-              <template v-else>
-                <template v-if="editingKey === s.key">
-                  <input
-                    v-model="editValue"
-                    class="block w-full rounded-lg border border-teal-400 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500"
-                    :type="isSensitive(s.key) ? 'password' : 'text'"
-                    @keydown.enter="saveField(s)"
-                    @keydown.esc="cancelEdit"
-                    autofocus
-                  />
+              <!-- Text edit mode -->
+              <template v-else-if="editingKey === s.key">
+                <input
+                  v-model="editValue"
+                  class="w-full rounded-lg border border-teal-400 px-3 py-1.5 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                  :type="isSensitive(s.key) ? 'text' : 'text'"
+                  :placeholder="s.key"
+                  @keydown.enter="saveField(s)"
+                  @keydown.escape="cancelEdit"
+                />
+                <div class="flex gap-2">
                   <button
-                    class="flex-shrink-0 rounded-md bg-teal-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+                    type="button"
+                    class="rounded-md bg-teal-600 px-3 py-1 text-xs font-medium text-white hover:bg-teal-700 disabled:opacity-50"
                     :disabled="savingKey === s.key"
                     @click="saveField(s)"
                   >
-                    {{ savingKey === s.key ? '...' : 'Simpan' }}
+                    {{ savingKey === s.key ? 'Menyimpan...' : 'Simpan' }}
                   </button>
                   <button
-                    class="flex-shrink-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                    type="button"
+                    class="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
                     @click="cancelEdit"
                   >
                     Batal
                   </button>
-                </template>
+                </div>
+              </template>
 
-                <template v-else>
-                  <span class="flex-1 truncate rounded-md bg-gray-50 px-3 py-1.5 text-sm font-mono text-gray-700">
+              <!-- Display mode -->
+              <template v-else>
+                <div class="flex items-center gap-2">
+                  <span class="min-w-0 flex-1 break-all font-mono text-sm text-gray-700">
                     {{ displayValue(s) }}
                   </span>
 
-                  <!-- Mask toggle (for sensitive keys) -->
+                  <!-- Mask toggle for sensitive -->
                   <button
                     v-if="isSensitive(s.key)"
-                    class="flex-shrink-0 rounded p-1 text-gray-400 hover:text-gray-600"
-                    :title="maskedKeys.has(s.key) ? 'Sembunyikan' : 'Tampilkan'"
+                    type="button"
+                    class="flex-shrink-0 text-gray-400 hover:text-gray-600"
                     @click="toggleMask(s.key)"
+                    :aria-label="maskedKeys.has(s.key) ? 'Sembunyikan nilai' : 'Tampilkan nilai'"
                   >
-                    <svg v-if="maskedKeys.has(s.key)" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-                    </svg>
-                    <svg v-else class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        v-if="maskedKeys.has(s.key)"
+                        stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                      />
+                      <path
+                        v-else
+                        stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                      />
                     </svg>
                   </button>
 
                   <!-- Copy -->
                   <button
-                    class="flex-shrink-0 rounded p-1 text-gray-400 hover:text-gray-600"
-                    title="Salin nilai"
+                    type="button"
+                    class="flex-shrink-0 text-gray-400 hover:text-gray-600"
                     @click="copyValue(s)"
+                    :aria-label="`Salin nilai ${s.key}`"
                   >
-                    <svg v-if="copiedKey === s.key" class="h-4 w-4 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    <svg v-if="copiedKey === s.key" class="h-4 w-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>
-                    <svg v-else class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                    <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   </button>
 
                   <!-- Edit -->
                   <button
-                    class="flex-shrink-0 rounded p-1 text-gray-400 hover:text-teal-600"
-                    title="Edit nilai"
+                    type="button"
+                    class="flex-shrink-0 text-gray-400 hover:text-teal-600"
                     @click="startEdit(s)"
+                    :aria-label="`Edit ${s.key}`"
                   >
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                   </button>
-                </template>
+                </div>
               </template>
             </div>
           </div>
