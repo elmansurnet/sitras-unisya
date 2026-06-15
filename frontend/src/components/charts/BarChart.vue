@@ -31,18 +31,17 @@ const props = defineProps({
   showDataLabels: { type: Boolean, default: false },
 })
 
-// ─── Palette SITRAS (teal primary + fallback) ───────────────────────────────
 const SITRAS_COLORS = [
-  '#0d9488', // primary-600
-  '#14b8a6', // primary-500
-  '#f59e0b', // secondary-500 (emas)
-  '#3b82f6', // info
-  '#22c55e', // success
-  '#ef4444', // danger
-  '#8b5cf6', // violet
-  '#ec4899', // pink
-  '#f97316', // orange
-  '#06b6d4', // cyan
+  '#0d9488',
+  '#14b8a6',
+  '#f59e0b',
+  '#3b82f6',
+  '#22c55e',
+  '#ef4444',
+  '#8b5cf6',
+  '#ec4899',
+  '#f97316',
+  '#06b6d4',
 ]
 
 const resolvedColors = computed(() =>
@@ -54,11 +53,7 @@ const chartOptions = computed(() => ({
     type: 'bar',
     fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
     toolbar: { show: false },
-    animations: {
-      enabled: true,
-      easing: 'easeinout',
-      speed: 500,
-    },
+    animations: { enabled: true, easing: 'easeinout', speed: 500 },
   },
   colors: resolvedColors.value,
   plotOptions: {
@@ -68,17 +63,15 @@ const chartOptions = computed(() => ({
       borderRadius: 4,
       columnWidth:  '60%',
       barHeight:    '70%',
-      dataLabels: {
-        position: props.horizontal ? 'bottom' : 'top',
-      },
+      dataLabels: { position: props.horizontal ? 'bottom' : 'top' },
     },
   },
   dataLabels: {
     enabled: props.showDataLabels,
     style: {
-      fontSize:  '11px',
+      fontSize:   '11px',
       fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
-      colors: ['#334155'],
+      colors:     ['#334155'],
     },
     formatter: (val) => val.toLocaleString('id-ID'),
   },
@@ -90,8 +83,8 @@ const chartOptions = computed(() => ({
         colors:     '#64748b',
         fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
       },
-      trim:        true,
-      maxHeight:   80,
+      trim:      true,
+      maxHeight: 80,
     },
     axisBorder: { show: false },
     axisTicks:  { show: false },
@@ -107,9 +100,9 @@ const chartOptions = computed(() => ({
     },
   },
   grid: {
-    borderColor: '#e2e8f0',
+    borderColor:     '#e2e8f0',
     strokeDashArray: 4,
-    xaxis: { lines: { show: props.horizontal } },
+    xaxis: { lines: { show:  props.horizontal } },
     yaxis: { lines: { show: !props.horizontal } },
     padding: { top: 0, right: 0, bottom: 0, left: 8 },
   },
@@ -122,26 +115,29 @@ const chartOptions = computed(() => ({
     y: { formatter: (val) => val.toLocaleString('id-ID') + ' alumni' },
   },
   legend: {
-    show: props.series.length > 1,
-    position: 'top',
+    show:            props.series.length > 1,
+    position:        'top',
     horizontalAlign: 'left',
-    fontSize: '13px',
-    fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
-    labels: { colors: '#475569' },
-    markers: { width: 10, height: 10, radius: 2 },
+    fontSize:        '13px',
+    fontFamily:      '"Plus Jakarta Sans", "Inter", sans-serif',
+    labels:          { colors: '#475569' },
+    markers:         { width: 10, height: 10, radius: 2 },
   },
-  title: props.title
-    ? {
-        text:  props.title,
-        align: 'left',
-        style: {
-          fontSize:   '14px',
-          fontWeight: '600',
-          fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
-          color:      '#1e293b',
-        },
-      }
-    : undefined,
+  // FIX: Jika title kosong, jangan sertakan key 'title' sama sekali dalam options.
+  // Menggunakan undefined menyebabkan ApexCharts crash saat internal merge options
+  // mencoba akses .text dari object yang tidak ada (versi lama).
+  ...(props.title ? {
+    title: {
+      text:  props.title,
+      align: 'left',
+      style: {
+        fontSize:   '14px',
+        fontWeight: '600',
+        fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
+        color:      '#1e293b',
+      },
+    },
+  } : {}),
   responsive: [
     {
       breakpoint: 640,
@@ -154,7 +150,6 @@ const chartOptions = computed(() => ({
   ],
 }))
 
-// isEmpty: series ada tapi semua data kosong
 const isEmpty = computed(() => {
   if (!props.series?.length) return true
   return props.series.every(s => !s.data?.length || s.data.every(v => !v))
@@ -162,12 +157,10 @@ const isEmpty = computed(() => {
 </script>
 
 <template>
-  <!-- Skeleton saat loading -->
   <div v-if="loading" class="bar-chart-skeleton" :style="{ height: height + 'px' }">
     <div class="skeleton-bar" v-for="n in 6" :key="n" :style="{ height: (50 + n * 10) + '%' }" />
   </div>
 
-  <!-- Empty state -->
   <div
     v-else-if="isEmpty"
     class="bar-chart-empty"
@@ -181,7 +174,6 @@ const isEmpty = computed(() => {
     </slot>
   </div>
 
-  <!-- Chart -->
   <VueApexCharts
     v-else
     type="bar"
@@ -192,7 +184,6 @@ const isEmpty = computed(() => {
 </template>
 
 <style scoped>
-/* Skeleton loader */
 .bar-chart-skeleton {
   display: flex;
   align-items: flex-end;
@@ -203,17 +194,10 @@ const isEmpty = computed(() => {
 .skeleton-bar {
   flex: 1;
   border-radius: 4px 4px 0 0;
-  background: linear-gradient(
-    90deg,
-    #e2e8f0 25%,
-    #f1f5f9 50%,
-    #e2e8f0 75%
-  );
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
-
-/* Empty state */
 .bar-chart-empty {
   display: flex;
   flex-direction: column;
@@ -232,7 +216,6 @@ const isEmpty = computed(() => {
   color: #94a3b8;
   font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
 }
-
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }

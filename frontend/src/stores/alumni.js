@@ -137,30 +137,56 @@ export const useAlumniStore = defineStore('alumni', {
       } finally { this.loadingImport = false }
     },
 
+    /**
+     * Export alumni ke file .xlsx dan trigger download di browser.
+     *
+     * FIX: Backend sekarang stream file binary langsung (BinaryFileResponse).
+     * Blob harus dibuat dengan MIME type eksplisit agar browser dan Excel
+     * mengenali format file dengan benar.
+     * MIME: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+     */
     async exportAlumni() {
       this.loadingExport = true
       try {
         const params = {}
-        if (this.filters.search)             params.search             = this.filters.search
         if (this.filters.study_program_id)   params.study_program_id   = this.filters.study_program_id
         if (this.filters.graduation_year_id) params.graduation_year_id = this.filters.graduation_year_id
         if (this.filters.survey_status)      params.survey_status      = this.filters.survey_status
-        const response = await api.get('/admin/alumni/export', { params, responseType: 'blob' })
-        const blob = new Blob([response.data])
-        const url  = window.URL.createObjectURL(blob)
-        const a    = document.createElement('a')
+        if (this.filters.gender)             params.gender             = this.filters.gender
+
+        const response = await api.get('/admin/alumni/export', {
+          params,
+          responseType: 'blob',
+        })
+
+        // FIX: Beri MIME type eksplisit agar Excel mengenali format .xlsx
+        const blob = new Blob([response.data], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+
+        // Ambil nama file dari Content-Disposition header jika tersedia
+        const disposition = response.headers?.['content-disposition'] ?? ''
+        const match       = disposition.match(/filename[^;=\n]*=((['"]).+?\2|[^;\n]*)/) 
+        const filename    = match ? match[1].replace(/[\'"]/g, '') : `alumni_export_${Date.now()}.xlsx`
+
+        const url = window.URL.createObjectURL(blob)
+        const a   = document.createElement('a')
         a.href     = url
-        a.download = 'alumni_export.xlsx'
+        a.download = filename
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
         window.URL.revokeObjectURL(url)
-      } finally { this.loadingExport = false }
+      } finally {
+        this.loadingExport = false
+      }
     },
 
     async downloadTemplate() {
       const response = await api.get('/admin/alumni/template', { responseType: 'blob' })
-      const blob = new Blob([response.data])
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
       const url  = window.URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href     = url

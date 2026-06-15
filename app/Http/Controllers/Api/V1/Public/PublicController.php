@@ -135,10 +135,11 @@ class PublicController extends Controller
 
     /**
      * GET /api/v1/public/salary-ranges
+     * FIX: kolom urutan di tabel salary_ranges adalah order_number, bukan sort_order.
      */
     public function masterSalaryRanges(): JsonResponse
     {
-        $ranges = SalaryRange::orderBy('sort_order')
+        $ranges = SalaryRange::orderBy('order_number')
             ->get()
             ->map(fn ($r) => [
                 'id'    => $r->id,

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exports\AlumniExport;
 use App\Models\Alumni;
 use App\Models\AuditLog;
 use App\Models\SurveyPeriod;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AlumniService
 {
@@ -26,8 +29,6 @@ class AlumniService
 
     /**
      * Ambil daftar alumni terpaginasi dengan filter.
-     * Proxy publik ke AlumniRepository::paginate() agar Controller
-     * tidak perlu mengakses $alumniRepo secara langsung (private).
      *
      * @param  array<string,mixed> $filters
      */
@@ -38,7 +39,6 @@ class AlumniService
 
     /**
      * Statistik ringkas alumni untuk dashboard.
-     * Proxy publik ke AlumniRepository::stats().
      *
      * @return array<string,int>
      */
@@ -52,8 +52,7 @@ class AlumniService
     /**
      * Buat alumni baru beserta user account-nya.
      *
-     * @param  array<string,mixed> $data      Validated data dari StoreAlumniRequest
-     * @param  int                 $actorId   user_id yang melakukan aksi
+     * @param  array<string,mixed> $data
      */
     public function create(array $data, int $actorId): Alumni
     {
@@ -71,7 +70,6 @@ class AlumniService
                 ['user_id' => $user->id, 'is_active' => true]
             ));
 
-            // Upload foto jika disertakan saat create
             if (isset($data['photo']) && $data['photo'] instanceof UploadedFile) {
                 $this->uploadPhoto($alumni, $data['photo']);
                 $alumni->refresh();
@@ -93,7 +91,6 @@ class AlumniService
                 $alumni->user?->update(['email' => $data['email']]);
             }
 
-            // Upload foto jika disertakan saat update
             if (isset($data['photo']) && $data['photo'] instanceof UploadedFile) {
                 $this->uploadPhoto($alumni, $data['photo']);
             }
@@ -110,7 +107,6 @@ class AlumniService
     public function delete(Alumni $alumni, int $actorId): void
     {
         DB::transaction(function () use ($alumni, $actorId) {
-            // Hapus foto dari private storage sebelum delete
             if ($alumni->photo_path && Storage::disk('private')->exists($alumni->photo_path)) {
                 Storage::disk('private')->delete($alumni->photo_path);
             }
@@ -123,28 +119,15 @@ class AlumniService
 
     /**
      * Upload foto profil alumni ke storage/app/private/alumni/photos/.
-     * Akses via signed URL — TIDAK boleh di public/.
-     * Max 2MB, MIME: jpg/jpeg/png/webp (divalidasi di StoreAlumniRequest/UpdateAlumniRequest).
-     *
-     * @param  Alumni       $alumni
-     * @param  UploadedFile $file
-     * @return string        Path relatif di disk 'private'
      */
     public function uploadPhoto(Alumni $alumni, UploadedFile $file): string
     {
-        // Hapus foto lama jika ada
         if ($alumni->photo_path && Storage::disk('private')->exists($alumni->photo_path)) {
             Storage::disk('private')->delete($alumni->photo_path);
         }
 
         $filename = Str::uuid() . '.' . $file->extension();
-
-        // storeAs() adalah cara benar menyimpan dengan nama custom di disk tertentu
-        $path = $file->storeAs(
-            'alumni/photos',
-            $filename,
-            'private'
-        );
+        $path     = $file->storeAs('alumni/photos', $filename, 'private');
 
         $alumni->update(['photo_path' => $path]);
 
@@ -176,7 +159,7 @@ class AlumniService
         ] = $this->importExport->validateRows($rows, 'alumni');
 
         $successCount = 0;
-        $batchId = 'import_' . now()->format('Ymd_His') . '_' . Str::random(6);
+        $batchId      = 'import_' . now()->format('Ymd_His') . '_' . Str::random(6);
 
         DB::transaction(function () use ($validRows, $batchId, $actorId, &$successCount) {
             foreach ($validRows as $row) {
@@ -218,7 +201,8 @@ class AlumniService
     }
 
     /**
-     * Export data alumni ke Excel via queue job.
+     * Export alumni via queue job (async).
+     * Digunakan untuk proses background (mis. report besar).
      *
      * @param  array<string,mixed> $filters
      */
@@ -238,6 +222,55 @@ class AlumniService
     }
 
     /**
+     * Export alumni secara synchronous dan stream file ke browser.
+     *
+     * FIX: Frontend memanggil GET /admin/alumni/export dengan responseType:'blob'.
+     * Method ini menggantikan alur queue — file digenerate langsung dan
+     * dikembalikan sebagai BinaryFileResponse (Excel::download).
+     * MIME type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+     *
+     * @param  array<string,mixed> $filters
+     */
+    public function exportStream(array $filters, int $actorId): BinaryFileResponse
+    {
+        $filename = 'alumni_export_' . now()->format('Ymd_His') . '.xlsx';
+
+        $query = Alumni::with(['studyProgram', 'graduationYear'])
+            ->when($filters['study_program_id']   ?? null, fn($q, $v) => $q->where('study_program_id', $v))
+            ->when($filters['graduation_year_id'] ?? null, fn($q, $v) => $q->where('graduation_year_id', $v))
+            ->when($filters['survey_status']      ?? null, fn($q, $v) => $q->where('survey_status', $v))
+            ->when($filters['gender']             ?? null, fn($q, $v) => $q->where('gender', $v))
+            ->orderBy('created_at', 'desc');
+
+        $rows = $query->get()->map(fn(Alumni $a) => [
+            $a->nim,
+            $a->full_name,
+            $a->gender === 'L' ? 'Laki-laki' : 'Perempuan',
+            $a->studyProgram?->name ?? '-',
+            $a->graduationYear?->year ?? '-',
+            $a->gpa,
+            $a->graduation_predicate ?? '-',
+            $a->user?->email ?? '-',
+            $a->phone ?? '-',
+            $a->address_city ?? '-',
+            $a->address_province ?? '-',
+            $a->survey_status,
+            $a->created_at?->format('d/m/Y') ?? '-',
+        ]);
+
+        AuditLog::record(
+            action   : 'export',
+            module   : 'alumni',
+            modelId  : null,
+            oldValues: null,
+            newValues: ['filters' => $filters, 'count' => $rows->count(), 'actor_id' => $actorId],
+            modelType: Alumni::class,
+        );
+
+        return Excel::download(new AlumniExport(collect($rows)), $filename);
+    }
+
+    /**
      * Generate template Excel untuk import alumni.
      */
     public function generateImportTemplate(): string
@@ -249,17 +282,11 @@ class AlumniService
 
     /**
      * Kirim undangan survei ke alumni.
-     * Dispatch via NotificationService → queue 'notifications'.
-     *
-     * @param  Alumni $alumni
-     * @param  int    $surveyPeriodId  ID dari survey_periods
-     * @param  int    $actorId
      */
     public function sendInvitation(Alumni $alumni, int $surveyPeriodId, int $actorId): void
     {
         $surveyPeriod = SurveyPeriod::findOrFail($surveyPeriodId);
 
-        // Dispatch notifikasi ke queue melalui NotificationService
         $this->notificationService->sendToAlumni(
             alumni       : $alumni,
             surveyPeriod : $surveyPeriod,

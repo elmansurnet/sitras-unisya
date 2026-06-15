@@ -12,7 +12,7 @@ use App\Services\AlumniService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AlumniController extends Controller
 {
@@ -152,21 +152,21 @@ class AlumniController extends Controller
         ]);
     }
 
-    // ─── GET /admin/alumni/export ─────────────────────────────────────────────
-    public function export(Request $request): JsonResponse
+    /**
+     * GET /admin/alumni/export
+     *
+     * FIX: Sebelumnya dispatch queue job dan return JSON {filename}.
+     * Frontend memanggil dengan responseType:'blob' dan mengharapkan file binary langsung.
+     * Sekarang menggunakan exportStream() yang return BinaryFileResponse (Excel::download).
+     */
+    public function export(Request $request): BinaryFileResponse
     {
         Gate::authorize('export', Alumni::class);
 
-        $filename = $this->alumniService->export(
+        return $this->alumniService->exportStream(
             $request->only(['study_program_id', 'graduation_year_id', 'survey_status', 'gender']),
             $request->user()->id,
         );
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Export sedang diproses. File akan tersedia dalam beberapa saat.',
-            'data'    => ['filename' => $filename],
-        ]);
     }
 
     // ─── GET /admin/alumni/template ───────────────────────────────────────────

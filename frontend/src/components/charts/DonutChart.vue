@@ -29,12 +29,11 @@ const props = defineProps({
   showLegend: { type: Boolean, default: true },
 })
 
-// ─── Palette SITRAS ─────────────────────────────────────────────────────────────
 const SITRAS_DONUT_COLORS = [
-  '#0d9488', // teal-600  bekerja
-  '#14b8a6', // teal-500  wirausaha
-  '#f59e0b', // amber-500 lanjut studi
-  '#94a3b8', // slate-400 belum bekerja
+  '#0d9488',
+  '#14b8a6',
+  '#f59e0b',
+  '#94a3b8',
 ]
 
 const resolvedColors = computed(() =>
@@ -49,17 +48,11 @@ const chartOptions = computed(() => ({
   chart: {
     type: 'donut',
     fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
-    animations: {
-      enabled: true,
-      easing: 'easeinout',
-      speed: 500,
-    },
+    animations: { enabled: true, easing: 'easeinout', speed: 500 },
   },
   colors: resolvedColors.value,
   labels: props.labels,
-  dataLabels: {
-    enabled: false,
-  },
+  dataLabels: { enabled: false },
   plotOptions: {
     pie: {
       donut: {
@@ -95,10 +88,7 @@ const chartOptions = computed(() => ({
       expandOnClick: false,
     },
   },
-  stroke: {
-    width: 2,
-    colors: ['#ffffff'],
-  },
+  stroke: { width: 2, colors: ['#ffffff'] },
   tooltip: {
     theme: 'light',
     style: {
@@ -115,40 +105,39 @@ const chartOptions = computed(() => ({
     },
   },
   legend: {
-    show: props.showLegend,
-    position: 'bottom',
+    show:            props.showLegend,
+    position:        'bottom',
     horizontalAlign: 'center',
-    fontSize: '13px',
-    fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
-    labels: { colors: '#475569' },
-    markers: {
-      width: 10,
-      height: 10,
-      radius: 2,
-    },
-    itemMargin: { horizontal: 12, vertical: 4 },
+    fontSize:        '13px',
+    fontFamily:      '"Plus Jakarta Sans", "Inter", sans-serif',
+    labels:          { colors: '#475569' },
+    markers:         { width: 10, height: 10, radius: 2 },
+    itemMargin:      { horizontal: 12, vertical: 4 },
     formatter: (seriesName, opts) => {
       const val = opts.w.globals.series[opts.seriesIndex]
       return `${seriesName}: ${val.toLocaleString('id-ID')}`
     },
   },
-  title: props.title
-    ? {
-        text:  props.title,
-        align: 'left',
-        style: {
-          fontSize:   '14px',
-          fontWeight: '600',
-          fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
-          color:      '#1e293b',
-        },
-      }
-    : undefined,
+  // FIX: Jika title kosong, jangan sertakan key 'title' sama sekali dalam options.
+  // Menggunakan undefined menyebabkan ApexCharts crash saat internal merge options
+  // mencoba akses .text dari object yang tidak ada (versi lama).
+  ...(props.title ? {
+    title: {
+      text:  props.title,
+      align: 'left',
+      style: {
+        fontSize:   '14px',
+        fontWeight: '600',
+        fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
+        color:      '#1e293b',
+      },
+    },
+  } : {}),
   responsive: [
     {
       breakpoint: 640,
       options: {
-        chart: { height: Math.max(props.height - 60, 220) },
+        chart:  { height: Math.max(props.height - 60, 220) },
         legend: { position: 'bottom', fontSize: '11px' },
       },
     },
@@ -161,7 +150,6 @@ const isEmpty = computed(() =>
 </script>
 
 <template>
-  <!-- Skeleton -->
   <div v-if="loading" class="donut-skeleton" :style="{ height: height + 'px' }">
     <div class="donut-circle" />
     <div class="donut-legend">
@@ -172,7 +160,6 @@ const isEmpty = computed(() =>
     </div>
   </div>
 
-  <!-- Empty -->
   <div
     v-else-if="isEmpty"
     class="donut-empty"
@@ -187,7 +174,6 @@ const isEmpty = computed(() =>
     </slot>
   </div>
 
-  <!-- Chart -->
   <VueApexCharts
     v-else
     type="donut"
@@ -198,7 +184,6 @@ const isEmpty = computed(() =>
 </template>
 
 <style scoped>
-/* Skeleton */
 .donut-skeleton {
   display: flex;
   flex-direction: column;
@@ -240,8 +225,6 @@ const isEmpty = computed(() =>
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
-
-/* Empty */
 .donut-empty {
   display: flex;
   flex-direction: column;
@@ -260,7 +243,6 @@ const isEmpty = computed(() =>
   color: #94a3b8;
   font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
 }
-
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }

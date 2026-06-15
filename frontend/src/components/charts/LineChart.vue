@@ -31,13 +31,12 @@ const props = defineProps({
   markers:     { type: Boolean, default: true },
 })
 
-// ─── Palette SITRAS ─────────────────────────────────────────────────────────
 const SITRAS_LINE_COLORS = [
-  '#0d9488', // teal-600 (primary)
-  '#f59e0b', // amber-500
-  '#3b82f6', // blue-500
-  '#22c55e', // green-500
-  '#ef4444', // red-500
+  '#0d9488',
+  '#f59e0b',
+  '#3b82f6',
+  '#22c55e',
+  '#ef4444',
 ]
 
 const resolvedColors = computed(() =>
@@ -50,12 +49,12 @@ const chartOptions = computed(() => ({
   chart: {
     type: chartType.value,
     fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
-    toolbar: { show: false },
-    zoom:    { enabled: false },
+    toolbar:    { show: false },
+    zoom:       { enabled: false },
     animations: {
       enabled: true,
-      easing: 'easeinout',
-      speed: 600,
+      easing:  'easeinout',
+      speed:   600,
       animateGradually: { enabled: true, delay: 80 },
       dynamicAnimation: { enabled: true, speed: 350 },
     },
@@ -95,14 +94,12 @@ const chartOptions = computed(() => ({
         colors:     '#64748b',
         fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
       },
-      rotate: -30,
+      rotate:       -30,
       rotateAlways: false,
     },
     axisBorder: { show: false },
     axisTicks:  { show: false },
-    crosshairs: {
-      stroke: { color: '#e2e8f0', width: 1, dashArray: 4 },
-    },
+    crosshairs: { stroke: { color: '#e2e8f0', width: 1, dashArray: 4 } },
   },
   yaxis: {
     labels: {
@@ -125,8 +122,8 @@ const chartOptions = computed(() => ({
     padding: { top: 0, right: 8, bottom: 0, left: 0 },
   },
   tooltip: {
-    theme: 'light',
-    shared: true,
+    theme:     'light',
+    shared:    true,
     intersect: false,
     style: {
       fontSize:   '13px',
@@ -135,33 +132,36 @@ const chartOptions = computed(() => ({
     y: { formatter: (val) => val.toLocaleString('id-ID') },
   },
   legend: {
-    show: props.series.length > 1,
-    position: 'top',
+    show:            props.series.length > 1,
+    position:        'top',
     horizontalAlign: 'left',
-    fontSize: '13px',
-    fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
-    labels: { colors: '#475569' },
-    markers: { width: 10, height: 10, radius: 2 },
+    fontSize:        '13px',
+    fontFamily:      '"Plus Jakarta Sans", "Inter", sans-serif',
+    labels:          { colors: '#475569' },
+    markers:         { width: 10, height: 10, radius: 2 },
   },
-  title: props.title
-    ? {
-        text:  props.title,
-        align: 'left',
-        style: {
-          fontSize:   '14px',
-          fontWeight: '600',
-          fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
-          color:      '#1e293b',
-        },
-      }
-    : undefined,
+  // FIX: Jika title kosong, jangan sertakan key 'title' sama sekali dalam options.
+  // Menggunakan undefined menyebabkan ApexCharts crash saat internal merge options
+  // mencoba akses .text dari object yang tidak ada (versi lama).
+  ...(props.title ? {
+    title: {
+      text:  props.title,
+      align: 'left',
+      style: {
+        fontSize:   '14px',
+        fontWeight: '600',
+        fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
+        color:      '#1e293b',
+      },
+    },
+  } : {}),
   responsive: [
     {
       breakpoint: 640,
       options: {
-        chart:  { height: Math.max(props.height - 60, 200) },
-        xaxis:  { labels: { style: { fontSize: '10px' }, rotate: -45 } },
-        yaxis:  { labels: { style: { fontSize: '10px' } } },
+        chart:   { height: Math.max(props.height - 60, 200) },
+        xaxis:   { labels: { style: { fontSize: '10px' }, rotate: -45 } },
+        yaxis:   { labels: { style: { fontSize: '10px' } } },
         markers: { size: 3 },
       },
     },
@@ -175,13 +175,11 @@ const isEmpty = computed(() => {
 </script>
 
 <template>
-  <!-- Skeleton -->
   <div v-if="loading" class="line-skeleton" :style="{ height: height + 'px' }">
     <div class="line-path" />
     <div class="line-path" style="opacity:0.5; margin-top: -40px" />
   </div>
 
-  <!-- Empty -->
   <div
     v-else-if="isEmpty"
     class="line-empty"
@@ -195,7 +193,6 @@ const isEmpty = computed(() => {
     </slot>
   </div>
 
-  <!-- Chart -->
   <VueApexCharts
     v-else
     :type="chartType"
@@ -206,7 +203,6 @@ const isEmpty = computed(() => {
 </template>
 
 <style scoped>
-/* Skeleton — simulasi garis chart dengan pseudo SVG path */
 .line-skeleton {
   display: flex;
   flex-direction: column;
@@ -229,8 +225,6 @@ const isEmpty = computed(() => {
     95% 8%, 100% 5%, 100% 100%, 0% 100%
   );
 }
-
-/* Empty */
 .line-empty {
   display: flex;
   flex-direction: column;
@@ -249,7 +243,6 @@ const isEmpty = computed(() => {
   color: #94a3b8;
   font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
 }
-
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
