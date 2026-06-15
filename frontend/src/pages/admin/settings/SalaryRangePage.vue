@@ -16,12 +16,13 @@ const filterStatus = ref('')
 const showModal   = ref(false)
 const editMode    = ref(false)
 
-const form = ref({ id: null, label: '', min_amount: '', max_amount: '', is_active: true })
+// Kolom DB: label, min_value, max_value, order_number, is_active
+const form = ref({ id: null, label: '', min_value: '', max_value: '', order_number: '', is_active: true })
 const formErrors = ref({})
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const filtered = computed(() => {
-  let result = ranges.value
+  let result = ranges.value ?? []
   if (filterStatus.value !== '') {
     const active = filterStatus.value === '1'
     result = result.filter((r) => r.is_active === active)
@@ -30,7 +31,7 @@ const filtered = computed(() => {
     const q = search.value.toLowerCase()
     result = result.filter((r) => r.label.toLowerCase().includes(q))
   }
-  return [...result].sort((a, b) => (a.min_amount ?? 0) - (b.min_amount ?? 0))
+  return [...result].sort((a, b) => (a.order_number ?? 0) - (b.order_number ?? 0) || (a.min_value ?? 0) - (b.min_value ?? 0))
 })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -49,9 +50,10 @@ async function fetchRanges() {
   loading.value = true
   try {
     const { data } = await api.get('/admin/salary-ranges', { params: { per_page: 200 } })
-    ranges.value = data.data
+    ranges.value = Array.isArray(data.data) ? data.data : []
   } catch {
     showToast('Gagal memuat data rentang gaji.', 'error')
+    ranges.value = []
   } finally {
     loading.value = false
   }
@@ -62,10 +64,11 @@ async function save() {
   saving.value = true
   try {
     const payload = {
-      label:      form.value.label.trim(),
-      min_amount: form.value.min_amount !== '' ? Number(form.value.min_amount) : null,
-      max_amount: form.value.max_amount !== '' ? Number(form.value.max_amount) : null,
-      is_active:  form.value.is_active,
+      label:        form.value.label.trim(),
+      min_value:    form.value.min_value !== '' ? Number(form.value.min_value) : null,
+      max_value:    form.value.max_value !== '' ? Number(form.value.max_value) : null,
+      order_number: form.value.order_number !== '' ? Number(form.value.order_number) : null,
+      is_active:    form.value.is_active,
     }
     if (editMode.value) {
       const { data } = await api.put(`/admin/salary-ranges/${form.value.id}`, payload)
@@ -121,7 +124,7 @@ async function toggleActive(range) {
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 function openCreate() {
-  form.value       = { id: null, label: '', min_amount: '', max_amount: '', is_active: true }
+  form.value       = { id: null, label: '', min_value: '', max_value: '', order_number: '', is_active: true }
   formErrors.value = {}
   editMode.value   = false
   showModal.value  = true
@@ -129,11 +132,12 @@ function openCreate() {
 
 function openEdit(range) {
   form.value = {
-    id:         range.id,
-    label:      range.label,
-    min_amount: range.min_amount ?? '',
-    max_amount: range.max_amount ?? '',
-    is_active:  range.is_active,
+    id:           range.id,
+    label:        range.label,
+    min_value:    range.min_value ?? '',
+    max_value:    range.max_value ?? '',
+    order_number: range.order_number ?? '',
+    is_active:    range.is_active,
   }
   formErrors.value = {}
   editMode.value   = true
@@ -143,7 +147,7 @@ function openEdit(range) {
 function closeModal() {
   showModal.value  = false
   editMode.value   = false
-  form.value       = { id: null, label: '', min_amount: '', max_amount: '', is_active: true }
+  form.value       = { id: null, label: '', min_value: '', max_value: '', order_number: '', is_active: true }
   formErrors.value = {}
 }
 
@@ -218,6 +222,7 @@ onMounted(fetchRanges)
       <table class="min-w-full divide-y divide-gray-200 text-sm">
         <thead class="bg-gray-50">
           <tr>
+            <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Urutan</th>
             <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Label</th>
             <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Min. Gaji</th>
             <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Maks. Gaji</th>
@@ -232,12 +237,13 @@ onMounted(fetchRanges)
             class="hover:bg-gray-50 transition-colors"
             :class="!range.is_active ? 'opacity-60' : ''"
           >
+            <td class="px-5 py-3 tabular-nums text-gray-400 text-center">{{ range.order_number ?? '—' }}</td>
             <td class="px-5 py-3 font-medium text-gray-900">{{ range.label }}</td>
             <td class="px-5 py-3 tabular-nums text-gray-600">
-              {{ range.min_amount !== null ? formatRupiah(range.min_amount) : '—' }}
+              {{ range.min_value !== null && range.min_value !== undefined ? formatRupiah(range.min_value) : '—' }}
             </td>
             <td class="px-5 py-3 tabular-nums text-gray-600">
-              {{ range.max_amount !== null ? formatRupiah(range.max_amount) : 'Tidak terbatas' }}
+              {{ range.max_value !== null && range.max_value !== undefined ? formatRupiah(range.max_value) : 'Tidak terbatas' }}
             </td>
             <td class="px-5 py-3">
               <button
@@ -316,41 +322,50 @@ onMounted(fetchRanges)
                   autofocus
                 />
                 <p v-if="formErrors.label" class="mt-1 text-xs text-red-500">{{ formErrors.label[0] }}</p>
-                <p class="mt-1 text-xs text-gray-400">Teks yang ditampilkan kepada alumni sebagai pilihan.</p>
               </div>
 
-              <!-- Min / Max amount -->
+              <!-- Min & Max Value -->
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Min. Gaji (Rp)</label>
                   <input
-                    v-model="form.min_amount"
+                    v-model="form.min_value"
                     type="number"
                     min="0"
-                    step="100000"
                     placeholder="0"
                     class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    :class="formErrors.min_amount ? 'border-red-400' : 'border-gray-300'"
+                    :class="formErrors.min_value ? 'border-red-400' : 'border-gray-300'"
                   />
-                  <p v-if="formErrors.min_amount" class="mt-1 text-xs text-red-500">{{ formErrors.min_amount[0] }}</p>
+                  <p v-if="formErrors.min_value" class="mt-1 text-xs text-red-500">{{ formErrors.min_value[0] }}</p>
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Maks. Gaji (Rp)</label>
                   <input
-                    v-model="form.max_amount"
+                    v-model="form.max_value"
                     type="number"
                     min="0"
-                    step="100000"
-                    placeholder="Kosong = tidak terbatas"
+                    placeholder="Kosongkan jika tak terbatas"
                     class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    :class="formErrors.max_amount ? 'border-red-400' : 'border-gray-300'"
+                    :class="formErrors.max_value ? 'border-red-400' : 'border-gray-300'"
                   />
-                  <p v-if="formErrors.max_amount" class="mt-1 text-xs text-red-500">{{ formErrors.max_amount[0] }}</p>
+                  <p v-if="formErrors.max_value" class="mt-1 text-xs text-red-500">{{ formErrors.max_value[0] }}</p>
                 </div>
               </div>
-              <p class="-mt-2 text-xs text-gray-400">Biarkan kosong jika tidak ada batas bawah/atas (misal: "Di atas Rp 20.000.000").</p>
 
-              <!-- Status -->
+              <!-- Urutan -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Urutan Tampil</label>
+                <input
+                  v-model="form.order_number"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+                <p class="mt-1 text-xs text-gray-400">Angka lebih kecil tampil lebih awal.</p>
+              </div>
+
+              <!-- Status aktif -->
               <div class="flex items-center gap-3">
                 <button
                   type="button"
@@ -367,7 +382,7 @@ onMounted(fetchRanges)
                     ]"
                   />
                 </button>
-                <span class="text-sm text-gray-700">Aktif (dapat dipilih di form survei alumni)</span>
+                <span class="text-sm text-gray-700">Aktif (dapat dipilih saat input data alumni)</span>
               </div>
 
               <!-- Actions -->

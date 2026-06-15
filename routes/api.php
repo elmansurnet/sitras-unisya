@@ -6,9 +6,11 @@ use App\Http\Controllers\Api\V1\Admin\DashboardController;
 use App\Http\Controllers\Api\V1\Admin\EmployerController as AdminEmployerController;
 use App\Http\Controllers\Api\V1\Admin\FacultyController;
 use App\Http\Controllers\Api\V1\Admin\GraduationYearController;
+use App\Http\Controllers\Api\V1\Admin\IndustrySectorController;
 use App\Http\Controllers\Api\V1\Admin\NotificationController;
 use App\Http\Controllers\Api\V1\Admin\QuestionnaireController;
 use App\Http\Controllers\Api\V1\Admin\ReportController;
+use App\Http\Controllers\Api\V1\Admin\SalaryRangeController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\StudyProgramController;
 use App\Http\Controllers\Api\V1\Admin\SurveyPeriodController;
@@ -96,7 +98,6 @@ Route::prefix('v1')->group(function () {
     ])->prefix('admin')->name('api.v1.admin.')->group(function () {
 
         // --- Alumni Management (2A.13) ---
-        // Urutan PENTING: route spesifik HARUS didaftarkan SEBELUM route parameter {alumni}
         Route::prefix('alumni')->name('alumni.')->group(function () {
             Route::get('stats',    [AlumniController::class, 'stats'])->name('stats');
             Route::get('export',   [AlumniController::class, 'export'])->name('export');
@@ -113,7 +114,6 @@ Route::prefix('v1')->group(function () {
         });
 
         // --- Employer Management (2B.10) ---
-        // Urutan: static routes SEBELUM route parameter {employer}
         Route::prefix('employers')->name('employers.')->group(function () {
             Route::get('/',    [AdminEmployerController::class, 'index'])->name('index');
             Route::post('/',   [AdminEmployerController::class, 'store'])->name('store');
@@ -126,7 +126,6 @@ Route::prefix('v1')->group(function () {
         });
 
         // --- Questionnaire Management (3A.10) ---
-        // Urutan PENTING: static routes (stats) SEBELUM route parameter {questionnaire}
         Route::prefix('questionnaires')->name('questionnaires.')->group(function () {
             Route::get('stats', [QuestionnaireController::class, 'stats'])->name('stats');
 
@@ -143,7 +142,6 @@ Route::prefix('v1')->group(function () {
         });
 
         // --- Survey Period Management (4A.19) ---
-        // Urutan PENTING: static routes (stats, blast) SEBELUM route parameter {surveyPeriod}
         Route::prefix('survey-periods')->name('survey-periods.')->group(function () {
             Route::get('stats',  [SurveyPeriodController::class, 'stats'])->name('stats');
 
@@ -160,9 +158,7 @@ Route::prefix('v1')->group(function () {
         });
 
         // --- Notification Management (4A.19) ---
-        // Urutan PENTING: static routes (templates static, logs) SEBELUM route parameter
         Route::prefix('notifications')->name('notifications.')->group(function () {
-            // Template management
             Route::prefix('templates')->name('templates.')->group(function () {
                 Route::get('/',                          [NotificationController::class, 'indexTemplates'])->name('index');
                 Route::post('/',                         [NotificationController::class, 'storeTemplate'])->name('store');
@@ -173,7 +169,6 @@ Route::prefix('v1')->group(function () {
                 Route::patch('/{template}/toggle-active',[NotificationController::class, 'toggleActive'])->name('toggle-active');
             });
 
-            // Log management (read-only + retry)
             Route::prefix('logs')->name('logs.')->group(function () {
                 Route::get('/',              [NotificationController::class, 'indexLogs'])->name('index');
                 Route::get('/stats',         [NotificationController::class, 'logStats'])->name('stats');
@@ -182,17 +177,14 @@ Route::prefix('v1')->group(function () {
             });
         });
 
-        // --- Dashboard & Statistik (5A.9 — 05_API.md §7) ---
-        // Urutan PENTING: semua route ini static, tidak ada route parameter.
+        // --- Dashboard & Statistik ---
         Route::prefix('dashboard')->name('dashboard.')->group(function () {
             Route::get('summary',          [DashboardController::class, 'summary'])->name('summary');
             Route::get('employment-stats', [DashboardController::class, 'employmentStats'])->name('employment-stats');
             Route::get('alumni-map',       [DashboardController::class, 'alumniMap'])->name('alumni-map');
         });
 
-        // --- Laporan (5A.9 — 05_API.md §8) ---
-        // Urutan PENTING: static routes (generate/pdf, generate/excel) SEBELUM route parameter {report}
-        // Rate limit khusus untuk generate (5 req / 5 menit) sesuai 05_API.md §1.5
+        // --- Laporan ---
         Route::prefix('reports')->name('reports.')->group(function () {
             Route::middleware('throttle:reports')->group(function () {
                 Route::post('generate/pdf',   [ReportController::class, 'generatePdf'])->name('generate.pdf');
@@ -203,7 +195,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/{report}/download', [ReportController::class, 'download'])->name('download');
         });
 
-        // --- Faculty Management (2C.1) ---
+        // --- Faculty Management ---
         Route::prefix('faculties')->name('faculties.')->group(function () {
             Route::get('/',              [FacultyController::class, 'index'])->name('index');
             Route::post('/',             [FacultyController::class, 'store'])->name('store');
@@ -212,7 +204,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('/{faculty}',  [FacultyController::class, 'destroy'])->name('destroy');
         });
 
-        // --- Study Program Management (2C.2) ---
+        // --- Study Program Management ---
         Route::prefix('study-programs')->name('study-programs.')->group(function () {
             Route::get('/',                      [StudyProgramController::class, 'index'])->name('index');
             Route::post('/',                     [StudyProgramController::class, 'store'])->name('store');
@@ -221,7 +213,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('/{study_program}',    [StudyProgramController::class, 'destroy'])->name('destroy');
         });
 
-        // --- Graduation Year Management (2C.3) ---
+        // --- Graduation Year Management ---
         Route::prefix('graduation-years')->name('graduation-years.')->group(function () {
             Route::get('/',                          [GraduationYearController::class, 'index'])->name('index');
             Route::post('/',                         [GraduationYearController::class, 'store'])->name('store');
@@ -230,7 +222,25 @@ Route::prefix('v1')->group(function () {
             Route::delete('/{graduation_year}',      [GraduationYearController::class, 'destroy'])->name('destroy');
         });
 
-        // --- User Management (2C.4) — superadmin only (Gate di controller) ---
+        // --- Salary Range Management ---
+        Route::prefix('salary-ranges')->name('salary-ranges.')->group(function () {
+            Route::get('/',                       [SalaryRangeController::class, 'index'])->name('index');
+            Route::post('/',                      [SalaryRangeController::class, 'store'])->name('store');
+            Route::get('/{salaryRange}',          [SalaryRangeController::class, 'show'])->name('show');
+            Route::put('/{salaryRange}',          [SalaryRangeController::class, 'update'])->name('update');
+            Route::delete('/{salaryRange}',       [SalaryRangeController::class, 'destroy'])->name('destroy');
+        });
+
+        // --- Industry Sector Management ---
+        Route::prefix('industry-sectors')->name('industry-sectors.')->group(function () {
+            Route::get('/',                          [IndustrySectorController::class, 'index'])->name('index');
+            Route::post('/',                         [IndustrySectorController::class, 'store'])->name('store');
+            Route::get('/{industrySector}',          [IndustrySectorController::class, 'show'])->name('show');
+            Route::put('/{industrySector}',          [IndustrySectorController::class, 'update'])->name('update');
+            Route::delete('/{industrySector}',       [IndustrySectorController::class, 'destroy'])->name('destroy');
+        });
+
+        // --- User Management ---
         Route::prefix('users')->name('users.')->group(function () {
             Route::get('/',                      [UserController::class, 'index'])->name('index');
             Route::post('/',                     [UserController::class, 'store'])->name('store');
@@ -240,7 +250,7 @@ Route::prefix('v1')->group(function () {
             Route::patch('/{user}/password',     [UserController::class, 'updatePassword'])->name('password');
         });
 
-        // --- System Settings (2C.5) — superadmin only (Gate di controller) ---
+        // --- System Settings ---
         Route::prefix('settings')->name('settings.')->group(function () {
             Route::get('/',          [SettingController::class, 'index'])->name('index');
             Route::patch('/bulk',    [SettingController::class, 'bulkUpdate'])->name('bulk');
@@ -248,7 +258,7 @@ Route::prefix('v1')->group(function () {
             Route::put('/{key}',     [SettingController::class, 'update'])->name('update');
         });
 
-        // --- Audit Log (2C.6) — superadmin only, read-only (Gate di controller) ---
+        // --- Audit Log ---
         Route::prefix('audit-logs')->name('audit-logs.')->group(function () {
             Route::get('/',              [AuditLogController::class, 'index'])->name('index');
             Route::get('/modules',       [AuditLogController::class, 'modules'])->name('modules');
@@ -267,12 +277,10 @@ Route::prefix('v1')->group(function () {
         'throttle:api',
     ])->prefix('alumni')->name('api.v1.alumni.')->group(function () {
 
-        // Profil alumni (2A.13)
         Route::get('profile',        [AlumniProfileController::class, 'show'])->name('profile.show');
         Route::put('profile',        [AlumniProfileController::class, 'update'])->name('profile.update');
         Route::post('profile/photo', [AlumniProfileController::class, 'uploadPhoto'])->name('profile.photo');
 
-        // Riwayat pekerjaan (2A.13)
         Route::prefix('work-histories')->name('work-histories.')->group(function () {
             Route::get('/',                           [WorkHistoryController::class, 'index'])->name('index');
             Route::post('/{alumni}',                  [WorkHistoryController::class, 'store'])->name('store');
@@ -280,8 +288,6 @@ Route::prefix('v1')->group(function () {
             Route::delete('/{alumni}/{workHistory}',   [WorkHistoryController::class, 'destroy'])->name('destroy');
         });
 
-        // Survei alumni (4A.19)
-        // Urutan PENTING: route spesifik (active) SEBELUM route parameter {surveyPeriod}
         Route::prefix('surveys')->name('surveys.')->group(function () {
             Route::get('active',                              [AlumniSurveyController::class, 'activeSurvey'])->name('active');
             Route::get('/{surveyPeriod}',                     [AlumniSurveyController::class, 'show'])->name('show');
@@ -293,7 +299,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // =========================================================================
-    // EMPLOYER — Role: employer (2B.10 + 4A.19)
+    // EMPLOYER — Role: employer
     // =========================================================================
     Route::middleware([
         'auth:sanctum',
@@ -302,12 +308,9 @@ Route::prefix('v1')->group(function () {
         'throttle:api',
     ])->prefix('employer')->name('api.v1.employer.')->group(function () {
 
-        // Profil employer (2B.9)
         Route::get('profile',  [EmployerProfileController::class, 'show'])->name('profile.show');
         Route::put('profile',  [EmployerProfileController::class, 'update'])->name('profile.update');
 
-        // Survei employer (4A.19)
-        // Urutan PENTING: route spesifik (active) SEBELUM route parameter {surveyPeriod}
         Route::prefix('surveys')->name('surveys.')->group(function () {
             Route::get('active',                       [EmployerSurveyController::class, 'activeSurvey'])->name('active');
             Route::get('/{surveyPeriod}',              [EmployerSurveyController::class, 'show'])->name('show');
