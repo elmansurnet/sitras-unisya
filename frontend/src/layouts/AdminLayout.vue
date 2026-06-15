@@ -53,8 +53,8 @@
 
         <!-- Statistik & Laporan -->
         <SidebarGroup label="Statistik & Laporan" icon="bar-chart-2">
-          <SidebarItem :to="{ name: 'admin.dashboard.statistics' }" icon="trending-up" label="Statistik" />
-          <SidebarItem :to="{ name: 'admin.reports' }"              label="Laporan" />
+          <SidebarItem :to="{ name: 'admin.dashboard.stats' }" icon="trending-up" label="Statistik" />
+          <SidebarItem :to="{ name: 'admin.reports' }"         label="Laporan" />
         </SidebarGroup>
 
         <!-- Notifikasi -->
