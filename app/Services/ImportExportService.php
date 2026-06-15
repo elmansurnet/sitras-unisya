@@ -10,6 +10,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ImportExportService
 {
@@ -139,16 +140,23 @@ class ImportExportService
     }
 
     /**
-     * Generate template Excel untuk diunduh.
-     * Simpan di storage/app/private/templates/{type}_import_template.xlsx.
+     * Generate template Excel dan kembalikan sebagai BinaryFileResponse
+     * untuk di-stream langsung ke browser.
      *
-     * @return string  path relatif di storage
+     * FIX: Sebelumnya hanya menyimpan file ke storage dan return path string.
+     * Controller kemudian return JSON {filename} → frontend simpan JSON sebagai
+     * .xlsx → Excel error "file format not valid".
+     *
+     * Sekarang method ini langsung return response()->download() sehingga
+     * seluruh pipeline konsisten:
+     * GET /admin/alumni/template → BinaryFileResponse (binary XLSX)
+     * → frontend Blob(MIME xlsx) → browser trigger download file valid.
      */
-    public function generateTemplate(string $type): string
+    public function generateTemplate(string $type): BinaryFileResponse
     {
-        $headers   = self::TEMPLATE_HEADERS[$type] ?? [];
-        $path      = "templates/{$type}_import_template.xlsx";
-        $storagePath = storage_path('app/private/' . $path);
+        $headers     = self::TEMPLATE_HEADERS[$type] ?? [];
+        $filename    = "{$type}_import_template.xlsx";
+        $storagePath = storage_path("app/private/templates/{$filename}");
 
         // Buat direktori jika belum ada
         if (!is_dir(dirname($storagePath))) {
@@ -190,7 +198,14 @@ class ImportExportService
         $writer = new XlsxWriter($spreadsheet);
         $writer->save($storagePath);
 
-        return $path;
+        return response()->download(
+            $storagePath,
+            $filename,
+            [
+                'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]
+        );
     }
 
     /**

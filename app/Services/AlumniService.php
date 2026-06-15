@@ -271,9 +271,16 @@ class AlumniService
     }
 
     /**
-     * Generate template Excel untuk import alumni.
+     * Generate template Excel untuk import alumni dan stream ke browser.
+     *
+     * FIX: Sebelumnya return string (path relatif di storage).
+     * Controller kemudian return JSON {filename} → frontend simpan JSON
+     * sebagai .xlsx → Excel error "file format not valid".
+     *
+     * Sekarang return BinaryFileResponse sehingga pipeline konsisten:
+     * Controller → BinaryFileResponse → browser download file binary XLSX valid.
      */
-    public function generateImportTemplate(): string
+    public function generateImportTemplate(): BinaryFileResponse
     {
         return $this->importExport->generateTemplate('alumni');
     }

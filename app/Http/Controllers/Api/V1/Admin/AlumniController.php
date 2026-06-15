@@ -169,18 +169,26 @@ class AlumniController extends Controller
         );
     }
 
-    // ─── GET /admin/alumni/template ───────────────────────────────────────────
-    public function importTemplate(Request $request): JsonResponse
+    /**
+     * GET /admin/alumni/template
+     *
+     * FIX: Sebelumnya return JsonResponse berisi {filename}.
+     * Frontend memanggil dengan responseType:'blob' dan menyimpan response
+     * sebagai .xlsx — yang ternyata isinya JSON teks, bukan binary XLSX.
+     * Excel kemudian error: "file format or file extension is not valid".
+     *
+     * Sekarang return BinaryFileResponse (stream file .xlsx langsung).
+     * Pipeline konsisten:
+     *   GET /admin/alumni/template
+     *   → BinaryFileResponse (binary XLSX, Content-Type: .xlsx)
+     *   → frontend Blob({ type: 'application/vnd.openxmlformats...' })
+     *   → browser download file .xlsx valid, Excel dapat membuka
+     */
+    public function importTemplate(Request $request): BinaryFileResponse
     {
         Gate::authorize('import', Alumni::class);
 
-        $filename = $this->alumniService->generateImportTemplate();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Template berhasil digenerate',
-            'data'    => ['filename' => $filename],
-        ]);
+        return $this->alumniService->generateImportTemplate();
     }
 
     // ─── GET /admin/alumni/stats ──────────────────────────────────────────────
