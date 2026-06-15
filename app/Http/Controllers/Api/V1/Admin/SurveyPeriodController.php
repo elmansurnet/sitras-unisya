@@ -7,6 +7,7 @@ use App\Models\SurveyPeriod;
 use App\Services\SurveyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class SurveyPeriodController extends Controller
 {
@@ -20,7 +21,7 @@ class SurveyPeriodController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $this->authorize('admin-or-superadmin');
+        Gate::authorize('admin-or-superadmin');
 
         $request->validate([
             'status'   => ['nullable', 'in:draft,active,closed'],
@@ -55,7 +56,7 @@ class SurveyPeriodController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $this->authorize('admin-or-superadmin');
+        Gate::authorize('admin-or-superadmin');
 
         $data = $request->validate([
             'name'                    => ['required', 'string', 'max:255'],
@@ -82,7 +83,7 @@ class SurveyPeriodController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $this->authorize('admin-or-superadmin');
+        Gate::authorize('admin-or-superadmin');
 
         $period = SurveyPeriod::withCount([
             'responses',
@@ -106,7 +107,7 @@ class SurveyPeriodController extends Controller
      */
     public function update(Request $request, int $id): JsonResponse
     {
-        $this->authorize('admin-or-superadmin');
+        Gate::authorize('admin-or-superadmin');
 
         $period = SurveyPeriod::find($id);
 
@@ -147,7 +148,7 @@ class SurveyPeriodController extends Controller
      */
     public function destroy(int $id): JsonResponse
     {
-        $this->authorize('superadmin-only');
+        Gate::authorize('superadmin-only');
 
         $period = SurveyPeriod::withCount('responses')->find($id);
 
@@ -183,7 +184,7 @@ class SurveyPeriodController extends Controller
      */
     public function activate(Request $request, int $id): JsonResponse
     {
-        $this->authorize('admin-or-superadmin');
+        Gate::authorize('admin-or-superadmin');
 
         $period = SurveyPeriod::find($id);
 
@@ -213,7 +214,7 @@ class SurveyPeriodController extends Controller
      */
     public function close(Request $request, int $id): JsonResponse
     {
-        $this->authorize('admin-or-superadmin');
+        Gate::authorize('admin-or-superadmin');
 
         $period = SurveyPeriod::find($id);
 
@@ -244,7 +245,7 @@ class SurveyPeriodController extends Controller
      */
     public function sendBlast(Request $request, int $id): JsonResponse
     {
-        $this->authorize('admin-or-superadmin');
+        Gate::authorize('admin-or-superadmin');
 
         $period = SurveyPeriod::find($id);
 
@@ -287,7 +288,7 @@ class SurveyPeriodController extends Controller
      */
     public function stats(int $id): JsonResponse
     {
-        $this->authorize('admin-or-superadmin');
+        Gate::authorize('admin-or-superadmin');
 
         $period = SurveyPeriod::find($id);
 

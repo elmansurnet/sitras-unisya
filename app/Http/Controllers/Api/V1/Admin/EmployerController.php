@@ -10,6 +10,7 @@ use App\Services\EmployerService;
 use App\Repositories\Contracts\EmployerRepositoryInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 class EmployerController extends Controller
@@ -25,7 +26,7 @@ class EmployerController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $this->authorize('viewAny', Employer::class);
+        Gate::authorize('viewAny', Employer::class);
 
         $request->validate([
             'search'          => ['nullable', 'string', 'max:100'],
@@ -60,7 +61,7 @@ class EmployerController extends Controller
      */
     public function store(StoreEmployerRequest $request): JsonResponse
     {
-        $this->authorize('create', Employer::class);
+        Gate::authorize('create', Employer::class);
 
         $employer = $this->service->create($request->validated());
 
@@ -82,7 +83,7 @@ class EmployerController extends Controller
             return response()->json(['success' => false, 'message' => 'Employer tidak ditemukan.'], 404);
         }
 
-        $this->authorize('view', $employer);
+        Gate::authorize('view', $employer);
 
         return response()->json([
             'success' => true,
@@ -101,7 +102,7 @@ class EmployerController extends Controller
             return response()->json(['success' => false, 'message' => 'Employer tidak ditemukan.'], 404);
         }
 
-        $this->authorize('update', $employer);
+        Gate::authorize('update', $employer);
 
         $updated = $this->service->update($employer, $request->validated());
 
@@ -124,7 +125,7 @@ class EmployerController extends Controller
             return response()->json(['success' => false, 'message' => 'Employer tidak ditemukan.'], 404);
         }
 
-        $this->authorize('delete', $employer);
+        Gate::authorize('delete', $employer);
 
         $this->service->delete($employer);
 
@@ -145,7 +146,7 @@ class EmployerController extends Controller
             return response()->json(['success' => false, 'message' => 'Employer tidak ditemukan.'], 404);
         }
 
-        $this->authorize('sendSurveyToken', $employer);
+        Gate::authorize('sendSurveyToken', $employer);
 
         $request->validate([
             'channel' => ['required', 'in:whatsapp,email'],
@@ -183,7 +184,7 @@ class EmployerController extends Controller
             return response()->json(['success' => false, 'message' => 'Employer tidak ditemukan.'], 404);
         }
 
-        $this->authorize('regenerateToken', $employer);
+        Gate::authorize('regenerateToken', $employer);
 
         try {
             $this->service->regenerateToken($employer);

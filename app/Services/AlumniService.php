@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\SurveyPeriod;
 use App\Models\User;
 use App\Repositories\AlumniRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -20,6 +21,31 @@ class AlumniService
         private readonly ImportExportService $importExport,
         private readonly NotificationService $notificationService,
     ) {}
+
+    // ─── PROXY: Repository methods untuk diakses dari Controller ──────────────
+
+    /**
+     * Ambil daftar alumni terpaginasi dengan filter.
+     * Proxy publik ke AlumniRepository::paginate() agar Controller
+     * tidak perlu mengakses $alumniRepo secara langsung (private).
+     *
+     * @param  array<string,mixed> $filters
+     */
+    public function paginate(array $filters = []): LengthAwarePaginator
+    {
+        return $this->alumniRepo->paginate($filters);
+    }
+
+    /**
+     * Statistik ringkas alumni untuk dashboard.
+     * Proxy publik ke AlumniRepository::stats().
+     *
+     * @return array<string,int>
+     */
+    public function stats(): array
+    {
+        return $this->alumniRepo->stats();
+    }
 
     // ─── CRUD ─────────────────────────────────────────────────────────────────
 

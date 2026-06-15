@@ -25,7 +25,7 @@ class AlumniController extends Controller
     {
         Gate::authorize('viewAny', Alumni::class);
 
-        $paginator = $this->alumniService->alumniRepo->paginate($request->only([
+        $paginator = $this->alumniService->paginate($request->only([
             'search', 'study_program_id', 'graduation_year_id',
             'survey_status', 'gender', 'sort_by', 'sort_dir', 'per_page',
         ]));
@@ -188,7 +188,7 @@ class AlumniController extends Controller
     {
         Gate::authorize('viewAny', Alumni::class);
 
-        $stats = $this->alumniService->alumniRepo->stats();
+        $stats = $this->alumniService->stats();
 
         return response()->json([
             'success' => true,

@@ -8,6 +8,7 @@ use App\Models\NotificationTemplate;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class NotificationController extends Controller
 {
@@ -22,7 +23,7 @@ class NotificationController extends Controller
      */
     public function indexTemplates(Request $request): JsonResponse
     {
-        $this->authorize('admin-or-superadmin');
+        Gate::authorize('admin-or-superadmin');
 
         $request->validate([
             'channel'  => ['nullable', 'in:whatsapp,email'],
@@ -49,7 +50,7 @@ class NotificationController extends Controller
      */
     public function storeTemplate(Request $request): JsonResponse
     {
-        $this->authorize('superadmin-only');
+        Gate::authorize('superadmin-only');
 
         $data = $request->validate([
             'channel'    => ['required', 'in:whatsapp,email'],
@@ -62,7 +63,6 @@ class NotificationController extends Controller
             'is_active'  => ['boolean'],
         ]);
 
-        // Unique constraint: (channel, event)
         $exists = NotificationTemplate::where('channel', $data['channel'])
             ->where('event', $data['event'])
             ->exists();
@@ -89,7 +89,7 @@ class NotificationController extends Controller
      */
     public function showTemplate(int $id): JsonResponse
     {
-        $this->authorize('admin-or-superadmin');
+        Gate::authorize('admin-or-superadmin');
 
         $template = NotificationTemplate::find($id);
 
@@ -108,7 +108,7 @@ class NotificationController extends Controller
      */
     public function updateTemplate(Request $request, int $id): JsonResponse
     {
-        $this->authorize('superadmin-only');
+        Gate::authorize('superadmin-only');
 
         $template = NotificationTemplate::find($id);
 
@@ -139,7 +139,7 @@ class NotificationController extends Controller
      */
     public function destroyTemplate(int $id): JsonResponse
     {
-        $this->authorize('superadmin-only');
+        Gate::authorize('superadmin-only');
 
         $template = NotificationTemplate::find($id);
 
@@ -163,7 +163,7 @@ class NotificationController extends Controller
      */
     public function indexLogs(Request $request): JsonResponse
     {
-        $this->authorize('admin-or-superadmin');
+        Gate::authorize('admin-or-superadmin');
 
         $request->validate([
             'channel'        => ['nullable', 'in:whatsapp,email'],
@@ -202,7 +202,7 @@ class NotificationController extends Controller
      */
     public function showLog(int $id): JsonResponse
     {
-        $this->authorize('admin-or-superadmin');
+        Gate::authorize('admin-or-superadmin');
 
         $log = NotificationLog::with('template')->find($id);
 
@@ -222,7 +222,7 @@ class NotificationController extends Controller
      */
     public function resend(int $id): JsonResponse
     {
-        $this->authorize('admin-or-superadmin');
+        Gate::authorize('admin-or-superadmin');
 
         $log = NotificationLog::find($id);
 
