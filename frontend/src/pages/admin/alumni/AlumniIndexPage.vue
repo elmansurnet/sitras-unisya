@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAlumniStore } from '@/stores/alumni'
+import { useMasterDataStore } from '@/stores/masterData'
 import { useToast } from '@/composables/useToast'
 import DataTable from '@/components/common/DataTable.vue'
 import FilterBar from '@/components/common/FilterBar.vue'
@@ -9,21 +10,22 @@ import Pagination from '@/components/common/Pagination.vue'
 import Badge from '@/components/common/Badge.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
-const router = useRouter()
-const alumniStore = useAlumniStore()
-const { showToast } = useToast()
+const router          = useRouter()
+const alumniStore     = useAlumniStore()
+const masterDataStore = useMasterDataStore()
+const { showToast }   = useToast()
 
 const showDeleteModal = ref(false)
-const deleteTarget = ref(null)
-const selectedIds = ref([])
+const deleteTarget    = ref(null)
+const selectedIds     = ref([])
 
 const columns = [
-  { key: 'nim', label: 'NIM', sortable: true },
-  { key: 'full_name', label: 'Nama', sortable: true },
-  { key: 'study_program', label: 'Program Studi', sortable: false },
-  { key: 'graduation_year', label: 'Angkatan', sortable: true },
-  { key: 'gpa', label: 'IPK', sortable: true },
-  { key: 'survey_status', label: 'Status Survei', sortable: false },
+  { key: 'nim',            label: 'NIM',           sortable: true  },
+  { key: 'full_name',      label: 'Nama',          sortable: true  },
+  { key: 'study_program',  label: 'Program Studi', sortable: false },
+  { key: 'graduation_year',label: 'Angkatan',      sortable: true  },
+  { key: 'gpa',            label: 'IPK',           sortable: true  },
+  { key: 'survey_status',  label: 'Status Survei', sortable: false },
 ]
 
 const filterConfig = [
@@ -32,39 +34,44 @@ const filterConfig = [
     key: 'study_program_id',
     type: 'select',
     label: 'Program Studi',
-    options: computed(() => alumniStore.studyProgramOptions),
+    options: computed(() => masterDataStore.studyProgramOptions),
   },
   {
     key: 'graduation_year_id',
     type: 'select',
     label: 'Angkatan',
-    options: computed(() => alumniStore.graduationYearOptions),
+    options: computed(() => masterDataStore.graduationYearOptions),
   },
   {
     key: 'survey_status',
     type: 'select',
     label: 'Status Survei',
     options: [
-      { value: '', label: 'Semua Status' },
-      { value: 'belum_disurvei', label: 'Belum Disurvei' },
-      { value: 'terkirim', label: 'Terkirim' },
-      { value: 'sedang_mengisi', label: 'Sedang Mengisi' },
-      { value: 'selesai', label: 'Selesai' },
+      { value: '',                label: 'Semua Status'    },
+      { value: 'belum_disurvei',  label: 'Belum Disurvei'  },
+      { value: 'terkirim',        label: 'Terkirim'        },
+      { value: 'sedang_mengisi',  label: 'Sedang Mengisi'  },
+      { value: 'selesai',         label: 'Selesai'         },
     ],
   },
 ]
 
 onMounted(() => {
-  alumniStore.fetchAlumni()
-  alumniStore.fetchMasterData()
+  alumniStore.fetchList()
+  masterDataStore.fetchPublicAll()
 })
 
 function handleSort(key) {
-  alumniStore.setSort(key)
+  const newDir = alumniStore.filters.sort_by === key && alumniStore.filters.sort_dir === 'asc'
+    ? 'desc'
+    : 'asc'
+  alumniStore.setFilter('sort_by',  key)
+  alumniStore.setFilter('sort_dir', newDir)
+  alumniStore.fetchList()
 }
 
 function handlePageChange(page) {
-  alumniStore.setPage(page)
+  alumniStore.fetchList(page)
 }
 
 function handleRowSelect(ids) {
@@ -72,11 +79,13 @@ function handleRowSelect(ids) {
 }
 
 function applyFilter(filters) {
-  alumniStore.setFilters(filters)
+  Object.entries(filters).forEach(([k, v]) => alumniStore.setFilter(k, v))
+  alumniStore.fetchList()
 }
 
 function resetFilter() {
   alumniStore.resetFilters()
+  alumniStore.fetchList()
 }
 
 function goToCreate() {
@@ -97,7 +106,7 @@ function goToImport() {
 
 async function handleExport() {
   try {
-    await alumniStore.exportAlumni(alumniStore.filters)
+    await alumniStore.exportAlumni()
     showToast('Export berhasil diproses.', 'success')
   } catch {
     showToast('Export gagal.', 'error')
@@ -105,16 +114,16 @@ async function handleExport() {
 }
 
 function confirmDelete(row) {
-  deleteTarget.value = row
+  deleteTarget.value    = row
   showDeleteModal.value = true
 }
 
 async function handleDelete() {
   try {
-    await alumniStore.deleteAlumni(deleteTarget.value.id)
+    await alumniStore.remove(deleteTarget.value.id)
     showToast('Alumni berhasil dihapus.', 'success')
     showDeleteModal.value = false
-    deleteTarget.value = null
+    deleteTarget.value    = null
   } catch {
     showToast('Gagal menghapus alumni.', 'error')
   }
@@ -139,28 +148,21 @@ async function handleSendInvitation(row) {
         <p class="text-sm text-gray-500 mt-1">Kelola seluruh data alumni universitas</p>
       </div>
       <div class="flex items-center gap-3">
-        <button
-          class="btn-secondary flex items-center gap-2"
-          @click="goToImport"
-        >
+        <button class="btn-secondary flex items-center gap-2" @click="goToImport">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
           </svg>
           Import Excel
         </button>
-        <button
-          class="btn-secondary flex items-center gap-2"
-          @click="handleExport"
-        >
+        <button class="btn-secondary flex items-center gap-2" @click="handleExport">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
           Export Excel
         </button>
-        <button
-          class="btn-primary flex items-center gap-2"
-          @click="goToCreate"
-        >
+        <button class="btn-primary flex items-center gap-2" @click="goToCreate">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
           </svg>
@@ -183,7 +185,6 @@ async function handleSendInvitation(row) {
         :columns="columns"
         :data="alumniStore.list"
         :loading="alumniStore.loading"
-        :pagination="alumniStore.pagination"
         :selectable="true"
         empty-text="Belum ada data alumni. Mulai dengan menambahkan atau mengimpor data alumni."
         @sort="handleSort"
@@ -211,7 +212,8 @@ async function handleSendInvitation(row) {
             />
             <div
               v-else
-              class="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold flex-shrink-0"
+              class="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center
+                     justify-center text-xs font-bold flex-shrink-0"
             >
               {{ row.full_name?.charAt(0)?.toUpperCase() }}
             </div>
@@ -238,8 +240,10 @@ async function handleSendInvitation(row) {
               @click="goToDetail(row)"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
             </button>
             <button
@@ -248,7 +252,8 @@ async function handleSendInvitation(row) {
               @click="goToEdit(row)"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
             </button>
             <button
@@ -258,7 +263,8 @@ async function handleSendInvitation(row) {
               @click="handleSendInvitation(row)"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </button>
             <button
@@ -267,16 +273,22 @@ async function handleSendInvitation(row) {
               @click="confirmDelete(row)"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
           </div>
         </template>
       </DataTable>
 
+      <!-- Pagination — gunakan alumniStore.meta (bukan .pagination) -->
       <Pagination
-        v-if="alumniStore.pagination.last_page > 1"
-        :pagination="alumniStore.pagination"
+        v-if="alumniStore.meta.last_page > 1"
+        :current-page="alumniStore.meta.current_page"
+        :last-page="alumniStore.meta.last_page"
+        :total="alumniStore.meta.total"
+        :from="alumniStore.meta.from"
+        :to="alumniStore.meta.to"
         class="mt-4 px-6 pb-4"
         @change="handlePageChange"
       />
