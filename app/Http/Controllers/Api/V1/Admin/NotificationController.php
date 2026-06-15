@@ -26,16 +26,16 @@ class NotificationController extends Controller
         Gate::authorize('admin-or-superadmin');
 
         $request->validate([
-            'channel'  => ['nullable', 'in:whatsapp,email'],
-            'event'    => ['nullable', 'string', 'max:100'],
+            'type'      => ['nullable', 'in:whatsapp,email'],
+            'event'     => ['nullable', 'string', 'max:100'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
         $templates = NotificationTemplate::query()
-            ->when($request->channel,  fn ($q, $v) => $q->forChannel($v))
-            ->when($request->event,    fn ($q, $v) => $q->forEvent($v))
+            ->when($request->type,      fn ($q, $v) => $q->forChannel($v))
+            ->when($request->event,     fn ($q, $v) => $q->forEvent($v))
             ->when($request->has('is_active'), fn ($q) => $q->where('is_active', $request->boolean('is_active')))
-            ->orderBy('channel')
+            ->orderBy('type')
             ->orderBy('event')
             ->get();
 
@@ -53,25 +53,25 @@ class NotificationController extends Controller
         Gate::authorize('superadmin-only');
 
         $data = $request->validate([
-            'channel'    => ['required', 'in:whatsapp,email'],
-            'event'      => ['required', 'string', 'max:100'],
-            'name'       => ['required', 'string', 'max:255'],
-            'body'       => ['required', 'string'],
-            'footer'     => ['nullable', 'string'],
-            'variables'  => ['nullable', 'array'],
+            'type'        => ['required', 'in:whatsapp,email'],
+            'event'       => ['required', 'string', 'max:100'],
+            'name'        => ['required', 'string', 'max:255'],
+            'subject'     => ['nullable', 'string', 'max:255'],
+            'body'        => ['required', 'string'],
+            'variables'   => ['nullable', 'array'],
             'variables.*' => ['string', 'max:50'],
-            'is_active'  => ['boolean'],
+            'is_active'   => ['boolean'],
         ]);
 
-        $exists = NotificationTemplate::where('channel', $data['channel'])
+        $exists = NotificationTemplate::where('type', $data['type'])
             ->where('event', $data['event'])
             ->exists();
 
         if ($exists) {
             return response()->json([
                 'success' => false,
-                'message' => 'Template untuk channel dan event ini sudah ada.',
-                'errors'  => ['event' => ['Kombinasi channel + event sudah terdaftar.']],
+                'message' => 'Template untuk type dan event ini sudah ada.',
+                'errors'  => ['event' => ['Kombinasi type + event sudah terdaftar.']],
             ], 422);
         }
 
@@ -117,12 +117,12 @@ class NotificationController extends Controller
         }
 
         $data = $request->validate([
-            'name'       => ['sometimes', 'string', 'max:255'],
-            'body'       => ['sometimes', 'string'],
-            'footer'     => ['nullable', 'string'],
-            'variables'  => ['nullable', 'array'],
+            'name'        => ['sometimes', 'string', 'max:255'],
+            'subject'     => ['nullable', 'string', 'max:255'],
+            'body'        => ['sometimes', 'string'],
+            'variables'   => ['nullable', 'array'],
             'variables.*' => ['string', 'max:50'],
-            'is_active'  => ['boolean'],
+            'is_active'   => ['boolean'],
         ]);
 
         $template->update($data);
@@ -159,14 +159,14 @@ class NotificationController extends Controller
 
     /**
      * GET /api/v1/admin/notifications/logs
-     * Log notifikasi dengan filter channel, status, recipient_type.
+     * Log notifikasi dengan filter type, status, recipient_type.
      */
     public function indexLogs(Request $request): JsonResponse
     {
         Gate::authorize('admin-or-superadmin');
 
         $request->validate([
-            'channel'        => ['nullable', 'in:whatsapp,email'],
+            'type'           => ['nullable', 'in:whatsapp,email'],
             'status'         => ['nullable', 'in:pending,sent,failed,delivered'],
             'recipient_type' => ['nullable', 'in:alumni,employer'],
             'date_from'      => ['nullable', 'date'],
@@ -175,8 +175,8 @@ class NotificationController extends Controller
         ]);
 
         $query = NotificationLog::query()
-            ->with('template:id,name,event,channel')
-            ->when($request->channel,        fn ($q, $v) => $q->where('channel', $v))
+            ->with('template:id,name,event,type')
+            ->when($request->type,           fn ($q, $v) => $q->where('type', $v))
             ->when($request->status,         fn ($q, $v) => $q->where('status', $v))
             ->when($request->recipient_type, fn ($q, $v) => $q->where('recipient_type', $v))
             ->when($request->date_from, fn ($q, $v) => $q->whereDate('sent_at', '>=', $v))
@@ -238,15 +238,14 @@ class NotificationController extends Controller
         }
 
         $newLog = $this->notificationService->send(
-            channel  : $log->channel,
+            type     : $log->type,
             event    : $log->template?->event ?? 'resend',
             variables: [],
             recipient: [
                 'recipient_type' => $log->recipient_type,
                 'recipient_id'   => $log->recipient_id,
-                'phone'          => $log->phone,
-                'email'          => $log->email,
-                'name'           => $log->phone ?? $log->email ?? '-',
+                'recipient'      => $log->recipient,
+                'name'           => $log->recipient,
             ]
         );
 

@@ -34,7 +34,7 @@ class NotificationService
             $this->send('whatsapp', $event, $variables, [
                 'recipient_type' => 'alumni',
                 'recipient_id'   => $alumni->id,
-                'phone'          => $alumni->phone,
+                'recipient'      => $alumni->phone,
                 'name'           => $alumni->full_name,
             ]);
         }
@@ -43,7 +43,7 @@ class NotificationService
             $this->send('email', $event, $variables, [
                 'recipient_type' => 'alumni',
                 'recipient_id'   => $alumni->id,
-                'email'          => $alumni->user->email,
+                'recipient'      => $alumni->user->email,
                 'name'           => $alumni->full_name,
             ]);
         }
@@ -69,7 +69,7 @@ class NotificationService
             $this->send('whatsapp', $event, $variables, [
                 'recipient_type' => 'employer',
                 'recipient_id'   => $employer->id,
-                'phone'          => $employer->phone,
+                'recipient'      => $employer->phone,
                 'name'           => $employer->name,
             ]);
         }
@@ -78,7 +78,7 @@ class NotificationService
             $this->send('email', $event, $variables, [
                 'recipient_type' => 'employer',
                 'recipient_id'   => $employer->id,
-                'email'          => $employer->user->email,
+                'recipient'      => $employer->user->email,
                 'name'           => $employer->name,
             ]);
         }
@@ -87,75 +87,75 @@ class NotificationService
     /**
      * Core dispatcher: ambil template, render, kirim, catat log.
      *
-     * @param  string  $channel  'whatsapp' | 'email'
+     * @param  string  $type     'whatsapp' | 'email'
      * @param  string  $event
      * @param  array   $variables
-     * @param  array{recipient_type:string, recipient_id:int, phone?:string, email?:string, name:string} $recipient
+     * @param  array{recipient_type:string, recipient_id:int, recipient:string, name:string} $recipient
      */
     public function send(
-        string $channel,
+        string $type,
         string $event,
         array $variables,
         array $recipient
     ): NotificationLog {
-        // 1. Ambil template aktif
+        // 1. Ambil template aktif berdasarkan type + event
         $template = NotificationTemplate::query()
             ->active()
-            ->forChannel($channel)
+            ->forChannel($type)   // scope: where('type', $type)
             ->forEvent($event)
             ->first();
 
-        $renderedBody   = null;
-        $renderedFooter = null;
-        $templateId     = null;
+        $renderedBody = null;
+        $templateId   = null;
+        $subject      = null;
 
         if ($template) {
             $templateId   = $template->id;
             $renderedBody = $this->renderTemplate($template->body, $variables);
-            if ($template->footer) {
-                $renderedFooter = $this->renderTemplate($template->footer, $variables);
+            if ($template->subject) {
+                $subject = $this->renderTemplate($template->subject, $variables);
             }
         } else {
             Log::warning('[NotificationService] Template tidak ditemukan', [
-                'channel' => $channel,
-                'event'   => $event,
+                'type'  => $type,
+                'event' => $event,
             ]);
             // Fallback message minimal
             $renderedBody = "Notifikasi dari SITRAS UNISYA: {$event}";
         }
 
         // 2. Buat log awal (status: pending)
+        // Kolom 'recipient' menyimpan satu alamat tujuan: nomor WA atau alamat email
         $log = NotificationLog::create([
-            'notification_template_id' => $templateId,
-            'recipient_type'           => $recipient['recipient_type'],
-            'recipient_id'             => $recipient['recipient_id'],
-            'channel'                  => $channel,
-            'phone'                    => $recipient['phone'] ?? null,
-            'email'                    => $recipient['email'] ?? null,
-            'rendered_body'            => $renderedBody,
-            'rendered_footer'          => $renderedFooter,
-            'status'                   => 'pending',
-            'sent_at'                  => now(),
+            'template_id'    => $templateId,
+            'type'           => $type,
+            'recipient'      => $recipient['recipient'],
+            'recipient_type' => $recipient['recipient_type'],
+            'recipient_id'   => $recipient['recipient_id'],
+            'subject'        => $subject,
+            'body'           => $renderedBody,
+            'status'         => 'pending',
+            'sent_at'        => now(),
         ]);
 
-        // 3. Kirim sesuai channel
+        // 3. Kirim sesuai type
         try {
-            $providerResponse = match ($channel) {
+            $providerResponse = match ($type) {
                 'whatsapp' => $this->whatsApp->send(
-                    number : $recipient['phone'],
+                    number : $recipient['recipient'],
                     message: $renderedBody,
-                    footer : $renderedFooter,
                 ),
                 'email' => $this->sendEmail(
-                    to     : $recipient['email'],
-                    name   : $recipient['name'],
-                    body   : $renderedBody,
-                    event  : $event,
+                    to   : $recipient['recipient'],
+                    name : $recipient['name'],
+                    body : $renderedBody,
+                    event: $event,
                 ),
-                default => throw new \InvalidArgumentException("Channel '{$channel}' tidak didukung"),
+                default => throw new \InvalidArgumentException("Type '{$type}' tidak didukung"),
             };
 
-            // 4. Update log → sent (gateway UNISYA tidak kirim delivered callback)
+            // 4. Update log → sent
+            // Catatan: gateway UNISYA tidak mengirim webhook 'delivered' callback
             $log->update([
                 'status'            => 'sent',
                 'provider_response' => $providerResponse,
@@ -163,14 +163,15 @@ class NotificationService
         } catch (\Throwable $e) {
             $log->update([
                 'status'            => 'failed',
+                'error_message'     => $e->getMessage(),
                 'provider_response' => ['error' => $e->getMessage()],
             ]);
 
             Log::error('[NotificationService] Gagal kirim notifikasi', [
-                'channel'        => $channel,
-                'event'          => $event,
-                'recipient_id'   => $recipient['recipient_id'],
-                'error'          => $e->getMessage(),
+                'type'         => $type,
+                'event'        => $event,
+                'recipient_id' => $recipient['recipient_id'],
+                'error'        => $e->getMessage(),
             ]);
         }
 
@@ -186,7 +187,7 @@ class NotificationService
     public function renderTemplate(string $template, array $variables): string
     {
         foreach ($variables as $key => $value) {
-            $template = str_replace("{{{$key}}}", (string) ($value ?? ''), $template);
+            $template = str_replace("{{{{$key}}}}", (string) ($value ?? ''), $template);
         }
 
         // Bersihkan placeholder yang tidak terisi
@@ -197,7 +198,7 @@ class NotificationService
      * Kirim notifikasi email via Laravel Mail.
      * Saat ini menggunakan Mail::raw() — dapat diganti Mailable.
      *
-     * @return array{status:bool}
+     * @return array{status:bool, type:string, to:string}
      */
     private function sendEmail(string $to, string $name, string $body, string $event): array
     {
@@ -206,6 +207,6 @@ class NotificationService
                     ->subject('SITRAS UNISYA — ' . ucwords(str_replace('_', ' ', $event)));
         });
 
-        return ['status' => true, 'channel' => 'email', 'to' => $to];
+        return ['status' => true, 'type' => 'email', 'to' => $to];
     }
 }
