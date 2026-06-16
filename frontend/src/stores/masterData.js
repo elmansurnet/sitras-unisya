@@ -1,37 +1,24 @@
 import { defineStore } from 'pinia'
 import api from '@/services/api'
 
-/**
- * Store untuk Master Data Akademik:
- * - Faculties (GET/POST/PUT/DELETE /admin/faculties)
- * - Study Programs (GET/POST/PUT/DELETE /admin/study-programs)
- * - Graduation Years (GET/POST/PUT/DELETE /admin/graduation-years)
- * - Public endpoints (GET /public/faculties, /public/study-programs, /public/graduation-years)
- */
 export const useMasterDataStore = defineStore('masterData', {
   state: () => ({
-    // ─── Faculties ────────────────────────────────────────────────────────────
-    /** @type {Array<{id:number,name:string,code:string}>} */
     faculties: [],
     loadingFaculties: false,
 
-    // ─── Study Programs ───────────────────────────────────────────────────────
-    /** @type {Array<{id:number,name:string,code:string,degree_level:string,faculty_id:number,faculty:object}>} */
     studyPrograms: [],
     studyProgramFilters: { faculty_id: null },
     loadingStudyPrograms: false,
 
-    // ─── Graduation Years ─────────────────────────────────────────────────────
-    /** @type {Array<{id:number,year:number,alumni_count:number}>} */
     graduationYears: [],
     loadingGraduationYears: false,
 
-    // ─── Public (untuk form alumni/survey — tidak perlu auth) ─────────────────
-    /** @type {Array<{id:number,name:string,code:string}>} */
+    // BUG #4a FIX: tambah industry sectors state
+    industrySectors: [],
+    loadingIndustrySectors: false,
+
     publicFaculties: [],
-    /** @type {Array<{id:number,name:string,code:string,degree_level:string,faculty_id:number}>} */
     publicStudyPrograms: [],
-    /** @type {Array<{id:number,year:number}>} */
     publicGraduationYears: [],
     loadingPublic: false,
 
@@ -40,11 +27,9 @@ export const useMasterDataStore = defineStore('masterData', {
   }),
 
   getters: {
-    // Study programs difilter by faculty untuk keperluan form
     studyProgramsByFaculty: (state) => (facultyId) =>
       state.studyPrograms.filter((sp) => sp.faculty_id === facultyId),
 
-    // Opsi select untuk form (value/label format)
     facultyOptions: (state) =>
       state.faculties.map((f) => ({ value: f.id, label: `${f.code} — ${f.name}` })),
 
@@ -56,6 +41,10 @@ export const useMasterDataStore = defineStore('masterData', {
         .slice()
         .sort((a, b) => b.year - a.year)
         .map((gy) => ({ value: gy.id, label: String(gy.year) })),
+
+    // BUG #4a FIX: getter untuk dropdown industry sector
+    industrySectorOptions: (state) =>
+      state.industrySectors.map((s) => ({ value: s.id, label: s.name })),
   },
 
   actions: {
@@ -141,9 +130,23 @@ export const useMasterDataStore = defineStore('masterData', {
       return this._mutate('delete', `/admin/graduation-years/${id}`, null, this.fetchGraduationYears)
     },
 
+    // ═══ INDUSTRY SECTORS (BUG #4a FIX) ═════════════════════════════════════
+
+    async fetchIndustrySectors() {
+      this.loadingIndustrySectors = true
+      this.error = null
+      try {
+        const { data } = await api.get('/admin/industry-sectors')
+        this.industrySectors = data.data ?? []
+      } catch (err) {
+        this.error = err.response?.data?.message ?? 'Gagal memuat sektor industri'
+      } finally {
+        this.loadingIndustrySectors = false
+      }
+    },
+
     // ═══ PUBLIC (no-auth) ════════════════════════════════════════════════════
 
-    /** Fetch semua data publik sekaligus (untuk form alumni/survei) */
     async fetchPublicAll() {
       this.loadingPublic = true
       this.error = null

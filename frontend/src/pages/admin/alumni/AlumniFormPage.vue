@@ -15,6 +15,18 @@ const activeTab = ref('pribadi')
 const saving  = ref(false)
 const errors  = ref({})
 
+// BUG #8 FIX: pisahkan local number dari prefix +62
+const phoneLocal = ref('')
+
+function normalizePhone(localNumber) {
+  const digits = localNumber.replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.startsWith('0')) return '62' + digits.slice(1)
+  if (digits.startsWith('8')) return '62' + digits
+  if (digits.startsWith('62')) return digits
+  return '62' + digits
+}
+
 // Semua field sesuai $fillable model Alumni dan kolom migration
 const form = ref({
   // Identitas — kolom DB: birth_place, birth_date (bukan birthplace/birthdate)
@@ -73,6 +85,11 @@ onMounted(async () => {
           if (alumniStore.current[key] !== undefined) {
             form.value[key] = alumniStore.current[key] ?? ''
           }
+          // BUG #8 FIX: pisahkan phone ke local (tanpa 62)
+          if (form.value.phone) {
+            const d = form.value.phone.replace(/\D/g, '')
+            phoneLocal.value = d.startsWith('62') ? d.slice(2) : d
+          }
         })
       }
     }
@@ -98,6 +115,8 @@ async function fillCurrentLocation() {
 }
 
 async function handleSubmit() {
+  // BUG #8 FIX: gabung prefix + local sebelum submit
+  form.value.phone = normalizePhone(phoneLocal.value)
   saving.value = true
   errors.value = {}
   try {
@@ -458,19 +477,26 @@ function fieldError(key) {
       <!-- ── Tab: Kontak ─────────────────────────────────────────────────────── -->
       <div v-show="activeTab === 'kontak'" class="card mt-4 p-6">
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <!-- No. HP -->
+          <!-- No. HP / WhatsApp — BUG #8 FIX: phone picker +62 -->
           <div>
             <label class="form-label">Nomor HP / WhatsApp <span class="text-red-500">*</span></label>
-            <input
-              v-model="form.phone"
-              type="tel"
-              class="form-input"
-              :class="{ 'border-red-400': fieldError('phone') }"
-              placeholder="08xxxxxxxxxx"
-            />
+            <div class="flex">
+              <span class="inline-flex items-center rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 px-3 text-sm text-gray-500 select-none">
+                +62
+              </span>
+              <input
+                v-model="phoneLocal"
+                type="tel"
+                class="form-input rounded-l-none"
+                :class="{ 'border-red-400': fieldError('phone') }"
+                placeholder="8xxxxxxxxxx"
+                maxlength="13"
+                @input="phoneLocal = phoneLocal.replace(/\D/g, '').replace(/^0+/, '')"
+              />
+            </div>
+            <p class="mt-1 text-xs text-gray-400">Contoh: 81234567890 → disimpan sebagai 6281234567890</p>
             <p v-if="fieldError('phone')" class="form-error">{{ fieldError('phone') }}</p>
           </div>
-
           <!-- Email -->
           <div>
             <label class="form-label">Email</label>

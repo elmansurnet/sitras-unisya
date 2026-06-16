@@ -9,11 +9,11 @@ import ConfirmModal from '@/components/common/ConfirmModal.vue'
 const route = useRoute()
 const router = useRouter()
 const alumniStore = useAlumniStore()
-// FIX: destructure toast (bukan showToast) sesuai composable useToast
 const { toast } = useToast()
 
 const alumniId = computed(() => route.params.id)
 const activeTab = ref('profil')
+// BUG #2 FIX: showDeleteModal dipakai sebagai v-model ke ConfirmModal
 const showDeleteModal = ref(false)
 
 const tabs = [
@@ -23,7 +23,6 @@ const tabs = [
 ]
 
 onMounted(async () => {
-  // FIX: fetchAlumniDetail → fetchDetail (nama action di alumni store)
   await alumniStore.fetchDetail(alumniId.value)
 })
 
@@ -33,14 +32,14 @@ function goToEdit() {
   router.push({ name: 'admin.alumni.edit', params: { id: alumniId.value } })
 }
 
+// BUG #1 FIX: 'admin.alumni' → 'admin.alumni.index'
 function goBack() {
-  router.push({ name: 'admin.alumni' })
+  router.push({ name: 'admin.alumni.index' })
 }
 
 async function handleSendInvitation() {
   try {
     await alumniStore.sendInvitation(alumniId.value)
-    // FIX: showToast → toast.success
     toast.success('Undangan survei berhasil dikirim.')
   } catch {
     toast.error('Gagal mengirim undangan.')
@@ -48,11 +47,12 @@ async function handleSendInvitation() {
 }
 
 async function handleDelete() {
+  showDeleteModal.value = false
   try {
-    // FIX: deleteAlumni → remove (nama action di alumni store)
     await alumniStore.remove(alumniId.value)
     toast.success('Alumni berhasil dihapus.')
-    router.push({ name: 'admin.alumni' })
+    // BUG #1 FIX: konsisten dengan goBack()
+    router.push({ name: 'admin.alumni.index' })
   } catch {
     toast.error('Gagal menghapus alumni.')
   }
@@ -61,7 +61,6 @@ async function handleDelete() {
 
 <template>
   <div>
-    <!-- Loading state -->
     <div v-if="alumniStore.loadingDetail" class="flex items-center justify-center py-24">
       <svg class="h-8 w-8 animate-spin text-teal-600" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -70,7 +69,6 @@ async function handleDelete() {
     </div>
 
     <template v-else-if="alumni">
-      <!-- Page header -->
       <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
           <button
@@ -94,7 +92,6 @@ async function handleDelete() {
         </div>
       </div>
 
-      <!-- Tabs -->
       <div class="mb-1 border-b border-gray-200">
         <nav class="-mb-px flex gap-1" aria-label="Detail tabs">
           <button
@@ -114,9 +111,7 @@ async function handleDelete() {
         </nav>
       </div>
 
-      <!-- ── Tab: Data Profil ──────────────────────────────────────────────── -->
       <div v-show="activeTab === 'profil'" class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <!-- Identitas -->
         <div class="card p-6">
           <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Identitas</h2>
           <dl class="space-y-3 text-sm">
@@ -130,7 +125,6 @@ async function handleDelete() {
                 {{ alumni.gender === 'L' ? 'Laki-laki' : alumni.gender === 'P' ? 'Perempuan' : '—' }}
               </dd>
             </div>
-            <!-- FIX: birth_place / birth_date (bukan birthplace / birthdate) -->
             <div class="flex justify-between">
               <dt class="text-gray-500">Tempat Lahir</dt>
               <dd class="font-medium text-gray-900">{{ alumni.birth_place ?? '—' }}</dd>
@@ -142,7 +136,6 @@ async function handleDelete() {
           </dl>
         </div>
 
-        <!-- Akademik -->
         <div class="card p-6">
           <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Akademik</h2>
           <dl class="space-y-3 text-sm">
@@ -169,38 +162,36 @@ async function handleDelete() {
           </dl>
         </div>
 
-        <!-- Alamat -->
         <div class="card p-6">
           <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Alamat</h2>
           <dl class="space-y-3 text-sm">
             <div class="flex justify-between">
               <dt class="text-gray-500">Jalan</dt>
-              <dd class="font-medium text-gray-900">{{ alumni.address?.street ?? '—' }}</dd>
+              <dd class="font-medium text-gray-900">{{ alumni.address_street ?? alumni.address?.street ?? '—' }}</dd>
             </div>
             <div class="flex justify-between">
               <dt class="text-gray-500">Desa/Kelurahan</dt>
-              <dd class="font-medium text-gray-900">{{ alumni.address?.village ?? '—' }}</dd>
+              <dd class="font-medium text-gray-900">{{ alumni.address_village ?? alumni.address?.village ?? '—' }}</dd>
             </div>
             <div class="flex justify-between">
               <dt class="text-gray-500">Kecamatan</dt>
-              <dd class="font-medium text-gray-900">{{ alumni.address?.district ?? '—' }}</dd>
+              <dd class="font-medium text-gray-900">{{ alumni.address_district ?? alumni.address?.district ?? '—' }}</dd>
             </div>
             <div class="flex justify-between">
               <dt class="text-gray-500">Kota/Kab</dt>
-              <dd class="font-medium text-gray-900">{{ alumni.address?.city ?? '—' }}</dd>
+              <dd class="font-medium text-gray-900">{{ alumni.address_city ?? alumni.address?.city ?? '—' }}</dd>
             </div>
             <div class="flex justify-between">
               <dt class="text-gray-500">Provinsi</dt>
-              <dd class="font-medium text-gray-900">{{ alumni.address?.province ?? '—' }}</dd>
+              <dd class="font-medium text-gray-900">{{ alumni.address_province ?? alumni.address?.province ?? '—' }}</dd>
             </div>
             <div class="flex justify-between">
               <dt class="text-gray-500">Kode Pos</dt>
-              <dd class="font-medium text-gray-900">{{ alumni.address?.postal_code ?? '—' }}</dd>
+              <dd class="font-medium text-gray-900">{{ alumni.address_postal_code ?? alumni.address?.postal_code ?? '—' }}</dd>
             </div>
           </dl>
         </div>
 
-        <!-- Kontak -->
         <div class="card p-6">
           <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Kontak</h2>
           <dl class="space-y-3 text-sm">
@@ -229,7 +220,6 @@ async function handleDelete() {
         </div>
       </div>
 
-      <!-- ── Tab: Riwayat Pekerjaan ──────────────────────────────────────────── -->
       <div v-show="activeTab === 'pekerjaan'" class="mt-4">
         <div v-if="alumni.work_histories?.length" class="space-y-3">
           <div
@@ -249,7 +239,6 @@ async function handleDelete() {
         </div>
       </div>
 
-      <!-- ── Tab: Respons Survei ──────────────────────────────────────────────── -->
       <div v-show="activeTab === 'survei'" class="mt-4">
         <div v-if="alumni.survey_responses?.length" class="space-y-3">
           <div
@@ -270,20 +259,23 @@ async function handleDelete() {
       </div>
     </template>
 
-    <!-- Empty / error state -->
     <div v-else class="card p-12 text-center text-sm text-gray-400">
       Data alumni tidak ditemukan.
     </div>
 
-    <!-- Confirm Delete Modal -->
+    <!--
+      BUG #2 FIX:
+      1. v-if → v-model="showDeleteModal" (ConfirmModal mengontrol visibilitasnya sendiri)
+      2. variant="danger" → :danger="true" (prop yg benar di ConfirmModal)
+      3. @cancel tidak perlu lagi karena ConfirmModal emit update:modelValue false
+    -->
     <ConfirmModal
-      v-if="showDeleteModal"
+      v-model="showDeleteModal"
       title="Hapus Alumni"
       message="Tindakan ini tidak dapat dibatalkan. Yakin ingin menghapus alumni ini?"
       confirm-label="Ya, Hapus"
-      variant="danger"
+      :danger="true"
       @confirm="handleDelete"
-      @cancel="showDeleteModal = false"
     />
   </div>
 </template>
