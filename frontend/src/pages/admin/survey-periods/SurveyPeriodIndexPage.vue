@@ -7,6 +7,7 @@ import DataTable from '@/components/common/DataTable.vue'
 import Badge from '@/components/common/Badge.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import Pagination from '@/components/common/Pagination.vue'
+import SkeletonLoader from '@/components/common/SkeletonLoader.vue'
 
 const router = useRouter()
 const store = useSurveyAdminStore()
@@ -37,7 +38,11 @@ const statusOptions = [
 
 const periods = computed(() => store.periods ?? [])
 const pagination = computed(() => store.pagination)
-const filteredPeriods = computed(() => !filterStatus.value ? periods.value : periods.value.filter((p) => p.status === filterStatus.value))
+const filteredPeriods = computed(() =>
+  !filterStatus.value
+    ? periods.value
+    : periods.value.filter((p) => p.status === filterStatus.value)
+)
 
 function formatDate(dateStr) {
   if (!dateStr) return '-'
@@ -148,27 +153,132 @@ function handleConfirm() {
         <h1 class="page-title">Periode Survei</h1>
         <p class="page-subtitle">Kelola periode pelaksanaan tracer study</p>
       </div>
-      <button class="btn btn-primary" @click="goCreate">Buat Periode</button>
+      <button class="btn btn-primary" @click="goCreate">+ Buat Periode</button>
     </div>
 
     <div class="filter-row">
       <label class="filter-label" for="filter-status">Status:</label>
       <select id="filter-status" v-model="filterStatus" class="select-input select-input--sm">
-        <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
+          {{ opt.label }}
+        </option>
       </select>
     </div>
 
-    <div class="card">
-      <DataTable :columns="columns" :rows="filteredPeriods" :loading="store.loading" empty-message="Belum ada periode survei.">
+    <!-- Loading skeleton -->
+    <SkeletonLoader v-if="store.loading" variant="table" :rows="5" />
+
+    <div v-else class="card">
+      <DataTable
+        :columns="columns"
+        :rows="filteredPeriods"
+        :loading="false"
+        empty-message="Belum ada periode survei."
+      >
+        <!-- Nama periode — klik untuk detail -->
         <template #cell-name="{ row }">
           <button class="link-btn" @click="goDetail(row.id)">{{ row.name }}</button>
         </template>
-        <template #cell-questionnaire="{ row }">{{ row.questionnaire?.title ?? '-' }}</template>
-        <template #cell-date_range="{ row }"><span class="date-range">{{ formatDate(row.start_date) }} — {{ formatDate(row.end_date) }}</span></template>
-        <template #cell-status="{ row }"><Badge :variant="badgeVariant(row.status)">{{ badgeLabel(row.status) }}</Badge></template>
-        <template #cell-response_count="{ row }"><span class="response-count">{{ row.response_count ?? 0 }} <span class="response-total">/ {{ row.target_alumni_count ?? '—' }}</span></span></template>
+
+        <!-- Kuesioner terkait -->
+        <template #cell-questionnaire="{ row }">
+          {{ row.questionnaire?.title ?? '-' }}
+        </template>
+
+        <!-- Rentang tanggal -->
+        <template #cell-date_range="{ row }">
+          <span class="date-range">
+            {{ formatDate(row.start_date) }} — {{ formatDate(row.end_date) }}
+          </span>
+        </template>
+
+        <!-- Badge status -->
+        <template #cell-status="{ row }">
+          <Badge :variant="badgeVariant(row.status)">{{ badgeLabel(row.status) }}</Badge>
+        </template>
+
+        <!-- Hitungan respons -->
+        <template #cell-response_count="{ row }">
+          <span class="response-count">
+            {{ row.response_count ?? 0 }}
+            <span class="response-total">/ {{ row.target_alumni_count ?? '—' }}</span>
+          </span>
+        </template>
+
+        <!-- BUG #5 FIX: slot aksi yang sebelumnya tidak ada sama sekali -->
+        <template #cell-actions="{ row }">
+          <div class="flex items-center justify-center gap-1">
+            <!-- Tombol Detail -->
+            <button
+              class="btn-icon btn-icon--ghost"
+              title="Lihat Detail"
+              @click="goDetail(row.id)"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </button>
+
+            <!-- Tombol Aktifkan — hanya jika status draft -->
+            <button
+              v-if="row.status === 'draft'"
+              class="btn-icon btn-icon--success"
+              :class="{ 'opacity-50 pointer-events-none': activatingId === row.id }"
+              title="Aktifkan Periode"
+              @click="confirmActivate(row)"
+            >
+              <svg v-if="activatingId === row.id" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+
+            <!-- Tombol Kirim Undangan Massal — hanya jika status aktif -->
+            <button
+              v-if="row.status === 'aktif'"
+              class="btn-icon btn-icon--primary"
+              :class="{ 'opacity-50 pointer-events-none': blastingId === row.id }"
+              title="Kirim Undangan Massal"
+              @click="confirmBlast(row)"
+            >
+              <svg v-if="blastingId === row.id" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </button>
+
+            <!-- Tombol Tutup — hanya jika status aktif -->
+            <button
+              v-if="row.status === 'aktif'"
+              class="btn-icon btn-icon--danger"
+              :class="{ 'opacity-50 pointer-events-none': closingId === row.id }"
+              title="Tutup Periode"
+              @click="confirmClose(row)"
+            >
+              <svg v-if="closingId === row.id" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+          </div>
+        </template>
       </DataTable>
-      <Pagination v-if="pagination?.last_page > 1" :meta="pagination" @change="loadPeriods" />
+
+      <Pagination
+        v-if="pagination?.last_page > 1"
+        :meta="pagination"
+        @change="loadPeriods"
+      />
     </div>
 
     <ConfirmModal

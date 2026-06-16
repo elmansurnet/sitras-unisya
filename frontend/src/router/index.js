@@ -42,6 +42,8 @@ const EmployerFormPage           = () => import('@/pages/admin/employers/Employe
 
 // Admin — Questionnaires: pages/admin/questionnaires/
 const QuestionnaireIndexPage     = () => import('@/pages/admin/questionnaires/QuestionnaireIndexPage.vue')
+// Bug #6 fix: pisah antara halaman create (form dasar) dan builder (full editor)
+const QuestionnaireCreatePage    = () => import('@/pages/admin/questionnaires/QuestionnaireCreatePage.vue')
 const QuestionnaireBuilderPage   = () => import('@/pages/admin/questionnaires/QuestionnaireBuilderPage.vue')
 const QuestionnairePreviewPage   = () => import('@/pages/admin/questionnaires/QuestionnairePreviewPage.vue')
 
@@ -283,10 +285,11 @@ const routes = [
           breadcrumbs: [{ label: 'Kuesioner' }],
         },
       },
+      // Bug #6 fix: /create → QuestionnaireCreatePage (bukan langsung builder)
       {
         path: 'questionnaires/create',
         name: 'admin.questionnaires.create',
-        component: QuestionnaireBuilderPage,
+        component: QuestionnaireCreatePage,
         meta: {
           title: 'Buat Kuesioner',
           breadcrumbs: [
@@ -295,6 +298,7 @@ const routes = [
           ],
         },
       },
+      // /builder/:id → full builder (selalu butuh ID yang valid)
       {
         path: 'questionnaires/:id/builder',
         name: 'admin.questionnaires.builder',
