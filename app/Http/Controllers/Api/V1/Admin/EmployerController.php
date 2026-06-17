@@ -210,6 +210,9 @@ class EmployerController extends Controller
     /**
      * Build resource array untuk detail view.
      * survey_token TIDAK diekspos ke response (keamanan).
+     *
+     * BUGFIX: $a->full_name (bukan $a->fullname) — sesuai kolom tabel alumni
+     * di 02_DATABASE.md §2.3 dan Alumni::$fillable.
      */
     private function buildDetailResource(Employer $employer): array
     {
@@ -247,7 +250,7 @@ class EmployerController extends Controller
             'alumni'                  => $employer->alumni->map(fn ($a) => [
                 'id'       => $a->id,
                 'nim'      => $a->nim,
-                'fullname' => $a->fullname,
+                'full_name' => $a->full_name,   // FIX: was $a->fullname (typo) → HTTP 500
                 'pivot'    => ['is_verified' => (bool) $a->pivot->is_verified],
             ]),
         ];
