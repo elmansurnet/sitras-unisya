@@ -3,7 +3,7 @@
     <!-- Back + actions -->
     <div class="flex flex-wrap items-center justify-between gap-4">
       <button
-        @click="$router.push({ name: 'admin.employers.index' })"
+        @click="$router.push({ name: 'admin.employer.index' })"
         class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
       >
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -13,7 +13,7 @@
       </button>
       <div class="flex flex-wrap gap-2">
         <button
-          @click="$router.push({ name: 'admin.employers.edit', params: { id: route.params.id } })"
+          @click="$router.push({ name: 'admin.employer.edit', params: { id: route.params.id } })"
           class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
         >
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -140,7 +140,7 @@
               class="flex items-center justify-between py-3"
             >
               <div>
-                <p class="text-sm font-medium text-gray-800">{{ alumni.fullname }}</p>
+                <p class="text-sm font-medium text-gray-800">{{ alumni.full_name }}</p>
                 <p class="text-xs text-gray-400">NIM: {{ alumni.nim }}</p>
               </div>
               <span
@@ -292,10 +292,10 @@ function openSendModal() { showSendModal.value = true }
 async function handleSendToken() {
   try {
     await store.sendSurveyToken(route.params.id, selectedChannel.value)
-    toast('Token survei berhasil dikirim.', 'success')
+    toast.success('Token survei berhasil dikirim.')
     showSendModal.value = false
   } catch {
-    toast(store.error ?? 'Gagal mengirim token.', 'error')
+    toast.error(store.error ?? 'Gagal mengirim token.')
   }
 }
 
@@ -303,9 +303,9 @@ async function handleRegenerate() {
   if (!confirm('Regenerate token akan membatalkan token lama yang sudah dikirim. Lanjutkan?')) return
   try {
     await store.regenerateToken(route.params.id)
-    toast('Token berhasil di-regenerate.', 'success')
+    toast.success('Token berhasil di-regenerate.')
   } catch {
-    toast(store.error ?? 'Gagal regenerate token.', 'error')
+    toast.error(store.error ?? 'Gagal regenerate token.')
   }
 }
 
@@ -313,10 +313,10 @@ async function confirmDelete() {
   if (!confirm(`Hapus employer "${store.current?.company_name}"? Tindakan ini tidak dapat dibatalkan.`)) return
   try {
     await store.destroy(route.params.id)
-    toast('Employer berhasil dihapus.', 'success')
-    router.push({ name: 'admin.employers.index' })
+    toast.success('Employer berhasil dihapus.')
+    router.push({ name: 'admin.employer.index' })
   } catch {
-    toast(store.error ?? 'Gagal menghapus employer.', 'error')
+    toast.error(store.error ?? 'Gagal menghapus employer.')
   }
 }
 
