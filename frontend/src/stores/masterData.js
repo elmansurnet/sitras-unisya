@@ -13,7 +13,6 @@ export const useMasterDataStore = defineStore('masterData', {
     graduationYears: [],
     loadingGraduationYears: false,
 
-    // BUG #4a FIX: tambah industry sectors state
     industrySectors: [],
     loadingIndustrySectors: false,
 
@@ -42,9 +41,9 @@ export const useMasterDataStore = defineStore('masterData', {
         .sort((a, b) => b.year - a.year)
         .map((gy) => ({ value: gy.id, label: String(gy.year) })),
 
-    // BUG #4a FIX: getter untuk dropdown industry sector
+    // industrySectorOptions: bind ke s.name karena employers.industry_sector = VARCHAR
     industrySectorOptions: (state) =>
-      state.industrySectors.map((s) => ({ value: s.id, label: s.name })),
+      state.industrySectors.map((s) => ({ value: s.name, label: s.name })),
   },
 
   actions: {
@@ -130,19 +129,43 @@ export const useMasterDataStore = defineStore('masterData', {
       return this._mutate('delete', `/admin/graduation-years/${id}`, null, this.fetchGraduationYears)
     },
 
-    // ═══ INDUSTRY SECTORS (BUG #4a FIX) ═════════════════════════════════════
+    // ═══ INDUSTRY SECTORS ════════════════════════════════════════════════════
+    // Endpoint: GET /api/v1/admin/industry-sectors?status=1
+    // Hanya ambil sektor aktif (is_active=1) untuk keperluan dropdown
 
     async fetchIndustrySectors() {
+      if (this.industrySectors.length > 0) return // cache sederhana
       this.loadingIndustrySectors = true
       this.error = null
       try {
-        const { data } = await api.get('/admin/industry-sectors')
+        const { data } = await api.get('/admin/industry-sectors', { params: { status: 1 } })
         this.industrySectors = data.data ?? []
       } catch (err) {
         this.error = err.response?.data?.message ?? 'Gagal memuat sektor industri'
       } finally {
         this.loadingIndustrySectors = false
       }
+    },
+
+    async createIndustrySector(payload) {
+      return this._mutate('post', '/admin/industry-sectors', payload, () => {
+        this.industrySectors = [] // reset cache agar refetch
+        return this.fetchIndustrySectors()
+      })
+    },
+
+    async updateIndustrySector(id, payload) {
+      return this._mutate('put', `/admin/industry-sectors/${id}`, payload, () => {
+        this.industrySectors = []
+        return this.fetchIndustrySectors()
+      })
+    },
+
+    async deleteIndustrySector(id) {
+      return this._mutate('delete', `/admin/industry-sectors/${id}`, null, () => {
+        this.industrySectors = []
+        return this.fetchIndustrySectors()
+      })
     },
 
     // ═══ PUBLIC (no-auth) ════════════════════════════════════════════════════

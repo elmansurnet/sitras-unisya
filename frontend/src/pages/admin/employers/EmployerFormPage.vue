@@ -2,11 +2,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useEmployerStore } from '@/stores/employer'
+import { useMasterDataStore } from '@/stores/masterData'
 import { useToast } from '@/composables/useToast'
 
 const route = useRoute()
 const router = useRouter()
 const employerStore = useEmployerStore()
+const masterData = useMasterDataStore()
 const { toast } = useToast()
 
 const isEdit = computed(() => !!route.params.id)
@@ -45,10 +47,11 @@ const COMPANY_TYPE_OPTIONS = [
 ]
 
 const COMPANY_SCALE_OPTIONS = [
-  { value: 'micro',  label: 'Mikro (< 10 karyawan)' },
-  { value: 'small',  label: 'Kecil (10–49 karyawan)' },
-  { value: 'medium', label: 'Menengah (50–249 karyawan)' },
-  { value: 'large',  label: 'Besar (≥ 250 karyawan)' },
+  { value: 'mikro',        label: 'Mikro (< 10 karyawan)' },
+  { value: 'kecil',        label: 'Kecil (10–49 karyawan)' },
+  { value: 'menengah',     label: 'Menengah (50–249 karyawan)' },
+  { value: 'besar',        label: 'Besar (≥ 250 karyawan)' },
+  { value: 'multinasional',label: 'Multinasional' },
 ]
 
 function normalizePhone(localNumber) {
@@ -61,6 +64,9 @@ function normalizePhone(localNumber) {
 }
 
 onMounted(async () => {
+  // Muat sektor industri aktif untuk dropdown
+  await masterData.fetchIndustrySectors()
+
   if (isEdit.value) {
     await employerStore.fetchById(employerId.value)
     if (employerStore.current) {
@@ -140,7 +146,7 @@ function fieldError(key) {
       </h1>
     </div>
 
-    <form @submit.prevent="handleSubmit" novalidate>
+    <form novalidate @submit.prevent="handleSubmit">
 
       <!-- Data Perusahaan -->
       <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm mb-5">
@@ -177,14 +183,25 @@ function fieldError(key) {
             <p v-if="fieldError('company_type')" class="mt-1 text-xs text-red-500">{{ fieldError('company_type') }}</p>
           </div>
 
+          <!-- Sektor Industri — dropdown dari tabel industry_sectors (is_active=1) -->
           <div>
             <label class="mb-1 block text-sm font-medium text-gray-700">Sektor Industri</label>
-            <input
+            <select
               v-model="form.industry_sector"
-              type="text"
               class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              placeholder="Teknologi, Pendidikan, Kesehatan, dst."
-            />
+              :disabled="masterData.loadingIndustrySectors"
+            >
+              <option value="">
+                {{ masterData.loadingIndustrySectors ? 'Memuat...' : '-- Pilih sektor industri --' }}
+              </option>
+              <option
+                v-for="opt in masterData.industrySectorOptions"
+                :key="opt.value"
+                :value="opt.value"
+              >
+                {{ opt.label }}
+              </option>
+            </select>
             <p v-if="fieldError('industry_sector')" class="mt-1 text-xs text-red-500">{{ fieldError('industry_sector') }}</p>
           </div>
 
@@ -375,8 +392,8 @@ function fieldError(key) {
       <div class="flex items-center justify-end gap-3">
         <button
           type="button"
-          @click="router.push({ name: 'admin.employer.index' })"
           class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          @click="router.push({ name: 'admin.employer.index' })"
         >
           Batal
         </button>
