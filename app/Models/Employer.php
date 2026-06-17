@@ -95,8 +95,11 @@ class Employer extends Model
     public function alumni(): BelongsToMany
     {
         return $this->belongsToMany(Alumni::class, 'alumni_employer')
-                    ->withPivot('is_verified')
-                    ->withTimestamps();
+                    ->withPivot('is_verified', 'created_at');
+        // CATATAN: withTimestamps() DIHAPUS — tabel alumni_employer hanya memiliki
+        // created_at, TIDAK ADA updated_at. withTimestamps() menyebabkan
+        // SQLSTATE[42S22] HTTP 500 pada GET /api/v1/admin/employers/{id}.
+        // Sesuai 02_DATABASE.md §2.x skema tabel alumni_employer.
     }
 
     public function workHistories(): HasMany
