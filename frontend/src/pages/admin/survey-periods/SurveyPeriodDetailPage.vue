@@ -7,25 +7,11 @@
  * Mode:
  *  - Create : route admin.survey-periods.create  (id = undefined)
  *  - Edit   : route admin.survey-periods.detail  (id = :id)
- *
- * Fitur:
- *  - Form: nama, tahun akademik, start_date, end_date, questionnaire, target angkatan
- *  - Load daftar kuesioner (store questionnaire atau endpoint GET /admin/questionnaires)
- *  - Load daftar graduation years untuk multi-select angkatan target
- *  - Simpan (create/update) → redirect ke index
- *  - Aktifkan / Tutup langsung dari halaman detail
- *  - Kirim Undangan Blast dengan konfirmasi
- *  - Readonly form saat status = ditutup
- *  - Tabel respons singkat (nama alumni, status, submitted_at)
- *
- * Store   : useSurveyAdminStore
- * Route   : /admin/survey-periods/create
- *           /admin/survey-periods/:id
  */
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter }             from 'vue-router'
-import { useSurveyAdminStore }             from '@/stores/surveyAdmin'
-import { useToast }                        from '@/composables/useToast'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter }      from 'vue-router'
+import { useSurveyAdminStore }      from '@/stores/surveyAdmin'
+import { useToast }                 from '@/composables/useToast'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import Badge        from '@/components/common/Badge.vue'
 import Pagination   from '@/components/common/Pagination.vue'
@@ -34,13 +20,13 @@ import api          from '@/services/api'
 const route  = useRoute()
 const router = useRouter()
 const store  = useSurveyAdminStore()
-const toast  = useToast()
+const { toast } = useToast()
 
 // ---------------------------------------------------------------------------
 // Mode
 // ---------------------------------------------------------------------------
-const isCreate = computed(() => !route.params.id)
-const periodId = computed(() => route.params.id ? Number(route.params.id) : null)
+const isCreate  = computed(() => !route.params.id)
+const periodId  = computed(() => route.params.id ? Number(route.params.id) : null)
 
 // ---------------------------------------------------------------------------
 // Form state
@@ -51,51 +37,46 @@ const form = ref({
   start_date              : '',
   end_date                : '',
   questionnaire_id        : '',
-  target_graduation_years : [],   // array of graduation_year id
+  target_graduation_years : [],
   description             : '',
 })
 
-const formErrors   = ref({})
-const saving       = ref(false)
-const pageLoading  = ref(false)
+const formErrors    = ref({})
+const saving        = ref(false)
+const pageLoading   = ref(false)
 const currentPeriod = ref(null)
 
-// Opsi dropdown
-const questionnaires    = ref([])   // { id, title }
-const graduationYears   = ref([])   // { id, year }
+const questionnaires  = ref([])
+const graduationYears = ref([])
 
-// Confirm modal
-const confirmModal = ref({ open: false, title: '', message: '', onConfirm: null })
+// Confirm modal — v-model binding
+const showConfirm     = ref(false)
+const confirmTitle    = ref('')
+const confirmMessage  = ref('')
+const confirmAction   = ref(null)
 
-// Blast state
+// Action loading states
 const blasting   = ref(false)
 const activating = ref(false)
 const closing    = ref(false)
 
 // Responses mini-table
-const responses     = ref([])
-const responsesPage = ref(1)
-const responsesTotal= ref(0)
+const responses        = ref([])
+const responsesPage    = ref(1)
+const responsesTotal   = ref(0)
 const responsesLoading = ref(false)
 
 // ---------------------------------------------------------------------------
 // Computed
 // ---------------------------------------------------------------------------
-const isReadonly = computed(() => currentPeriod.value?.status === 'ditutup')
+const isReadonly   = computed(() => currentPeriod.value?.status === 'ditutup')
 const periodStatus = computed(() => currentPeriod.value?.status ?? null)
-
-const responseColumns = [
-  { key: 'alumni_name',    label: 'Alumni' },
-  { key: 'status',         label: 'Status' },
-  { key: 'completion',     label: 'Progres', align: 'center' },
-  { key: 'submitted_at',   label: 'Dikirim Pada' },
-]
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 function formatDate(d) {
-  if (!d) return '-'
+  if (!d) return '—'
   return new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
@@ -103,9 +84,7 @@ function badgeVariant(status) {
   return { draft: 'secondary', aktif: 'success', ditutup: 'danger', selesai: 'primary' }[status] ?? 'secondary'
 }
 
-function clearError(field) {
-  delete formErrors.value[field]
-}
+function clearError(field) { delete formErrors.value[field] }
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -113,10 +92,7 @@ function clearError(field) {
 onMounted(async () => {
   pageLoading.value = true
   try {
-    await Promise.all([
-      loadQuestionnaires(),
-      loadGraduationYears(),
-    ])
+    await Promise.all([ loadQuestionnaires(), loadGraduationYears() ])
     if (!isCreate.value) {
       await loadPeriod()
       await loadResponses()
@@ -130,25 +106,21 @@ async function loadQuestionnaires() {
   try {
     const { data } = await api.get('/admin/questionnaires', { params: { per_page: 100, status: 'aktif' } })
     questionnaires.value = data.data ?? []
-  } catch {
-    // silent — dropdown dikosongkan
-  }
+  } catch { /* silent */ }
 }
 
 async function loadGraduationYears() {
   try {
-    const { data } = await api.get('/admin/settings/graduation-years', { params: { per_page: 100 } })
+    // Fix: endpoint yang benar adalah /admin/graduation-years (bukan /admin/settings/graduation-years)
+    const { data } = await api.get('/admin/graduation-years', { params: { per_page: 100 } })
     graduationYears.value = data.data ?? []
-  } catch {
-    // silent
-  }
+  } catch { /* silent */ }
 }
 
 async function loadPeriod() {
   try {
     const data = await store.fetchPeriod(periodId.value)
     currentPeriod.value = data
-    // Isi form dari data period
     form.value = {
       name                    : data.name ?? '',
       academic_year           : data.academic_year ?? '',
@@ -174,15 +146,13 @@ async function loadResponses(page = 1) {
     responses.value      = data.data ?? []
     responsesTotal.value = data.meta?.total ?? 0
     responsesPage.value  = page
-  } catch {
-    // silent — tabel dikosongkan
-  } finally {
+  } catch { /* silent */ } finally {
     responsesLoading.value = false
   }
 }
 
 // ---------------------------------------------------------------------------
-// Validasi form sederhana
+// Validasi form
 // ---------------------------------------------------------------------------
 function validateForm() {
   const errors = {}
@@ -228,33 +198,42 @@ async function handleSave() {
 }
 
 // ---------------------------------------------------------------------------
-// Aksi status
+// Aksi status — buka ConfirmModal via v-model
 // ---------------------------------------------------------------------------
+function openConfirm(title, message, action) {
+  confirmTitle.value   = title
+  confirmMessage.value = message
+  confirmAction.value  = action
+  showConfirm.value    = true
+}
+
+function handleConfirm() {
+  if (confirmAction.value) confirmAction.value()
+  // v-model di ConfirmModal akan set false via emit update:modelValue
+}
+
 function confirmActivate() {
-  confirmModal.value = {
-    open    : true,
-    title   : 'Aktifkan Periode',
-    message : `Aktifkan periode "${currentPeriod.value?.name}"? Alumni bisa diundang setelah periode aktif.`,
-    onConfirm: doActivate,
-  }
+  openConfirm(
+    'Aktifkan Periode',
+    `Aktifkan periode "${currentPeriod.value?.name}"? Alumni bisa diundang setelah periode aktif.`,
+    doActivate,
+  )
 }
 
 function confirmClose() {
-  confirmModal.value = {
-    open    : true,
-    title   : 'Tutup Periode',
-    message : 'Menutup periode ini akan menghentikan penerimaan jawaban. Tindakan tidak dapat dibatalkan.',
-    onConfirm: doClose,
-  }
+  openConfirm(
+    'Tutup Periode',
+    'Menutup periode ini akan menghentikan penerimaan jawaban. Tindakan tidak dapat dibatalkan.',
+    doClose,
+  )
 }
 
 function confirmBlast() {
-  confirmModal.value = {
-    open    : true,
-    title   : 'Kirim Undangan Massal',
-    message : `Kirim undangan survei ke semua alumni target periode ini? Proses berjalan di background queue dan mungkin memakan beberapa menit.`,
-    onConfirm: doBlast,
-  }
+  openConfirm(
+    'Kirim Undangan Massal',
+    'Kirim undangan survei ke semua alumni target periode ini? Proses berjalan di background queue dan mungkin memakan beberapa menit.',
+    doBlast,
+  )
 }
 
 async function doActivate() {
@@ -295,15 +274,6 @@ async function doBlast() {
   }
 }
 
-function handleConfirm() {
-  if (confirmModal.value.onConfirm) confirmModal.value.onConfirm()
-  confirmModal.value.open = false
-}
-
-function handleCancelConfirm() {
-  confirmModal.value.open = false
-}
-
 // ---------------------------------------------------------------------------
 // Checkbox multi-select angkatan
 // ---------------------------------------------------------------------------
@@ -319,141 +289,136 @@ function isYearSelected(yearId) {
 </script>
 
 <template>
-  <div class="survey-period-detail">
+  <div>
     <!-- Loading overlay -->
-    <div v-if="pageLoading" class="page-loading">
-      <span class="spinner spinner--lg" aria-label="Memuat data..."/>
+    <div v-if="pageLoading" class="flex items-center justify-center py-24">
+      <svg class="h-8 w-8 animate-spin text-teal-600" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+      </svg>
     </div>
 
     <template v-else>
-      <!-- ── Breadcrumb & Header ──────────────────────────────────────── -->
-      <div class="page-header">
-        <div class="page-header__left">
-          <button class="back-btn" @click="router.push({ name: 'admin.survey-periods.index' })">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <polyline points="15 18 9 12 15 6"/>
+      <!-- ── Header ──────────────────────────────────────────────────── -->
+      <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center gap-3">
+          <button
+            class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
+            @click="router.push({ name: 'admin.survey-periods.index' })"
+          >
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
             </svg>
             Kembali
           </button>
-          <h1 class="page-title">
+          <h1 class="text-xl font-semibold text-gray-900">
             {{ isCreate ? 'Buat Periode Survei' : currentPeriod?.name ?? 'Detail Periode' }}
           </h1>
-          <Badge v-if="periodStatus" :variant="badgeVariant(periodStatus)" class="status-badge">
+          <Badge v-if="periodStatus" :variant="badgeVariant(periodStatus)">
             {{ { draft: 'Draft', aktif: 'Aktif', ditutup: 'Ditutup' }[periodStatus] ?? periodStatus }}
           </Badge>
         </div>
 
         <!-- Tombol aksi status (hanya mode edit) -->
-        <div v-if="!isCreate" class="header-actions">
+        <div v-if="!isCreate" class="flex flex-wrap gap-2">
           <button
             v-if="periodStatus === 'draft'"
-            class="btn btn-success"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
             :disabled="activating"
             @click="confirmActivate"
           >
-            <span v-if="activating" class="spinner spinner--xs" aria-hidden="true"/>
+            <svg v-if="activating" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
             <span v-else>Aktifkan</span>
           </button>
 
           <button
             v-if="periodStatus === 'aktif'"
-            class="btn btn-primary"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
             :disabled="blasting"
             @click="confirmBlast"
           >
-            <span v-if="blasting" class="spinner spinner--xs" aria-hidden="true"/>
-            <span v-else>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="display:inline;vertical-align:-2px"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <svg v-if="blasting" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            <template v-else>
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
               Kirim Undangan
-            </span>
+            </template>
           </button>
 
           <button
             v-if="periodStatus === 'aktif'"
-            class="btn btn-danger"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
             :disabled="closing"
             @click="confirmClose"
           >
-            <span v-if="closing" class="spinner spinner--xs" aria-hidden="true"/>
+            <svg v-if="closing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
             <span v-else>Tutup Periode</span>
           </button>
         </div>
       </div>
 
       <!-- ── Form Card ────────────────────────────────────────────────── -->
-      <div class="card form-card">
-        <h2 class="card-section-title">Informasi Periode</h2>
+      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm mb-6">
+        <h2 class="mb-5 text-base font-semibold text-gray-900">Informasi Periode</h2>
 
-        <fieldset :disabled="isReadonly" class="form-fieldset">
-          <div class="form-grid">
+        <fieldset :disabled="isReadonly" class="border-0 p-0 m-0">
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <!-- Nama -->
-            <div class="form-group form-group--wide">
-              <label class="form-label" for="sp-name">Nama Periode <span class="required">*</span></label>
+            <div class="sm:col-span-2">
+              <label class="mb-1.5 block text-sm font-medium text-gray-700" for="sp-name">
+                Nama Periode <span class="text-red-500">*</span>
+              </label>
               <input
                 id="sp-name"
                 v-model="form.name"
                 type="text"
-                class="form-input"
-                :class="{ 'form-input--error': formErrors.name }"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none disabled:bg-gray-50 disabled:opacity-60"
+                :class="{ 'border-red-400': formErrors.name }"
                 placeholder="Contoh: Tracer Study Angkatan 2020"
                 maxlength="255"
                 @input="clearError('name')"
               />
-              <p v-if="formErrors.name" class="form-error">{{ formErrors.name }}</p>
+              <p v-if="formErrors.name" class="mt-1 text-xs text-red-500">{{ formErrors.name }}</p>
             </div>
 
             <!-- Tahun Akademik -->
-            <div class="form-group">
-              <label class="form-label" for="sp-academic-year">Tahun Akademik <span class="required">*</span></label>
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-gray-700" for="sp-academic-year">
+                Tahun Akademik <span class="text-red-500">*</span>
+              </label>
               <input
                 id="sp-academic-year"
                 v-model="form.academic_year"
                 type="text"
-                class="form-input"
-                :class="{ 'form-input--error': formErrors.academic_year }"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none disabled:bg-gray-50 disabled:opacity-60"
+                :class="{ 'border-red-400': formErrors.academic_year }"
                 placeholder="2024/2025"
                 maxlength="20"
                 @input="clearError('academic_year')"
               />
-              <p v-if="formErrors.academic_year" class="form-error">{{ formErrors.academic_year }}</p>
-            </div>
-
-            <!-- Start Date -->
-            <div class="form-group">
-              <label class="form-label" for="sp-start">Tanggal Mulai <span class="required">*</span></label>
-              <input
-                id="sp-start"
-                v-model="form.start_date"
-                type="date"
-                class="form-input"
-                :class="{ 'form-input--error': formErrors.start_date }"
-                @change="clearError('start_date')"
-              />
-              <p v-if="formErrors.start_date" class="form-error">{{ formErrors.start_date }}</p>
-            </div>
-
-            <!-- End Date -->
-            <div class="form-group">
-              <label class="form-label" for="sp-end">Tanggal Selesai <span class="required">*</span></label>
-              <input
-                id="sp-end"
-                v-model="form.end_date"
-                type="date"
-                class="form-input"
-                :class="{ 'form-input--error': formErrors.end_date }"
-                @change="clearError('end_date')"
-              />
-              <p v-if="formErrors.end_date" class="form-error">{{ formErrors.end_date }}</p>
+              <p v-if="formErrors.academic_year" class="mt-1 text-xs text-red-500">{{ formErrors.academic_year }}</p>
             </div>
 
             <!-- Questionnaire -->
-            <div class="form-group form-group--wide">
-              <label class="form-label" for="sp-questionnaire">Kuesioner <span class="required">*</span></label>
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-gray-700" for="sp-questionnaire">
+                Kuesioner <span class="text-red-500">*</span>
+              </label>
               <select
                 id="sp-questionnaire"
                 v-model="form.questionnaire_id"
-                class="form-input"
-                :class="{ 'form-input--error': formErrors.questionnaire_id }"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none disabled:bg-gray-50 disabled:opacity-60"
+                :class="{ 'border-red-400': formErrors.questionnaire_id }"
                 @change="clearError('questionnaire_id')"
               >
                 <option value="" disabled>— Pilih kuesioner —</option>
@@ -461,17 +426,51 @@ function isYearSelected(yearId) {
                   {{ q.title }}
                 </option>
               </select>
-              <p v-if="formErrors.questionnaire_id" class="form-error">{{ formErrors.questionnaire_id }}</p>
-              <p class="form-hint">Kuesioner yang ditampilkan hanya yang berstatus aktif.</p>
+              <p v-if="formErrors.questionnaire_id" class="mt-1 text-xs text-red-500">{{ formErrors.questionnaire_id }}</p>
+              <p class="mt-1 text-xs text-gray-400">Hanya kuesioner berstatus aktif yang ditampilkan.</p>
+            </div>
+
+            <!-- Start Date -->
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-gray-700" for="sp-start">
+                Tanggal Mulai <span class="text-red-500">*</span>
+              </label>
+              <input
+                id="sp-start"
+                v-model="form.start_date"
+                type="date"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none disabled:bg-gray-50 disabled:opacity-60"
+                :class="{ 'border-red-400': formErrors.start_date }"
+                @change="clearError('start_date')"
+              />
+              <p v-if="formErrors.start_date" class="mt-1 text-xs text-red-500">{{ formErrors.start_date }}</p>
+            </div>
+
+            <!-- End Date -->
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-gray-700" for="sp-end">
+                Tanggal Selesai <span class="text-red-500">*</span>
+              </label>
+              <input
+                id="sp-end"
+                v-model="form.end_date"
+                type="date"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none disabled:bg-gray-50 disabled:opacity-60"
+                :class="{ 'border-red-400': formErrors.end_date }"
+                @change="clearError('end_date')"
+              />
+              <p v-if="formErrors.end_date" class="mt-1 text-xs text-red-500">{{ formErrors.end_date }}</p>
             </div>
 
             <!-- Deskripsi -->
-            <div class="form-group form-group--full">
-              <label class="form-label" for="sp-desc">Deskripsi <span class="optional">(opsional)</span></label>
+            <div class="sm:col-span-2">
+              <label class="mb-1.5 block text-sm font-medium text-gray-700" for="sp-desc">
+                Deskripsi <span class="text-xs font-normal text-gray-400">(opsional)</span>
+              </label>
               <textarea
                 id="sp-desc"
                 v-model="form.description"
-                class="form-input form-textarea"
+                class="w-full resize-y rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none disabled:bg-gray-50 disabled:opacity-60"
                 rows="3"
                 placeholder="Catatan atau keterangan tambahan tentang periode ini"
                 maxlength="1000"
@@ -480,16 +479,20 @@ function isYearSelected(yearId) {
           </div>
 
           <!-- Target Angkatan -->
-          <div class="form-group form-group--full" style="margin-top: var(--space-4)">
-            <label class="form-label">Target Angkatan Lulus <span class="optional">(kosongkan = semua angkatan)</span></label>
-            <div class="year-checkboxes">
+          <div class="mt-5">
+            <label class="mb-2 block text-sm font-medium text-gray-700">
+              Target Angkatan Lulus
+              <span class="text-xs font-normal text-gray-400">(kosongkan = semua angkatan)</span>
+            </label>
+            <div v-if="graduationYears.length" class="flex flex-wrap gap-x-6 gap-y-2">
               <label
                 v-for="gy in graduationYears"
                 :key="gy.id"
-                class="year-checkbox"
+                class="flex cursor-pointer items-center gap-2 text-sm text-gray-700"
               >
                 <input
                   type="checkbox"
+                  class="h-4 w-4 rounded accent-teal-600"
                   :checked="isYearSelected(gy.id)"
                   :disabled="isReadonly"
                   @change="toggleGraduationYear(gy.id)"
@@ -497,353 +500,126 @@ function isYearSelected(yearId) {
                 {{ gy.year }}
               </label>
             </div>
+            <p v-else class="text-sm text-gray-400">Data angkatan belum tersedia.</p>
           </div>
         </fieldset>
 
-        <!-- Tombol simpan -->
-        <div v-if="!isReadonly" class="form-actions">
+        <!-- Form actions -->
+        <div v-if="!isReadonly" class="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-5">
           <button
-            class="btn btn-ghost"
+            class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
             @click="router.push({ name: 'admin.survey-periods.index' })"
           >
             Batal
           </button>
           <button
-            class="btn btn-primary"
+            class="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
             :disabled="saving"
             @click="handleSave"
           >
-            <span v-if="saving" class="spinner spinner--xs" aria-hidden="true"/>
-            <span v-else>{{ isCreate ? 'Buat Periode' : 'Simpan Perubahan' }}</span>
+            <svg v-if="saving" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            {{ isCreate ? 'Buat Periode' : 'Simpan Perubahan' }}
           </button>
         </div>
 
-        <!-- Info readonly -->
-        <div v-else class="readonly-notice">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        <!-- Readonly notice -->
+        <div v-else class="mt-5 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="12" stroke-width="2"/><line x1="12" y1="16" x2="12.01" y2="16" stroke-width="2"/>
           </svg>
           Periode ini sudah ditutup. Data tidak dapat diubah.
         </div>
       </div>
 
       <!-- ── Tabel Respons (hanya mode edit) ─────────────────────────── -->
-      <div v-if="!isCreate" class="card responses-card">
-        <div class="card-header">
-          <h2 class="card-section-title">Respons Alumni</h2>
-          <span class="response-meta">Total: {{ responsesTotal }} respons</span>
+      <div v-if="!isCreate" class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <!-- Card header -->
+        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+          <h2 class="text-base font-semibold text-gray-900">Respons Alumni</h2>
+          <span class="text-sm text-gray-400">Total: {{ responsesTotal }} respons</span>
         </div>
 
-        <div v-if="responsesLoading" class="loading-block">
-          <span class="spinner" aria-label="Memuat respons..."/>
+        <!-- Loading -->
+        <div v-if="responsesLoading" class="flex justify-center py-8">
+          <svg class="h-6 w-6 animate-spin text-teal-600" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+          </svg>
         </div>
 
         <template v-else>
-          <div v-if="responses.length === 0" class="empty-state">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="empty-icon">
-              <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/>
+          <!-- Empty state -->
+          <div v-if="responses.length === 0" class="flex flex-col items-center py-12 text-center">
+            <svg class="mb-3 h-10 w-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <p>Belum ada alumni yang mengisi survei pada periode ini.</p>
+            <p class="text-sm text-gray-500">Belum ada alumni yang mengisi survei pada periode ini.</p>
           </div>
 
-          <table v-else class="responses-table">
-            <thead>
-              <tr>
-                <th>Alumni</th>
-                <th>Status</th>
-                <th style="text-align:center">Progres</th>
-                <th>Dikirim Pada</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in responses" :key="r.id">
-                <td>
-                  <div class="alumni-name">{{ r.alumni?.name ?? '—' }}</div>
-                  <div class="alumni-nim">{{ r.alumni?.nim ?? '' }}</div>
-                </td>
-                <td>
-                  <Badge :variant="badgeVariant(r.status)">{{ r.status }}</Badge>
-                </td>
-                <td style="text-align:center">
-                  <div class="progress-bar-wrap">
-                    <div class="progress-bar">
-                      <div class="progress-fill" :style="{ width: (r.completion_percentage ?? 0) + '%' }"/>
+          <!-- Table -->
+          <div v-else class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-100 bg-gray-50 text-left">
+                  <th class="px-4 py-3 font-medium text-gray-600">Alumni</th>
+                  <th class="px-4 py-3 font-medium text-gray-600">Status</th>
+                  <th class="px-4 py-3 text-center font-medium text-gray-600">Progres</th>
+                  <th class="px-4 py-3 font-medium text-gray-600">Dikirim Pada</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-50">
+                <tr v-for="r in responses" :key="r.id" class="hover:bg-gray-50">
+                  <td class="px-4 py-3">
+                    <p class="font-medium text-gray-900">{{ r.alumni?.name ?? '—' }}</p>
+                    <p class="text-xs text-gray-400">{{ r.alumni?.nim ?? '' }}</p>
+                  </td>
+                  <td class="px-4 py-3">
+                    <Badge :variant="badgeVariant(r.status)">{{ r.status }}</Badge>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="flex items-center justify-center gap-2">
+                      <div class="h-1.5 w-20 overflow-hidden rounded-full bg-gray-200">
+                        <div
+                          class="h-full rounded-full bg-teal-500 transition-[width]"
+                          :style="{ width: (r.completion_percentage ?? 0) + '%' }"
+                        />
+                      </div>
+                      <span class="min-w-[2.5rem] text-right text-xs tabular-nums text-gray-500">
+                        {{ r.completion_percentage ?? 0 }}%
+                      </span>
                     </div>
-                    <span class="progress-pct">{{ r.completion_percentage ?? 0 }}%</span>
-                  </div>
-                </td>
-                <td class="date-cell">{{ formatDate(r.submitted_at) }}</td>
-              </tr>
-            </tbody>
-          </table>
+                  </td>
+                  <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                    {{ formatDate(r.submitted_at) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-          <!-- Pagination respons -->
-          <Pagination
-            v-if="Math.ceil(responsesTotal / 10) > 1"
-            :current-page="responsesPage"
-            :last-page="Math.ceil(responsesTotal / 10)"
-            :total="responsesTotal"
-            class="table-pagination"
-            @change="loadResponses"
-          />
+          <!-- Pagination -->
+          <div v-if="Math.ceil(responsesTotal / 10) > 1" class="border-t border-gray-100 px-4 py-3">
+            <Pagination
+              :current-page="responsesPage"
+              :last-page="Math.ceil(responsesTotal / 10)"
+              :total="responsesTotal"
+              @change="loadResponses"
+            />
+          </div>
         </template>
       </div>
     </template>
 
-    <!-- ── Confirm Modal ──────────────────────────────────────────────── -->
+    <!-- ── Confirm Modal — v-model binding yang benar ─────────────────── -->
     <ConfirmModal
-      :open="confirmModal.open"
-      :title="confirmModal.title"
-      :message="confirmModal.message"
+      v-model="showConfirm"
+      :title="confirmTitle"
+      :message="confirmMessage"
       @confirm="handleConfirm"
-      @cancel="handleCancelConfirm"
     />
   </div>
 </template>
-
-<style scoped>
-.survey-period-detail { padding: var(--space-6); max-width: 900px; margin-inline: auto; }
-
-/* Loading fullpage */
-.page-loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 300px;
-}
-
-/* Header */
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
-  flex-wrap: wrap;
-}
-.page-header__left { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-.page-title  { font-size: var(--text-xl); font-weight: 700; color: var(--color-text); margin: 0; }
-.status-badge{ flex-shrink: 0; }
-
-.back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  background: none;
-  border: none;
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  padding: var(--space-1) 0;
-}
-.back-btn:hover { color: var(--color-text); }
-
-.header-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
-
-/* Card */
-.card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
-  margin-bottom: var(--space-6);
-}
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-4);
-}
-.card-section-title {
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--color-text);
-  margin: 0 0 var(--space-5) 0;
-}
-.response-meta { font-size: var(--text-sm); color: var(--color-text-muted); }
-
-/* Form */
-.form-fieldset { border: none; padding: 0; margin: 0; }
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-4) var(--space-6);
-}
-.form-group { display: flex; flex-direction: column; gap: var(--space-1); }
-.form-group--wide { grid-column: span 2; }
-.form-group--full { grid-column: 1 / -1; }
-
-.form-label   { font-size: var(--text-sm); font-weight: 500; color: var(--color-text); }
-.required     { color: var(--color-notification); margin-left: 2px; }
-.optional     { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 400; }
-
-.form-input {
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-2);
-  color: var(--color-text);
-  font-size: var(--text-sm);
-  transition: border-color var(--transition-interactive);
-}
-.form-input:focus    { outline: none; border-color: var(--color-primary); }
-.form-input--error   { border-color: var(--color-notification); }
-.form-input:disabled { opacity: 0.6; cursor: not-allowed; }
-.form-textarea       { resize: vertical; min-height: 80px; }
-
-.form-error { font-size: var(--text-xs); color: var(--color-notification); margin: 0; }
-.form-hint  { font-size: var(--text-xs); color: var(--color-text-muted); margin: 0; }
-
-/* Graduation year checkboxes */
-.year-checkboxes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-  margin-top: var(--space-2);
-}
-.year-checkbox {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  user-select: none;
-}
-.year-checkbox input { cursor: pointer; width: 15px; height: 15px; accent-color: var(--color-primary); }
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  margin-top: var(--space-6);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border);
-}
-
-.readonly-notice {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface-offset);
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-/* Responses */
-.responses-card { padding: 0; overflow: hidden; }
-.responses-card .card-header { padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--color-border); margin: 0; }
-.responses-card .card-section-title { margin: 0; }
-
-.responses-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--text-sm);
-}
-.responses-table th {
-  padding: var(--space-3) var(--space-4);
-  text-align: left;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  background: var(--color-surface-offset);
-  border-bottom: 1px solid var(--color-border);
-}
-.responses-table td {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-divider);
-  vertical-align: middle;
-}
-.responses-table tbody tr:last-child td { border-bottom: none; }
-.responses-table tbody tr:hover td      { background: var(--color-surface-offset); }
-
-.alumni-name { font-weight: 500; }
-.alumni-nim  { font-size: var(--text-xs); color: var(--color-text-muted); }
-.date-cell   { font-size: var(--text-xs); color: var(--color-text-muted); white-space: nowrap; }
-
-.progress-bar-wrap { display: flex; align-items: center; gap: var(--space-2); justify-content: center; }
-.progress-bar {
-  width: 80px; height: 6px;
-  background: var(--color-surface-offset-2);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  background: var(--color-primary);
-  border-radius: var(--radius-full);
-  transition: width 0.3s ease;
-}
-.progress-pct { font-size: var(--text-xs); color: var(--color-text-muted); min-width: 30px; text-align: right; }
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--space-12) var(--space-8);
-  color: var(--color-text-muted);
-  gap: var(--space-3);
-  font-size: var(--text-sm);
-}
-.empty-icon { color: var(--color-text-faint); }
-
-.loading-block {
-  display: flex;
-  justify-content: center;
-  padding: var(--space-8);
-}
-
-.table-pagination { padding: var(--space-4) var(--space-6); border-top: 1px solid var(--color-border); }
-
-/* Buttons */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: background var(--transition-interactive), color var(--transition-interactive), border-color var(--transition-interactive);
-  white-space: nowrap;
-}
-.btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.btn-primary { background: var(--color-primary); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
-.btn-success { background: var(--color-success); color: #fff; }
-.btn-success:hover:not(:disabled) { background: var(--color-success-hover); }
-.btn-danger  { background: var(--color-notification); color: #fff; }
-.btn-danger:hover:not(:disabled)  { background: var(--color-notification-hover); }
-.btn-ghost {
-  background: transparent;
-  color: var(--color-text-muted);
-  border-color: var(--color-border);
-}
-.btn-ghost:hover:not(:disabled) { background: var(--color-surface-offset); color: var(--color-text); }
-
-.spinner {
-  display: inline-block;
-  width: 16px; height: 16px;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-.spinner--xs { width: 12px; height: 12px; }
-.spinner--lg { width: 36px; height: 36px; border-width: 3px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-@media (max-width: 640px) {
-  .form-grid { grid-template-columns: 1fr; }
-  .form-group--wide { grid-column: span 1; }
-  .page-header { flex-direction: column; }
-  .responses-table th:nth-child(4),
-  .responses-table td:nth-child(4) { display: none; }
-}
-</style>
