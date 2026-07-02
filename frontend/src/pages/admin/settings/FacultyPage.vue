@@ -4,8 +4,8 @@ import api from '@/services/api'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 
-const { showToast } = useToast()
-const { confirm }   = useConfirm()
+const { toast }   = useToast()
+const { confirm } = useConfirm()
 
 // ─── State ────────────────────────────────────────────────────────────────────
 const faculties   = ref([])
@@ -34,7 +34,7 @@ async function fetchFaculties() {
     const { data } = await api.get('/admin/faculties', { params: { per_page: 100 } })
     faculties.value = data.data
   } catch {
-    showToast('Gagal memuat data fakultas.', 'error')
+    toast.error('Gagal memuat data fakultas.')
   } finally {
     loading.value = false
   }
@@ -52,7 +52,7 @@ async function save() {
       })
       const idx = faculties.value.findIndex((f) => f.id === form.value.id)
       if (idx !== -1) faculties.value[idx] = data.data
-      showToast('Fakultas berhasil diperbarui.', 'success')
+      toast.success('Fakultas berhasil diperbarui.')
     } else {
       const { data } = await api.post('/admin/faculties', {
         name: form.value.name,
@@ -60,14 +60,14 @@ async function save() {
         description: form.value.description,
       })
       faculties.value.unshift(data.data)
-      showToast('Fakultas berhasil ditambahkan.', 'success')
+      toast.success('Fakultas berhasil ditambahkan.')
     }
     closeModal()
   } catch (err) {
     if (err.response?.status === 422) {
       formErrors.value = err.response.data.errors ?? {}
     } else {
-      showToast(err.response?.data?.message ?? 'Gagal menyimpan data.', 'error')
+      toast.error(err.response?.data?.message ?? 'Gagal menyimpan data.')
     }
   } finally {
     saving.value = false
@@ -82,9 +82,9 @@ async function destroy(faculty) {
   try {
     await api.delete(`/admin/faculties/${faculty.id}`)
     faculties.value = faculties.value.filter((f) => f.id !== faculty.id)
-    showToast('Fakultas berhasil dihapus.', 'success')
+    toast.success('Fakultas berhasil dihapus.')
   } catch (err) {
-    showToast(err.response?.data?.message ?? 'Gagal menghapus fakultas.', 'error')
+    toast.error(err.response?.data?.message ?? 'Gagal menghapus fakultas.')
   }
 }
 
@@ -186,10 +186,10 @@ onMounted(fetchFaculties)
             <td class="px-5 py-3 font-medium text-gray-900">{{ faculty.name }}</td>
             <td class="px-5 py-3">
               <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                {{ faculty.study_programs_count ?? faculty.study_programs?.length ?? '—' }} prodi
+                {{ faculty.study_programs_count ?? faculty.study_programs?.length ?? '\u2014' }} prodi
               </span>
             </td>
-            <td class="px-5 py-3 text-gray-500 max-w-xs truncate">{{ faculty.description || '—' }}</td>
+            <td class="px-5 py-3 text-gray-500 max-w-xs truncate">{{ faculty.description || '\u2014' }}</td>
             <td class="px-5 py-3 text-right">
               <div class="flex items-center justify-end gap-2">
                 <button
