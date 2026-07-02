@@ -15,7 +15,13 @@ const filterStatus = ref('')
 const showModal    = ref(false)
 const editMode     = ref(false)
 
-const form = ref({ id: null, year: '', is_active: true })
+const form = ref({
+  id:            null,
+  year:          '',
+  academic_year: '',
+  semester:      'Ganjil',
+  is_active:     true,
+})
 const formErrors = ref({})
 
 const currentYear = new Date().getFullYear()
@@ -28,8 +34,19 @@ const filtered = computed(() => {
 })
 
 const sortedFiltered = computed(() =>
-  [...filtered.value].sort((a, b) => b.year - a.year)
+  [...filtered.value].sort((a, b) => b.year - a.year || a.semester.localeCompare(b.semester))
 )
+
+// ─── Auto-generate academic_year ketika year atau semester berubah ─────────────
+function syncAcademicYear() {
+  const y = Number(form.value.year)
+  if (!y || y < 2000) return
+  if (form.value.semester === 'Ganjil') {
+    form.value.academic_year = `${y - 1}/${y}`
+  } else {
+    form.value.academic_year = `${y}/${y + 1}`
+  }
+}
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 async function fetchYears() {
@@ -49,8 +66,10 @@ async function save() {
   saving.value = true
   try {
     const payload = {
-      year:      Number(form.value.year),
-      is_active: form.value.is_active,
+      year:          Number(form.value.year),
+      academic_year: form.value.academic_year.trim(),
+      semester:      form.value.semester,
+      is_active:     form.value.is_active,
     }
     if (editMode.value) {
       const { data } = await api.put(`/admin/graduation-years/${form.value.id}`, payload)
@@ -75,9 +94,12 @@ async function save() {
 }
 
 async function destroy(year) {
-  const ok = await confirm(
-    `Hapus tahun wisuda ${year.year}? Data alumni yang terhubung tidak akan terhapus.`
-  )
+  const ok = await confirm({
+    title:          'Hapus Tahun Wisuda',
+    message:        `Hapus tahun wisuda ${year.year} (${year.semester})? Data alumni yang terhubung tidak akan terhapus.`,
+    confirmText:    'Ya, Hapus',
+    confirmVariant: 'danger',
+  })
   if (!ok) return
   try {
     await api.delete(`/admin/graduation-years/${year.id}`)
@@ -96,7 +118,7 @@ async function toggleActive(year) {
     const idx = years.value.findIndex((y) => y.id === year.id)
     if (idx !== -1) years.value[idx] = data.data
     toast.success(
-      `Tahun wisuda ${data.data.year} ${data.data.is_active ? 'diaktifkan' : 'dinonaktifkan'}.`
+      `Tahun wisuda ${data.data.year} ${data.data.semester} ${data.data.is_active ? 'diaktifkan' : 'dinonaktifkan'}.`
     )
   } catch {
     toast.error('Gagal mengubah status.')
@@ -105,14 +127,26 @@ async function toggleActive(year) {
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 function openCreate() {
-  form.value = { id: null, year: String(currentYear), is_active: true }
+  form.value = {
+    id:            null,
+    year:          String(currentYear),
+    academic_year: `${currentYear - 1}/${currentYear}`,
+    semester:      'Ganjil',
+    is_active:     true,
+  }
   formErrors.value = {}
   editMode.value  = false
   showModal.value = true
 }
 
 function openEdit(year) {
-  form.value = { id: year.id, year: String(year.year), is_active: year.is_active }
+  form.value = {
+    id:            year.id,
+    year:          String(year.year),
+    academic_year: year.academic_year ?? '',
+    semester:      year.semester ?? 'Ganjil',
+    is_active:     year.is_active,
+  }
   formErrors.value = {}
   editMode.value   = true
   showModal.value  = true
@@ -120,7 +154,7 @@ function openEdit(year) {
 
 function closeModal() {
   showModal.value = false
-  form.value = { id: null, year: '', is_active: true }
+  form.value = { id: null, year: '', academic_year: '', semester: 'Ganjil', is_active: true }
   formErrors.value = {}
 }
 
@@ -160,7 +194,7 @@ onMounted(fetchYears)
 
     <!-- Skeleton -->
     <div v-if="loading" class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-      <div v-for="i in 10" :key="i" class="h-24 animate-pulse rounded-xl bg-gray-100" />
+      <div v-for="i in 10" :key="i" class="h-28 animate-pulse rounded-xl bg-gray-100" />
     </div>
 
     <!-- Empty -->
@@ -183,6 +217,10 @@ onMounted(fetchYears)
         <p class="text-2xl font-bold tabular-nums" :class="year.is_active ? 'text-teal-700' : 'text-gray-400'">
           {{ year.year }}
         </p>
+        <p class="mt-0.5 text-xs font-medium" :class="year.is_active ? 'text-teal-600' : 'text-gray-400'">
+          {{ year.semester }}
+        </p>
+        <p class="mt-0.5 text-xs text-gray-400">{{ year.academic_year }}</p>
         <p class="mt-1 text-xs text-gray-500">
           <span class="font-medium text-gray-700">{{ year.alumni_count ?? 0 }}</span> alumni
         </p>
@@ -229,6 +267,7 @@ onMounted(fetchYears)
             </div>
 
             <form @submit.prevent="save" class="space-y-4">
+              <!-- Tahun Wisuda -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Tahun Wisuda <span class="text-red-500">*</span></label>
                 <input
@@ -237,12 +276,46 @@ onMounted(fetchYears)
                   :min="2000"
                   :max="currentYear + 5"
                   placeholder="Contoh: 2024"
+                  @input="syncAcademicYear"
                   class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                   :class="formErrors.year ? 'border-red-400' : 'border-gray-300'"
                 />
                 <p v-if="formErrors.year" class="mt-1 text-xs text-red-500">{{ formErrors.year[0] }}</p>
               </div>
 
+              <!-- Semester -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Semester <span class="text-red-500">*</span></label>
+                <select
+                  v-model="form.semester"
+                  @change="syncAcademicYear"
+                  class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  :class="formErrors.semester ? 'border-red-400' : 'border-gray-300'"
+                >
+                  <option value="Ganjil">Ganjil</option>
+                  <option value="Genap">Genap</option>
+                </select>
+                <p v-if="formErrors.semester" class="mt-1 text-xs text-red-500">{{ formErrors.semester[0] }}</p>
+              </div>
+
+              <!-- Tahun Akademik -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Tahun Akademik <span class="text-red-500">*</span>
+                  <span class="ml-1 text-xs font-normal text-gray-400">(otomatis terisi)</span>
+                </label>
+                <input
+                  v-model="form.academic_year"
+                  type="text"
+                  placeholder="Contoh: 2023/2024"
+                  maxlength="20"
+                  class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  :class="formErrors.academic_year ? 'border-red-400' : 'border-gray-300'"
+                />
+                <p v-if="formErrors.academic_year" class="mt-1 text-xs text-red-500">{{ formErrors.academic_year[0] }}</p>
+              </div>
+
+              <!-- Status -->
               <div class="flex items-center gap-3">
                 <button
                   type="button"
