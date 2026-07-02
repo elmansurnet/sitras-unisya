@@ -19,7 +19,6 @@ class IndustrySectorController extends Controller
 {
     /**
      * GET /api/v1/admin/industry-sectors
-     * Dukung query params: search, status (1|0), per_page
      */
     public function index(Request $request): JsonResponse
     {
@@ -61,10 +60,10 @@ class IndustrySectorController extends Controller
         $sector = IndustrySector::create($request->validated());
 
         AuditLog::record(
-            module: 'industry_sector',
-            action: 'created',
-            targetType: IndustrySector::class,
-            targetId: $sector->id,
+            action:    'created',
+            module:    'industry_sector',
+            modelType: IndustrySector::class,
+            modelId:   $sector->id,
             newValues: $sector->toArray()
         );
 
@@ -85,10 +84,10 @@ class IndustrySectorController extends Controller
         $industrySector->update($request->validated());
 
         AuditLog::record(
-            module: 'industry_sector',
-            action: 'updated',
-            targetType: IndustrySector::class,
-            targetId: $industrySector->id,
+            action:    'updated',
+            module:    'industry_sector',
+            modelType: IndustrySector::class,
+            modelId:   $industrySector->id,
             oldValues: $oldValues,
             newValues: $industrySector->fresh()->toArray()
         );
@@ -102,7 +101,6 @@ class IndustrySectorController extends Controller
 
     /**
      * DELETE /api/v1/admin/industry-sectors/{industrySector}
-     * Restrict: tidak dapat dihapus jika masih direferensi data alumni.
      */
     public function destroy(IndustrySector $industrySector): JsonResponse
     {
@@ -114,13 +112,14 @@ class IndustrySectorController extends Controller
         }
 
         $oldValues = $industrySector->toArray();
+        $isId      = $industrySector->id;
         $industrySector->delete();
 
         AuditLog::record(
-            module: 'industry_sector',
-            action: 'deleted',
-            targetType: IndustrySector::class,
-            targetId: $industrySector->id,
+            action:    'deleted',
+            module:    'industry_sector',
+            modelType: IndustrySector::class,
+            modelId:   $isId,
             oldValues: $oldValues
         );
 

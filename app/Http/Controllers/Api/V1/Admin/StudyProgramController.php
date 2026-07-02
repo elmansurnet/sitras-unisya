@@ -61,10 +61,10 @@ class StudyProgramController extends Controller
         $studyProgram = StudyProgram::create($request->validated());
 
         AuditLog::record(
-            module: 'study_program',
-            action: 'created',
-            targetType: StudyProgram::class,
-            targetId: $studyProgram->id,
+            action:    'created',
+            module:    'study_program',
+            modelType: StudyProgram::class,
+            modelId:   $studyProgram->id,
             newValues: $studyProgram->toArray()
         );
 
@@ -85,10 +85,10 @@ class StudyProgramController extends Controller
         $studyProgram->update($request->validated());
 
         AuditLog::record(
-            module: 'study_program',
-            action: 'updated',
-            targetType: StudyProgram::class,
-            targetId: $studyProgram->id,
+            action:    'updated',
+            module:    'study_program',
+            modelType: StudyProgram::class,
+            modelId:   $studyProgram->id,
             oldValues: $oldValues,
             newValues: $studyProgram->fresh()->toArray()
         );
@@ -102,7 +102,6 @@ class StudyProgramController extends Controller
 
     /**
      * DELETE /api/v1/admin/study-programs/{study_program}
-     * Restrict: tidak boleh dihapus jika masih ada data alumni terkait.
      */
     public function destroy(StudyProgram $studyProgram): JsonResponse
     {
@@ -114,13 +113,14 @@ class StudyProgramController extends Controller
         }
 
         $oldValues = $studyProgram->toArray();
+        $spId      = $studyProgram->id;
         $studyProgram->delete();
 
         AuditLog::record(
-            module: 'study_program',
-            action: 'deleted',
-            targetType: StudyProgram::class,
-            targetId: $studyProgram->id,
+            action:    'deleted',
+            module:    'study_program',
+            modelType: StudyProgram::class,
+            modelId:   $spId,
             oldValues: $oldValues
         );
 

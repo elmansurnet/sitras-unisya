@@ -19,7 +19,6 @@ class SalaryRangeController extends Controller
 {
     /**
      * GET /api/v1/admin/salary-ranges
-     * Dukung query params: search, status (1|0), per_page
      */
     public function index(Request $request): JsonResponse
     {
@@ -32,8 +31,6 @@ class SalaryRangeController extends Controller
         if ($request->filled('status')) {
             $query->where('is_active', (bool) $request->status);
         }
-
-        $perPage = min((int) ($request->per_page ?? 50), 200);
 
         $ranges = $query->orderBy('order_number')->orderBy('label')->get();
 
@@ -62,10 +59,10 @@ class SalaryRangeController extends Controller
         $range = SalaryRange::create($request->validated());
 
         AuditLog::record(
-            module: 'salary_range',
-            action: 'created',
-            targetType: SalaryRange::class,
-            targetId: $range->id,
+            action:    'created',
+            module:    'salary_range',
+            modelType: SalaryRange::class,
+            modelId:   $range->id,
             newValues: $range->toArray()
         );
 
@@ -86,10 +83,10 @@ class SalaryRangeController extends Controller
         $salaryRange->update($request->validated());
 
         AuditLog::record(
-            module: 'salary_range',
-            action: 'updated',
-            targetType: SalaryRange::class,
-            targetId: $salaryRange->id,
+            action:    'updated',
+            module:    'salary_range',
+            modelType: SalaryRange::class,
+            modelId:   $salaryRange->id,
             oldValues: $oldValues,
             newValues: $salaryRange->fresh()->toArray()
         );
@@ -103,11 +100,9 @@ class SalaryRangeController extends Controller
 
     /**
      * DELETE /api/v1/admin/salary-ranges/{salaryRange}
-     * Restrict: tidak dapat dihapus jika masih direferensi alumni.
      */
     public function destroy(SalaryRange $salaryRange): JsonResponse
     {
-        // Cek apakah masih dipakai di tabel alumni
         if ($salaryRange->alumni()->exists()) {
             return response()->json([
                 'success' => false,
@@ -116,13 +111,14 @@ class SalaryRangeController extends Controller
         }
 
         $oldValues = $salaryRange->toArray();
+        $srId      = $salaryRange->id;
         $salaryRange->delete();
 
         AuditLog::record(
-            module: 'salary_range',
-            action: 'deleted',
-            targetType: SalaryRange::class,
-            targetId: $salaryRange->id,
+            action:    'deleted',
+            module:    'salary_range',
+            modelType: SalaryRange::class,
+            modelId:   $srId,
             oldValues: $oldValues
         );
 

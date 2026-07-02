@@ -48,17 +48,17 @@ class FacultyController extends Controller
         $faculty = Faculty::create($request->validated());
 
         AuditLog::record(
-            module: 'faculty',
-            action: 'created',
-            targetType: Faculty::class,
-            targetId: $faculty->id,
+            action:    'created',
+            module:    'faculty',
+            modelType: Faculty::class,
+            modelId:   $faculty->id,
             newValues: $faculty->toArray()
         );
 
         return response()->json([
             'success' => true,
             'message' => 'Fakultas berhasil ditambahkan.',
-            'data'    => $faculty,
+            'data'    => $faculty->loadCount('studyPrograms'),
         ], 201);
     }
 
@@ -72,10 +72,10 @@ class FacultyController extends Controller
         $faculty->update($request->validated());
 
         AuditLog::record(
-            module: 'faculty',
-            action: 'updated',
-            targetType: Faculty::class,
-            targetId: $faculty->id,
+            action:    'updated',
+            module:    'faculty',
+            modelType: Faculty::class,
+            modelId:   $faculty->id,
             oldValues: $oldValues,
             newValues: $faculty->fresh()->toArray()
         );
@@ -83,13 +83,12 @@ class FacultyController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Fakultas berhasil diperbarui.',
-            'data'    => $faculty->fresh()->load('studyPrograms'),
+            'data'    => $faculty->fresh()->loadCount('studyPrograms')->load('studyPrograms'),
         ]);
     }
 
     /**
      * DELETE /api/v1/admin/faculties/{faculty}
-     * Restrict: tidak boleh dihapus jika masih ada prodi aktif.
      */
     public function destroy(Faculty $faculty): JsonResponse
     {
@@ -101,13 +100,14 @@ class FacultyController extends Controller
         }
 
         $oldValues = $faculty->toArray();
+        $facId     = $faculty->id;
         $faculty->delete();
 
         AuditLog::record(
-            module: 'faculty',
-            action: 'deleted',
-            targetType: Faculty::class,
-            targetId: $faculty->id,
+            action:    'deleted',
+            module:    'faculty',
+            modelType: Faculty::class,
+            modelId:   $facId,
             oldValues: $oldValues
         );
 

@@ -52,10 +52,10 @@ class GraduationYearController extends Controller
         $graduationYear = GraduationYear::create($request->validated());
 
         AuditLog::record(
-            module: 'graduation_year',
-            action: 'created',
-            targetType: GraduationYear::class,
-            targetId: $graduationYear->id,
+            action:    'created',
+            module:    'graduation_year',
+            modelType: GraduationYear::class,
+            modelId:   $graduationYear->id,
             newValues: $graduationYear->toArray()
         );
 
@@ -76,10 +76,10 @@ class GraduationYearController extends Controller
         $graduationYear->update($request->validated());
 
         AuditLog::record(
-            module: 'graduation_year',
-            action: 'updated',
-            targetType: GraduationYear::class,
-            targetId: $graduationYear->id,
+            action:    'updated',
+            module:    'graduation_year',
+            modelType: GraduationYear::class,
+            modelId:   $graduationYear->id,
             oldValues: $oldValues,
             newValues: $graduationYear->fresh()->toArray()
         );
@@ -104,13 +104,14 @@ class GraduationYearController extends Controller
         }
 
         $oldValues = $graduationYear->toArray();
+        $gyId      = $graduationYear->id;
         $graduationYear->delete();
 
         AuditLog::record(
-            module: 'graduation_year',
-            action: 'deleted',
-            targetType: GraduationYear::class,
-            targetId: $graduationYear->id,
+            action:    'deleted',
+            module:    'graduation_year',
+            modelType: GraduationYear::class,
+            modelId:   $gyId,
             oldValues: $oldValues
         );
 
