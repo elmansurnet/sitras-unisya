@@ -25,9 +25,9 @@ const filtered = computed(() => {
   return (employerStore.list ?? []).filter(
     (e) =>
       e.company_name?.toLowerCase().includes(q) ||
-      e.industry_sector?.name?.toLowerCase().includes(q) ||
-      e.city?.toLowerCase().includes(q) ||
-      e.pic_name?.toLowerCase().includes(q)
+      e.industry_sector?.toLowerCase().includes(q) ||
+      e.address_city?.toLowerCase().includes(q) ||
+      e.contact_person_name?.toLowerCase().includes(q)
   )
 })
 
@@ -41,7 +41,8 @@ async function handleDelete() {
   showDeleteModal.value = false
   deletingId.value = selectedId.value
   try {
-    await employerStore.remove(selectedId.value)
+    // FIX B4: method di store adalah 'destroy', bukan 'remove'
+    await employerStore.destroy(selectedId.value)
     toast.success(`Employer "${selectedName.value}" berhasil dihapus.`)
   } catch {
     toast.error('Gagal menghapus employer.')
@@ -80,7 +81,7 @@ async function handleDelete() {
           v-model="search"
           type="search"
           class="w-full rounded-lg border border-gray-300 py-2.5 pl-9 pr-3 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
-          placeholder="Cari perusahaan, sektor, kota, PIC..."
+          placeholder="Cari perusahaan, sektor, kota, contact person..."
         />
       </div>
     </div>
@@ -117,10 +118,12 @@ async function handleDelete() {
           <thead>
             <tr class="border-b border-gray-100 bg-gray-50 text-left">
               <th class="px-4 py-3 font-medium text-gray-600">Perusahaan</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Sektor</th>
+              <th class="px-4 py-3 font-medium text-gray-600">Tipe</th>
+              <th class="px-4 py-3 font-medium text-gray-600">Sektor Industri</th>
               <th class="px-4 py-3 font-medium text-gray-600">Kota</th>
-              <th class="px-4 py-3 font-medium text-gray-600">PIC</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Ukuran</th>
+              <th class="px-4 py-3 font-medium text-gray-600">Contact Person</th>
+              <th class="px-4 py-3 font-medium text-gray-600">Skala</th>
+              <th class="px-4 py-3 font-medium text-gray-600">Status Survei</th>
               <th class="px-4 py-3 font-medium text-gray-600 text-right">Aksi</th>
             </tr>
           </thead>
@@ -130,6 +133,7 @@ async function handleDelete() {
               :key="employer.id"
               class="hover:bg-gray-50 transition-colors"
             >
+              <!-- FIX B3: gunakan nama kolom aktual dari Employer model -->
               <td class="px-4 py-3">
                 <button
                   class="font-medium text-gray-900 hover:text-teal-700 text-left"
@@ -137,22 +141,46 @@ async function handleDelete() {
                 >
                   {{ employer.company_name }}
                 </button>
-                <p v-if="employer.website_url" class="text-xs text-gray-400 truncate max-w-[180px]">
-                  {{ employer.website_url }}
+                <p v-if="employer.website" class="text-xs text-gray-400 truncate max-w-[180px]">
+                  {{ employer.website }}
                 </p>
               </td>
+              <td class="px-4 py-3 text-gray-600 capitalize">
+                {{ employer.company_type ?? '—' }}
+              </td>
+              <!-- industry_sector adalah string biasa, BUKAN object -->
               <td class="px-4 py-3 text-gray-600">
-                {{ employer.industry_sector?.name ?? '—' }}
+                {{ employer.industry_sector ?? '—' }}
               </td>
               <td class="px-4 py-3 text-gray-600">
-                {{ employer.city ?? '—' }}
+                {{ employer.address_city ?? '—' }}
               </td>
               <td class="px-4 py-3">
-                <p class="text-gray-900">{{ employer.pic_name ?? '—' }}</p>
-                <p class="text-xs text-gray-400">{{ employer.pic_email ?? '' }}</p>
+                <p class="text-gray-900">{{ employer.contact_person_name ?? '—' }}</p>
+                <p class="text-xs text-gray-400">{{ employer.contact_person_email ?? '' }}</p>
               </td>
               <td class="px-4 py-3 text-gray-600 capitalize">
-                {{ employer.company_size ?? '—' }}
+                {{ employer.company_scale ?? '—' }}
+              </td>
+              <td class="px-4 py-3">
+                <span
+                  :class="[
+                    'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                    employer.survey_status === 'selesai'
+                      ? 'bg-teal-50 text-teal-700'
+                      : employer.survey_status === 'terkirim'
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'bg-gray-100 text-gray-500',
+                  ]"
+                >
+                  {{
+                    employer.survey_status === 'selesai'
+                      ? 'Selesai'
+                      : employer.survey_status === 'terkirim'
+                        ? 'Terkirim'
+                        : 'Belum Disurvei'
+                  }}
+                </span>
               </td>
               <td class="px-4 py-3">
                 <div class="flex items-center justify-end gap-1">
